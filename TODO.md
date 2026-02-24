@@ -166,32 +166,33 @@
 
 ---
 
-## Phase 8 — Settings Tab (Tab 3)
+## Phase 8 — Settings Tab (Tab 3) ✅
 
-- [ ] **8.1** Create `Views/SettingsTab.xaml`
-  - Layout: RadioButtons (Horizontal / Vertical / Grid)
-  - Thumbnail size: sliders or numeric inputs (width, height)
-  - Panel opacity: slider 70%-100%
-  - Panel position: X / Y inputs (or "remember last position" checkbox)
-  - Polling interval: slider 500ms-5000ms
-  - Global hotkey: TextBox + `[Record]` button
+- [x] **8.1** Create `Views/SettingsTab.xaml`
+  - Layout: RadioButtons via `LayoutRadioConverter` (Horizontal / Vertical / Grid)
+  - Thumbnail size: sliders with value display (width 100–500, height 75–400)
+  - Panel opacity: slider 30%–100% with percentage display
+  - Polling interval: slider 500ms–5000ms with ms display
   - Checkboxes: remember position, close to tray, auto-start
-  - LLM Analysis section: enabled checkbox, provider dropdown, endpoint, API key, model, stale threshold slider, Edit Prompt button
+  - Global hotkey: TextBox (text-editable, recording deferred to Phase 10)
+  - LLM Analysis: enabled checkbox, provider dropdown (openai/google/ollama), endpoint, API key, model, stale threshold slider, Edit Prompt button
   - `[Save Configuration]` button
-- [ ] **8.2** Create `ViewModels/SettingsViewModel.cs`
-  - Properties bound to config
-  - Commands: `Save`, `RecordHotkey`, `EditPrompt`
-- [ ] **8.3** Implement hotkey recording (keyboard capture in the TextBox)
-- [ ] **8.4** Apply changes live when relevant
-  - Layout change → rearrange thumbnails immediately
-  - Opacity change → apply immediately
-  - Polling interval change → restart the timer
-- [ ] **8.5** Implement `EditPrompt` — open `prompt.txt` in default text editor
-- [ ] **8.6** Create `Converters/BoolToVisibilityConverter.cs` and other necessary converters
-- [ ] **8.7** Write and run unit tests
-  - Test `SettingsViewModel` property bindings and save command
-  - Test converters (BoolToVisibility, etc.)
-  - `dotnet test` passes
+  - LLM section visibility toggled via `BoolToVisibilityConverter`
+- [x] **8.2** Create `ViewModels/SettingsViewModel.cs`
+  - All config properties with live-apply to PreviewViewModel (layout, thumbnail size, polling interval)
+  - Opacity change via callback to MainWindow
+  - Commands: `SaveCommand`, `EditPromptCommand`
+  - `Save()` writes all settings (including LLM) to config file
+  - `EditPrompt()` creates default `prompt.txt` if missing, opens in default editor
+- [x] **8.3** Hotkey text input (full keyboard recording deferred to Phase 10 HotkeyService)
+- [x] **8.4** Apply changes live: layout → PreviewViewModel, opacity → Window.Opacity callback, polling → PreviewViewModel, thumbnail size → PreviewViewModel
+- [x] **8.5** Implement `EditPrompt` — opens `prompt.txt` via `Process.Start` with `UseShellExecute`
+- [x] **8.6** Create converters: `BoolToVisibilityConverter`, `LayoutRadioConverter`
+- [x] **8.7** Write and run unit tests (25 tests)
+  - `SettingsViewModelTests`: constructor init, live-apply to preview, opacity callback, PropertyChanged (8 properties via Theory), save persistence, commands
+  - `BoolToVisibilityConverterTests`: true/false/null Convert, ConvertBack
+  - `LayoutRadioConverterTests`: matching/non-matching/case-insensitive Convert, ConvertBack true/false
+  - `dotnet test` passes (174 total)
 
 ---
 
@@ -358,7 +359,7 @@
 | 5     | Click-to-Switch ✅                  | 4          |
 | 6     | Applications Tab (Tab 2) ✅         | 1, 3, 7    |
 | 7     | Configuration & Persistence ✅      | 0          |
-| 8     | Settings Tab (Tab 3)                | 1, 7       |
+| 8     | Settings Tab (Tab 3) ✅             | 1, 7       |
 | 9     | Single Instance & System Tray       | 1, 7       |
 | 10    | Global Hotkey                       | 2, 9       |
 | 11    | Theme (Light / Dark)                | 1          |

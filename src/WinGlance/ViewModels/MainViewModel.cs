@@ -11,7 +11,7 @@ internal class MainViewModel : ViewModelBase
 {
     private int _selectedTabIndex;
 
-    public MainViewModel(ConfigService configService, AppConfig config)
+    public MainViewModel(ConfigService configService, AppConfig config, Action<double>? onOpacityChanged = null)
     {
         ConfigService = configService;
         Config = config;
@@ -29,6 +29,9 @@ internal class MainViewModel : ViewModelBase
 
         ApplicationsViewModel = new ApplicationsViewModel(
             configService, config, OnMonitoredAppsChanged);
+
+        SettingsViewModel = new SettingsViewModel(
+            configService, config, PreviewViewModel, onOpacityChanged);
     }
 
     /// <summary>Index of the currently selected tab (0=Preview, 1=Applications, 2=Settings).</summary>
@@ -43,6 +46,9 @@ internal class MainViewModel : ViewModelBase
 
     /// <summary>ViewModel for the Applications tab.</summary>
     public ApplicationsViewModel ApplicationsViewModel { get; }
+
+    /// <summary>ViewModel for the Settings tab.</summary>
+    public SettingsViewModel SettingsViewModel { get; }
 
     /// <summary>The configuration service for load/save operations.</summary>
     public ConfigService ConfigService { get; }

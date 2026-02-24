@@ -14,7 +14,7 @@ public partial class MainWindow : Window
     internal MainWindow(ConfigService configService, AppConfig config)
     {
         InitializeComponent();
-        _viewModel = new MainViewModel(configService, config);
+        _viewModel = new MainViewModel(configService, config, opacity => Opacity = opacity);
         DataContext = _viewModel;
 
         // Restore saved panel position
