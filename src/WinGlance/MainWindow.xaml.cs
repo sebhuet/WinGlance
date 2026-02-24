@@ -62,6 +62,10 @@ public partial class MainWindow : Window
         // Attention detection (shell hook for flashing)
         _attentionDetector.Initialize(hwnd);
         _viewModel.PreviewViewModel.AttentionDetector = _attentionDetector;
+
+        // LLM analysis service
+        if (_viewModel.Config.Llm.Enabled)
+            _viewModel.PreviewViewModel.LlmService = new LlmService(_viewModel.Config.Llm);
     }
 
     private void OnClosing(object? sender, System.ComponentModel.CancelEventArgs e)

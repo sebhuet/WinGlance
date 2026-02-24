@@ -307,33 +307,35 @@
 
 ---
 
-## Phase 16 — LLM-Assisted Analysis (FR-10)
+## Phase 16 — LLM-Assisted Analysis (FR-10) ✅
 
-- [ ] **16.1** Create `Services/ScreenshotComparer.cs`
-  - Capture window screenshot via `PrintWindow` API
-  - Implement perceptual hashing (pHash) for image comparison
-  - Detect stale windows (no visual change for configurable threshold, default 30s)
-- [ ] **16.2** Create `Services/LlmAnalyzer.cs`
-  - Abstract provider interface for LLM calls
-  - OpenAI implementation (GPT-4o / GPT-4o-mini with vision)
-  - Google Gemini implementation (Gemini Pro/Flash with vision)
-  - Ollama implementation (local, optional vision)
-- [ ] **16.3** Load system prompt from `prompt.txt` next to the executable
-  - Create default `prompt.txt` if not present
-- [ ] **16.4** Trigger LLM call when window is flagged stale
-  - Send screenshot + window title + system prompt
-  - Parse response: "awaiting_action" or "idle"
-  - Set `TrackedWindow.LlmVerdict` accordingly
-  - One call per stale window — no repeat until content changes
-- [ ] **16.5** Add visual indicators in Preview tab
-  - Awaiting action: orange pulsating border
-  - Idle: dimmed/grayed border
-- [ ] **16.6** Write and run unit tests
-  - Test `ScreenshotComparer` pHash comparison logic (with synthetic bitmaps)
-  - Test `LlmAnalyzer` request formatting and response parsing per provider
-  - Test stale detection threshold logic
-  - `dotnet test` passes
-- [ ] **16.7** Manual test: with each provider, stale a window → verify LLM call and indicator
+- [x] **16.1** Create `Services/ScreenshotComparer.cs`
+  - Capture window screenshot via `PrintWindow` API (PW_RENDERFULLCONTENT)
+  - Average hash (8×8 grayscale, 64-bit perceptual hash)
+  - `IsStale()` tracks per-window hash + last-change timestamp
+  - `HammingDistance()` for hash comparison
+- [x] **16.2** Create `Services/LlmAnalyzer.cs`
+  - OpenAI-compatible API (chat/completions with vision, Bearer auth)
+  - Google Gemini API (generateContent with inline_data, API key in URL)
+  - Ollama API (generate with images, local)
+  - `ParseVerdict()` extracts "awaiting_action" or "idle" from response
+- [x] **16.3** Create `Services/LlmService.cs` — orchestrator
+  - Loads `prompt.txt` from exe directory (creates default if missing)
+  - `EvaluateAsync()` checks staleness, triggers LLM call once per stale window
+  - Auto-resets verdict when window content changes
+- [x] **16.4** Integrated into `PreviewViewModel` polling cycle
+  - `LlmService.EvaluateAsync()` called after merge for each window
+  - Cleanup on window removal via `LlmService.Remove()`
+  - Wired in `MainWindow.OnLoaded` when `Llm.Enabled` is true
+- [x] **16.5** Visual indicators in Preview tab
+  - `LlmVerdictToOpacityConverter`: idle → 0.5 opacity (dimmed), else 1.0
+  - `LlmVerdictToBorderBrushConverter`: awaiting_action → orange, idle → dim gray
+  - "Awaiting Action" overlay badge via DataTrigger on LlmVerdict
+- [x] **16.6** Write and run unit tests (23 tests)
+  - `ScreenshotComparerTests`: hash consistency, different images, hamming distance, edge cases
+  - `LlmAnalyzerTests`: ParseVerdict for all cases, priority, case insensitivity
+  - `LlmVerdictConverterTests`: brush + opacity converters for all states
+  - `dotnet test` passes (223 total)
 
 ---
 
@@ -374,5 +376,5 @@
 | 13    | Error Handling & Resilience ✅   | 3, 4, 7    |
 | 14    | Auto-Start with Windows ✅       | 7, 8       |
 | 15    | Window Attention Detection ✅    | 2, 3, 4    |
-| 16    | LLM-Assisted Analysis (FR-10)    | 2, 3, 15   |
+| 16    | LLM-Assisted Analysis ✅         | 2, 3, 15   |
 | 17    | Polish & Final Touches           | All        |

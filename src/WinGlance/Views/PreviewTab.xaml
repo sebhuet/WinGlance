@@ -12,6 +12,7 @@
         <converters:LayoutToPanelConverter x:Key="LayoutToPanelConverter" />
         <converters:WindowStateToBorderBrushConverter x:Key="StateBorderConverter" />
         <converters:BoolToVisibilityConverter x:Key="BoolToVisibility" />
+        <converters:LlmVerdictToOpacityConverter x:Key="LlmVerdictToOpacity" />
 
         <!-- Group header: app icon + app name -->
         <DataTemplate x:Key="GroupHeaderTemplate">
@@ -56,7 +57,8 @@
                             BorderThickness="2"
                             Background="#33000000"
                             ToolTip="{Binding Title}"
-                            Cursor="Hand">
+                            Cursor="Hand"
+                            Opacity="{Binding LlmVerdict, Converter={StaticResource LlmVerdictToOpacity}}">
                         <!-- Multi-value border: IsActive, IsFlashing, IsHung, IsModalBlocked -->
                         <Border.BorderBrush>
                             <MultiBinding Converter="{StaticResource StateBorderConverter}">
@@ -98,6 +100,29 @@
                                     Margin="0,4,0,0"
                                     Padding="6,2">
                                 <TextBlock Text="Not Responding"
+                                           Foreground="White"
+                                           FontSize="10"
+                                           FontWeight="Bold" />
+                            </Border>
+
+                            <!-- Awaiting Action overlay (LLM verdict) -->
+                            <Border Background="#CCFFA500"
+                                    CornerRadius="3"
+                                    VerticalAlignment="Bottom"
+                                    HorizontalAlignment="Center"
+                                    Margin="0,0,0,20"
+                                    Padding="6,2">
+                                <Border.Style>
+                                    <Style TargetType="Border">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding LlmVerdict}" Value="awaiting_action">
+                                                <Setter Property="Visibility" Value="Visible" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Border.Style>
+                                <TextBlock Text="Awaiting Action"
                                            Foreground="White"
                                            FontSize="10"
                                            FontWeight="Bold" />

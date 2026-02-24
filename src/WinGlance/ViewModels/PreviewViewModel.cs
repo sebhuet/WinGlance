@@ -69,6 +69,11 @@ internal sealed class PreviewViewModel : ViewModelBase, IDisposable
     public AttentionDetector? AttentionDetector { get; set; }
 
     /// <summary>
+    /// Optional LLM service for stale window analysis. Set by MainWindow after config load.
+    /// </summary>
+    public LlmService? LlmService { get; set; }
+
+    /// <summary>
     /// Layout mode: "horizontal", "vertical", or "grid".
     /// </summary>
     public string Layout
@@ -144,6 +149,7 @@ internal sealed class PreviewViewModel : ViewModelBase, IDisposable
     {
         _timer.Stop();
         _thumbnailManager.Dispose();
+        LlmService?.Dispose();
     }
 
     // ── Click-to-switch ────────────────────────────────────────────────
@@ -186,6 +192,20 @@ internal sealed class PreviewViewModel : ViewModelBase, IDisposable
     private async void OnTimerTick(object? sender, EventArgs e)
     {
         await Task.Run(Poll);
+
+        // LLM evaluation runs after merge, on background thread
+        if (LlmService is not null)
+        {
+            TrackedWindow[] snapshot;
+            lock (_lock)
+            {
+                snapshot = [.. _windows];
+            }
+            foreach (var w in snapshot)
+            {
+                await LlmService.EvaluateAsync(w);
+            }
+        }
     }
 
     private void Poll()
@@ -213,6 +233,7 @@ internal sealed class PreviewViewModel : ViewModelBase, IDisposable
                 if (!scannedByHwnd.ContainsKey(_windows[i].Hwnd))
                 {
                     _thumbnailManager.Unregister(_windows[i].Hwnd);
+                    LlmService?.Remove(_windows[i].Hwnd);
                     _windows.RemoveAt(i);
                 }
             }
