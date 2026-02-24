@@ -57,28 +57,27 @@
 
 ---
 
-## Phase 3 — Window Enumeration
+## Phase 3 — Window Enumeration ✅
 
-- [ ] **3.1** Create `Models/TrackedWindow.cs`
+- [x] **3.1** Create `Models/TrackedWindow.cs`
   - Properties: `IntPtr Hwnd`, `string Title`, `string ProcessName`, `string DisplayName`, `ImageSource Icon`, `bool IsActive`
   - Attention properties: `bool IsFlashing`, `bool IsHung`, `bool IsModalBlocked`
   - LLM properties: `bool IsStale`, `string LlmVerdict` (awaiting_action / idle / null)
-- [ ] **3.2** Create `Models/MonitoredApp.cs`
+- [x] **3.2** Create `Models/MonitoredApp.cs`
   - Properties: `string ProcessName`, `string DisplayName`
-- [ ] **3.3** Create `Services/WindowEnumerator.cs`
-  - Method `List<TrackedWindow> GetWindows(IEnumerable<string> processNames)`
+- [x] **3.3** Create `Services/WindowEnumerator.cs`
+  - Method `List<TrackedWindow> GetWindows(IEnumerable<MonitoredApp> monitoredApps)`
   - Filtering: visible windows, with title, no tool/ghost windows
-  - UWP resolution (`ApplicationFrameHost.exe` → real app name)
-- [ ] **3.4** Extract application icons (`WM_GETICON` / `GetClassLongPtr`)
-- [ ] **3.5** Implement periodic polling in `PreviewViewModel`
-  - Configurable `DispatcherTimer` (default 1000 ms)
-  - Diff between current state and new scan → add/remove
-  - Run scan on background thread, update UI via Dispatcher
-- [ ] **3.6** Detect the active window (`GetForegroundWindow`) for highlight
-- [ ] **3.7** Write and run unit tests
-  - Test `TrackedWindow` / `MonitoredApp` model properties and equality
-  - Test `WindowEnumerator` filtering logic (mock-friendly interface)
-  - `dotnet test` passes
+  - UWP resolution (`ApplicationFrameHost.exe` → real app name via AUMID)
+  - `DiscoverRunningApps()` for Applications tab discovery
+- [x] **3.4** Extract application icons (`WM_GETICON` cascade + `GetClassLongPtr` fallback)
+- [x] **3.5** Implement periodic polling in `PreviewViewModel`
+  - Configurable `DispatcherTimer` (default 1000 ms, 500–5000 ms range)
+  - Diff-merge between current state and new scan → add/remove/update
+  - Run scan on background thread, update UI via `EnableCollectionSynchronization`
+- [x] **3.6** Detect the active window (`GetForegroundWindow`) for highlight
+- [x] **3.7** Write and run unit tests (21 new tests — models, enumerator, AUMID parsing)
+  - `dotnet test` passes (42 total)
 
 ---
 
@@ -348,7 +347,7 @@
 | 0     | Scaffolding & Infrastructure ✅     | —          |
 | 1     | Main Window (Shell) ✅              | 0          |
 | 2     | Native Layer (P/Invoke) ✅          | 0          |
-| 3     | Window Enumeration                  | 2          |
+| 3     | Window Enumeration ✅               | 2          |
 | 4     | DWM Thumbnails (Preview Tab)        | 1, 2, 3    |
 | 5     | Click-to-Switch                     | 4          |
 | 6     | Applications Tab (Tab 2)            | 1, 3, 7    |
