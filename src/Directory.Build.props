@@ -1,0 +1,7 @@
+<Project>
+  <!-- Redirect build artifacts to a local path to avoid Google Drive file locking issues -->
+  <PropertyGroup>
+    <BaseIntermediateOutputPath>$(TEMP)\WinGlance\$(MSBuildProjectName)\obj\</BaseIntermediateOutputPath>
+    <BaseOutputPath>$(TEMP)\WinGlance\$(MSBuildProjectName)\bin\</BaseOutputPath>
+  </PropertyGroup>
+</Project>

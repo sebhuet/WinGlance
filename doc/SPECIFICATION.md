@@ -61,6 +61,14 @@ The panel has **3 tabs**:
 - **Auto-start with Windows**: checkbox
 - **Close button action**: checkbox — minimize to tray (default) or exit
 - **Global hotkey**: key combination input with **Record** button (default: Ctrl+Alt+G)
+- **LLM Analysis** section:
+  - **Enabled**: checkbox (default: off)
+  - **Provider**: dropdown — OpenAI / Gemini / Ollama
+  - **API endpoint**: text field (pre-filled per provider)
+  - **API key**: password field
+  - **Model**: text field
+  - **Stale threshold**: slider (10s–120s, default: 30s)
+  - **Edit prompt**: button to open `prompt.txt`
 - **Save** button to persist all settings
 
 ### FR-6: Panel Behavior
@@ -87,6 +95,54 @@ The panel has **3 tabs**:
 - If a **monitored process crashes** or a window handle becomes invalid, remove the corresponding thumbnail silently without crashing
 - If `SetForegroundWindow` fails (Windows **focus-stealing prevention**), use `AllowSetForegroundWindow` or the `Alt` key simulation workaround
 - If `config.json` is **corrupt or unreadable**, fall back to default settings and log a warning
+
+### FR-9: Window Attention Detection
+
+- Detect when a monitored window **requires user attention** and display a visual indicator on its thumbnail (pulsating border, attention icon)
+- Three detection mechanisms:
+  - **Flashing window**: use `RegisterShellHookWindow` to receive `HSHELL_FLASH` notifications when a window starts flashing in the taskbar (e.g., file transfer complete, message received)
+  - **Not responding**: use `IsHungAppWindow` to detect windows that have stopped processing messages — display a "(Not Responding)" overlay on the thumbnail
+  - **Modal dialog**: use `IsWindowEnabled` to detect when a main window is blocked by a modal dialog (e.g., "Save changes?"), and `GetWindow(GW_ENABLEDPOPUP)` to identify the popup
+- The attention indicator must clear automatically when the condition resolves (flash stops, app resumes, dialog is dismissed)
+
+### FR-10: LLM-Assisted Analysis
+
+Extends FR-9 with intelligent window analysis via an external LLM.
+
+#### Inactivity Detection (graphical diff)
+
+- Periodically capture a screenshot of each monitored window (via `PrintWindow` API)
+- Compare with the previous capture using **perceptual hashing** (pHash) to detect visual changes
+- If a window's content has **not changed for more than 30 seconds**, it is flagged as **stale**
+
+#### LLM Analysis Trigger
+
+- When a window is flagged as stale, a **single LLM call** is made with:
+  - The window **screenshot** (if the model supports vision) or a description of the window title/state
+  - The window **title**
+  - A **system prompt** loaded from a dedicated file (`prompt.txt` next to the executable)
+- The LLM determines whether the window:
+  - **Awaits user action** (dialog, error, confirmation, input field) → highlight thumbnail with **attention indicator** (orange pulsating border)
+  - **Is simply idle** (nothing happening, no action needed) → highlight thumbnail with **idle indicator** (dimmed/grayed border)
+- Only **one LLM call per stale window** — not repeated until the window content changes again
+
+#### Supported LLM Providers
+
+- **OpenAI** — API-compatible (GPT-4o, GPT-4o-mini with vision)
+- **Google Gemini** — API-compatible (Gemini Pro/Flash with vision)
+- **Ollama** (local) — for privacy-conscious users, local models with optional vision support
+- Provider, endpoint, API key, and model name are configurable in Tab 3 — Settings
+- The prompt is stored in a separate editable file: `prompt.txt` (not in `config.json`)
+
+#### Configuration (Tab 3 — Settings)
+
+- **LLM enabled**: checkbox (default: disabled)
+- **Provider**: dropdown — OpenAI / Gemini / Ollama
+- **API endpoint**: text field (pre-filled with default for each provider; editable for Ollama custom URL)
+- **API key**: password field (not needed for Ollama)
+- **Model**: text field (e.g., `gpt-4o-mini`, `gemini-2.0-flash`, `llava`)
+- **Stale threshold**: slider (10s–120s, default: 30s)
+- **Edit prompt**: button that opens `prompt.txt` in the default text editor
 
 ---
 
@@ -136,23 +192,28 @@ The panel has **3 tabs**:
 
 ### Core Windows APIs (P/Invoke)
 
-| API                                           | Purpose                                                  |
-| --------------------------------------------- | -------------------------------------------------------- |
-| `EnumWindows`                                 | Enumerate all top-level windows                          |
-| `GetWindowThreadProcessId`                    | Map window handles to process IDs                        |
-| `IsWindowVisible`                             | Filter invisible/hidden windows                          |
-| `GetWindowText`                               | Retrieve window titles                                   |
-| `DwmRegisterThumbnail`                        | Register a live DWM thumbnail relationship               |
-| `DwmUpdateThumbnailProperties`                | Set thumbnail region, size, opacity                      |
-| `DwmUnregisterThumbnail`                      | Clean up when a source window closes                     |
-| `SetForegroundWindow`                         | Bring clicked window to front                            |
-| `ShowWindow` / `IsIconic`                     | Restore minimized windows                                |
-| `GetWindowPlacement`                          | Get window state (minimized, maximized, normal)          |
-| `GetClassLongPtr` / `SendMessage(WM_GETICON)` | Retrieve application icon                                |
-| `RegisterHotKey` / `UnregisterHotKey`         | Register/unregister global keyboard shortcut             |
-| `GetApplicationUserModelId`                   | Resolve UWP app identity from `ApplicationFrameHost.exe` |
-| `DwmIsCompositionEnabled`                     | Check if DWM is enabled at startup                       |
-| `AllowSetForegroundWindow`                    | Workaround for focus-stealing prevention                 |
+| API                                           | Purpose                                                       |
+| --------------------------------------------- | ------------------------------------------------------------- |
+| `EnumWindows`                                 | Enumerate all top-level windows                               |
+| `GetWindowThreadProcessId`                    | Map window handles to process IDs                             |
+| `IsWindowVisible`                             | Filter invisible/hidden windows                               |
+| `GetWindowText`                               | Retrieve window titles                                        |
+| `DwmRegisterThumbnail`                        | Register a live DWM thumbnail relationship                    |
+| `DwmUpdateThumbnailProperties`                | Set thumbnail region, size, opacity                           |
+| `DwmUnregisterThumbnail`                      | Clean up when a source window closes                          |
+| `SetForegroundWindow`                         | Bring clicked window to front                                 |
+| `ShowWindow` / `IsIconic`                     | Restore minimized windows                                     |
+| `GetWindowPlacement`                          | Get window state (minimized, maximized, normal)               |
+| `GetClassLongPtr` / `SendMessage(WM_GETICON)` | Retrieve application icon                                     |
+| `RegisterHotKey` / `UnregisterHotKey`         | Register/unregister global keyboard shortcut                  |
+| `GetApplicationUserModelId`                   | Resolve UWP app identity from `ApplicationFrameHost.exe`      |
+| `DwmIsCompositionEnabled`                     | Check if DWM is enabled at startup                            |
+| `AllowSetForegroundWindow`                    | Workaround for focus-stealing prevention                      |
+| `RegisterShellHookWindow`                     | Receive shell notifications (window flash events)             |
+| `IsHungAppWindow`                             | Detect windows that stopped responding                        |
+| `IsWindowEnabled`                             | Detect windows blocked by a modal dialog                      |
+| `GetWindow(GW_ENABLEDPOPUP)`                  | Find the modal popup blocking a disabled window               |
+| `PrintWindow`                                 | Capture window content as bitmap (for graphical diff and LLM) |
 
 ### Application Structure
 
@@ -169,6 +230,9 @@ WinGlance/
 ├── Services/
 │   ├── WindowEnumerator.cs         # EnumWindows + process filtering
 │   ├── ThumbnailManager.cs         # DWM thumbnail registration & lifecycle
+│   ├── AttentionDetector.cs        # Shell hook + IsHungAppWindow + modal detection
+│   ├── ScreenshotComparer.cs       # PrintWindow capture + perceptual hash diff
+│   ├── LlmAnalyzer.cs             # LLM API calls (OpenAI, Gemini, Ollama)
 │   └── ConfigService.cs            # Load/save config.json
 ├── NativeApi/
 │   └── NativeMethods.cs            # All P/Invoke declarations (DWM, User32)
@@ -183,8 +247,9 @@ WinGlance/
 │   └── SettingsViewModel.cs        # Bindable settings properties
 ├── Converters/
 │   └── BoolToVisibilityConverter.cs
-└── Assets/
-    └── icon.ico                    # App + system tray icon
+├── Assets/
+│   └── icon.ico                    # App + system tray icon
+└── prompt.txt                      # LLM system prompt (editable by user)
 ```
 
 ### Key Implementation Details
@@ -208,6 +273,12 @@ WinGlance/
 9. **Global Hotkey**: On startup, `RegisterHotKey` registers the configured shortcut. A WndProc handler listens for `WM_HOTKEY` to toggle panel visibility. `UnregisterHotKey` is called on exit.
 
 10. **Theme Detection**: The app reads `HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\Themes\Personalize\AppsUseLightTheme` and applies a matching WPF resource dictionary. A `SystemEvents.UserPreferenceChanged` handler detects live theme changes.
+
+11. **Attention Detection**: `AttentionDetector` uses three mechanisms: (a) `RegisterShellHookWindow` to receive `HSHELL_FLASH` when a window starts flashing, (b) `IsHungAppWindow` polled alongside window enumeration to detect hung apps, (c) `IsWindowEnabled` checked each cycle to detect modal-blocked windows. Detected states are exposed as properties on `TrackedWindow` and bound to visual indicators (pulsating border, overlay) in the Preview tab.
+
+12. **Graphical Diff (Stale Detection)**: `ScreenshotComparer` captures each window via `PrintWindow` at the polling interval, computes a perceptual hash (pHash), and compares with the previous capture. If the hash is identical for longer than the configured stale threshold (default 30s), the window is marked as stale and triggers LLM analysis.
+
+13. **LLM Analysis**: `LlmAnalyzer` provides a unified interface for OpenAI, Gemini, and Ollama APIs. When a stale window is detected: (a) the latest screenshot is encoded as base64, (b) the system prompt is loaded from `prompt.txt`, (c) a single API call is made with the screenshot + window title, (d) the response is parsed to classify the window as "awaiting action" or "idle", (e) the result is set on `TrackedWindow.LlmState` and bound to the appropriate visual indicator. No further calls are made until the window content changes again.
 
 ---
 
@@ -275,6 +346,15 @@ WinGlance/
 │  [✓] Close button minimizes to tray                              │
 │  [ ] Auto-start with Windows                                     │
 │                                                                  │
+│  ── LLM Analysis ────────────────────────────────────────────    │
+│  [ ] Enable LLM analysis                                         │
+│  Provider:       [OpenAI     ▾]                                  │
+│  API endpoint:   [https://api.openai.com/v1      ]               │
+│  API key:        [••••••••••••••••                ]               │
+│  Model:          [gpt-4o-mini                     ]               │
+│  Stale threshold: [═══●═════] 30s                                │
+│                                          [Edit prompt.txt]       │
+│                                                                  │
 │                                              [Save Configuration]│
 └──────────────────────────────────────────────────────────────────┘
 ```
@@ -299,7 +379,15 @@ WinGlance/
   "panelY": 100,
   "autoStart": false,
   "closeToTray": true,
-  "hotkey": "Ctrl+Alt+G"
+  "hotkey": "Ctrl+Alt+G",
+  "llm": {
+    "enabled": false,
+    "provider": "openai",
+    "endpoint": "https://api.openai.com/v1",
+    "apiKey": "",
+    "model": "gpt-4o-mini",
+    "staleThresholdSeconds": 30
+  }
 }
 ```
 
@@ -338,6 +426,15 @@ Output: single `WinGlance.exe` (~30-60 MB self-contained)
 16. **DWM disabled**: In a remote desktop session (DWM disabled), launch WinGlance — verify graceful error message
 17. **Theme**: Switch Windows to dark mode — verify WinGlance UI adapts. Switch back to light mode — verify it adapts again
 18. **DPI scaling**: On a multi-monitor setup with different DPI, move the panel between monitors — verify correct sizing and positioning
+19. **Attention — flash**: Trigger a window flash (e.g., a background app requesting focus) — verify the thumbnail shows a pulsating attention indicator
+20. **Attention — not responding**: Force-hang a test app — verify its thumbnail shows a "(Not Responding)" overlay
+21. **Attention — modal dialog**: Open a "Save As" dialog in a monitored app — verify the thumbnail indicates the window is blocked by a modal
+22. **Stale detection**: Leave a monitored window untouched for >30s — verify the thumbnail is flagged as stale (dimmed border)
+23. **LLM — awaiting action**: Configure an LLM provider, open a dialog in a monitored window, wait 30s — verify LLM identifies it as awaiting action (orange indicator)
+24. **LLM — idle**: Configure an LLM provider, leave a static window (e.g., a text file) untouched — verify LLM classifies it as idle (dimmed indicator)
+25. **LLM — single call**: Verify that only one LLM call is made per stale window — no repeated calls until the window content changes
+26. **LLM — Ollama local**: Configure Ollama as provider with a local model — verify analysis works without an API key
+27. **Prompt file**: Edit `prompt.txt`, trigger a new analysis — verify the updated prompt is used
 
 ---
 
