@@ -70,6 +70,22 @@ public partial class MainWindow : Window
             var llmService = new LlmService(_viewModel.Config.Llm);
             llmService.DebugLogger = _viewModel.PromptEditorViewModel;
             _viewModel.PreviewViewModel.LlmService = llmService;
+
+            // Wire "Run" button in Prompt Editor
+            _viewModel.PromptEditorViewModel.RunAnalysisFunc = async () =>
+            {
+                llmService.ReloadPrompt(_viewModel.PromptEditorViewModel.PromptText);
+                var windows = _viewModel.PreviewViewModel.Windows.ToArray();
+                if (windows.Length == 0)
+                {
+                    _viewModel.PromptEditorViewModel.AppendLog("—", "—", "No monitored windows found");
+                    return;
+                }
+                foreach (var w in windows)
+                {
+                    await llmService.ForceEvaluateAsync(w);
+                }
+            };
         }
 
         // Allow settings to navigate to prompt editor
@@ -154,9 +170,9 @@ public partial class MainWindow : Window
             _viewModel.PreviewViewModel.ThumbnailManager.UnregisterAll();
         }
 
-        // Re-measure so the window auto-sizes to the new content
-        InvalidateMeasure();
-        UpdateLayout();
+        // Force SizeToContent recalculation (WPF resets it to Manual after user resize)
+        SizeToContent = SizeToContent.Manual;
+        SizeToContent = SizeToContent.WidthAndHeight;
     }
 
     // ── Right-click context menu ──────────────────────────────────

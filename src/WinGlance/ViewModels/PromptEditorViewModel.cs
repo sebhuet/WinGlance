@@ -15,6 +15,7 @@ internal sealed class PromptEditorViewModel : ViewModelBase
     private readonly AppConfig _config;
     private string _promptText;
     private bool _isDebugEnabled;
+    private bool _isRunning;
 
     public PromptEditorViewModel(ConfigService configService, AppConfig config)
     {
@@ -26,6 +27,7 @@ internal sealed class PromptEditorViewModel : ViewModelBase
         SaveCommand = new RelayCommand(_ => Save());
         ResetToDefaultCommand = new RelayCommand(_ => ResetToDefault());
         ClearLogCommand = new RelayCommand(_ => DebugLog.Clear());
+        RunAnalysisCommand = new RelayCommand(async _ => await RunAnalysis(), _ => !IsRunning);
     }
 
     /// <summary>The editable system prompt text sent to the LLM.</summary>
@@ -51,9 +53,23 @@ internal sealed class PromptEditorViewModel : ViewModelBase
     /// <summary>Live debug log entries showing LLM analysis reasoning.</summary>
     public ObservableCollection<string> DebugLog { get; } = [];
 
+    /// <summary>True while a manual "Run" analysis is in progress.</summary>
+    public bool IsRunning
+    {
+        get => _isRunning;
+        private set => SetProperty(ref _isRunning, value);
+    }
+
+    /// <summary>
+    /// Callback that executes a forced LLM analysis on all tracked windows.
+    /// Set by MainWindow after LLM service initialization.
+    /// </summary>
+    public Func<Task>? RunAnalysisFunc { get; set; }
+
     public ICommand SaveCommand { get; }
     public ICommand ResetToDefaultCommand { get; }
     public ICommand ClearLogCommand { get; }
+    public ICommand RunAnalysisCommand { get; }
 
     /// <summary>
     /// Appends a debug log entry. Called by the LLM service when debug mode is on.
@@ -92,7 +108,7 @@ internal sealed class PromptEditorViewModel : ViewModelBase
             DebugLog.RemoveAt(0);
     }
 
-    private void Save()
+    internal void Save()
     {
         _config.Llm.Prompt = PromptText;
         _config.Llm.DebugEnabled = IsDebugEnabled;
@@ -102,5 +118,28 @@ internal sealed class PromptEditorViewModel : ViewModelBase
     private void ResetToDefault()
     {
         PromptText = LlmConfig.DefaultPrompt;
+    }
+
+    private async Task RunAnalysis()
+    {
+        if (RunAnalysisFunc is null)
+        {
+            AppendLog("—", "—", "Enable LLM analysis in Settings first");
+            return;
+        }
+
+        // Auto-enable debug log so the user sees results
+        IsDebugEnabled = true;
+        Save();
+
+        IsRunning = true;
+        try
+        {
+            await RunAnalysisFunc();
+        }
+        finally
+        {
+            IsRunning = false;
+        }
     }
 }

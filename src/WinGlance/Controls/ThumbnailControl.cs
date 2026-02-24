@@ -49,6 +49,7 @@ internal sealed class ThumbnailControl : FrameworkElement
         Loaded += OnLoaded;
         Unloaded += OnUnloaded;
         SizeChanged += OnSizeChanged;
+        IsVisibleChanged += OnIsVisibleChanged;
     }
 
     private void OnLoaded(object sender, RoutedEventArgs e)
@@ -65,6 +66,22 @@ internal sealed class ThumbnailControl : FrameworkElement
     private void OnSizeChanged(object sender, SizeChangedEventArgs e)
     {
         UpdateThumbnail();
+    }
+
+    private void OnIsVisibleChanged(object sender, DependencyPropertyChangedEventArgs e)
+    {
+        if ((bool)e.NewValue && IsLoaded)
+        {
+            // Re-register after becoming visible (e.g., returning to Preview tab).
+            // The manager may have called UnregisterAll() while we were hidden.
+            _thumbnailId = IntPtr.Zero;
+            RegisterAndUpdate();
+        }
+        else if (!(bool)e.NewValue)
+        {
+            // Clear stale handle — the manager may unregister all while we're invisible.
+            _thumbnailId = IntPtr.Zero;
+        }
     }
 
     protected override void OnRender(DrawingContext drawingContext)

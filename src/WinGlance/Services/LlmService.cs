@@ -99,6 +99,38 @@ internal sealed class LlmService : IDisposable
     }
 
     /// <summary>
+    /// Forces a single LLM analysis on a window, bypassing staleness and pending checks.
+    /// Used by the "Run" button in the Prompt Editor for manual testing.
+    /// </summary>
+    public async Task ForceEvaluateAsync(TrackedWindow window)
+    {
+        if (_analyzer is null)
+            return;
+
+        try
+        {
+            var screenshot = CaptureWindow(window.Hwnd);
+            if (screenshot is null)
+            {
+                DebugLogger?.AppendLog(window.Title, "—", "Could not capture screenshot");
+                return;
+            }
+
+            var (verdict, reason) = await _analyzer.AnalyzeWithReasonAsync(screenshot, window.Title);
+            screenshot.Dispose();
+
+            var finalVerdict = verdict ?? "idle";
+            window.LlmVerdict = finalVerdict;
+            DebugLogger?.AppendLog(window.Title, finalVerdict, reason);
+        }
+        catch (Exception ex)
+        {
+            window.LlmVerdict = "idle";
+            DebugLogger?.AppendLog(window.Title, "idle", $"Error: {ex.Message}");
+        }
+    }
+
+    /// <summary>
     /// Removes tracking state for a window that is no longer monitored.
     /// </summary>
     public void Remove(IntPtr hwnd)
