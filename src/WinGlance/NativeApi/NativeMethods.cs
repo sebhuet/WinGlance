@@ -35,6 +35,11 @@ internal static partial class NativeMethods
 
     public const uint PROCESS_QUERY_LIMITED_INFORMATION = 0x1000;
 
+    // SendInput constants
+    public const uint INPUT_KEYBOARD = 1;
+    public const ushort VK_MENU = 0x12; // Alt key
+    public const uint KEYEVENTF_KEYUP = 0x0002;
+
     // ── Structures ────────────────────────────────────────────────────
 
     [StructLayout(LayoutKind.Sequential)]
@@ -80,6 +85,34 @@ internal static partial class NativeMethods
         public byte Opacity;
         public int Visible;
         public int SourceClientAreaOnly;
+    }
+
+    // ── SendInput structures ────────────────────────────────────────────
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct INPUT
+    {
+        public uint Type;
+        public InputUnion Union;
+
+        public static int Size => Marshal.SizeOf<INPUT>();
+    }
+
+    [StructLayout(LayoutKind.Explicit)]
+    public struct InputUnion
+    {
+        [FieldOffset(0)]
+        public KEYBDINPUT Keyboard;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct KEYBDINPUT
+    {
+        public ushort VirtualKey;
+        public ushort ScanCode;
+        public uint Flags;
+        public uint Time;
+        public IntPtr ExtraInfo;
     }
 
     // ── Delegates ─────────────────────────────────────────────────────
@@ -144,6 +177,9 @@ internal static partial class NativeMethods
 
     [DllImport("user32.dll")]
     public static extern bool PrintWindow(IntPtr hWnd, IntPtr hDC, uint nFlags);
+
+    [DllImport("user32.dll")]
+    public static extern uint SendInput(uint nInputs, INPUT[] pInputs, int cbSize);
 
     // ── Shell Hook ────────────────────────────────────────────────────
 

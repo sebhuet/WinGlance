@@ -1,3 +1,6 @@
+using WinGlance.Models;
+using WinGlance.Services;
+
 namespace WinGlance.ViewModels;
 
 /// <summary>
@@ -8,9 +11,24 @@ internal class MainViewModel : ViewModelBase
 {
     private int _selectedTabIndex;
 
-    public MainViewModel()
+    public MainViewModel(ConfigService configService, AppConfig config)
     {
-        PreviewViewModel = new PreviewViewModel();
+        ConfigService = configService;
+        Config = config;
+
+        PreviewViewModel = new PreviewViewModel
+        {
+            Layout = config.Layout,
+            ThumbnailWidth = config.ThumbnailWidth,
+            ThumbnailHeight = config.ThumbnailHeight,
+            PollingIntervalMs = config.PollingIntervalMs,
+            MonitoredApps = config.MonitoredApps
+                .Select(a => new MonitoredApp(a.ProcessName, a.DisplayName))
+                .ToList(),
+        };
+
+        ApplicationsViewModel = new ApplicationsViewModel(
+            configService, config, OnMonitoredAppsChanged);
     }
 
     /// <summary>Index of the currently selected tab (0=Preview, 1=Applications, 2=Settings).</summary>
@@ -22,4 +40,18 @@ internal class MainViewModel : ViewModelBase
 
     /// <summary>ViewModel for the Preview tab.</summary>
     public PreviewViewModel PreviewViewModel { get; }
+
+    /// <summary>ViewModel for the Applications tab.</summary>
+    public ApplicationsViewModel ApplicationsViewModel { get; }
+
+    /// <summary>The configuration service for load/save operations.</summary>
+    public ConfigService ConfigService { get; }
+
+    /// <summary>The current in-memory configuration.</summary>
+    public AppConfig Config { get; }
+
+    private void OnMonitoredAppsChanged(IReadOnlyList<MonitoredApp> apps)
+    {
+        PreviewViewModel.MonitoredApps = apps;
+    }
 }

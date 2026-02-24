@@ -1,6 +1,8 @@
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Interop;
+using WinGlance.Models;
+using WinGlance.Services;
 using WinGlance.ViewModels;
 
 namespace WinGlance;
@@ -9,11 +11,20 @@ public partial class MainWindow : Window
 {
     private readonly MainViewModel _viewModel;
 
-    public MainWindow()
+    internal MainWindow(ConfigService configService, AppConfig config)
     {
         InitializeComponent();
-        _viewModel = new MainViewModel();
+        _viewModel = new MainViewModel(configService, config);
         DataContext = _viewModel;
+
+        // Restore saved panel position
+        if (config.RememberPosition)
+        {
+            Left = config.PanelX;
+            Top = config.PanelY;
+        }
+
+        Opacity = config.PanelOpacity;
         Loaded += OnLoaded;
         Closing += OnClosing;
     }
@@ -22,10 +33,20 @@ public partial class MainWindow : Window
     {
         var hwnd = new WindowInteropHelper(this).Handle;
         _viewModel.PreviewViewModel.SetDestinationHwnd(hwnd);
+        _viewModel.PreviewViewModel.Start();
     }
 
     private void OnClosing(object? sender, System.ComponentModel.CancelEventArgs e)
     {
+        // Persist panel position if configured
+        var config = _viewModel.Config;
+        if (config.RememberPosition)
+        {
+            config.PanelX = Left;
+            config.PanelY = Top;
+        }
+
+        _viewModel.ConfigService.Save(config);
         _viewModel.PreviewViewModel.Dispose();
     }
 

@@ -1,8 +1,10 @@
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Windows.Data;
+using System.Windows.Input;
 using System.Windows.Threading;
 using WinGlance.Models;
+using WinGlance.NativeApi;
 using WinGlance.Services;
 
 namespace WinGlance.ViewModels;
@@ -37,6 +39,8 @@ internal sealed class PreviewViewModel : ViewModelBase, IDisposable
             Interval = TimeSpan.FromMilliseconds(1000),
         };
         _timer.Tick += OnTimerTick;
+
+        ActivateWindowCommand = new RelayCommand(ActivateWindow);
     }
 
     // ── Public API ──────────────────────────────────────────────────────
@@ -102,6 +106,12 @@ internal sealed class PreviewViewModel : ViewModelBase, IDisposable
     public bool IsPolling => _timer.IsEnabled;
 
     /// <summary>
+    /// Command that activates (brings to foreground) a clicked window.
+    /// Parameter is the <see cref="TrackedWindow"/> to activate.
+    /// </summary>
+    public ICommand ActivateWindowCommand { get; }
+
+    /// <summary>
     /// Sets the destination HWND on the ThumbnailManager. Call after the window is loaded.
     /// </summary>
     public void SetDestinationHwnd(IntPtr hwnd)
@@ -129,6 +139,41 @@ internal sealed class PreviewViewModel : ViewModelBase, IDisposable
     {
         _timer.Stop();
         _thumbnailManager.Dispose();
+    }
+
+    // ── Click-to-switch ────────────────────────────────────────────────
+
+    /// <summary>
+    /// Activates the given window: restores it if minimized, then brings it to the foreground.
+    /// Uses an Alt key simulation workaround to bypass Windows focus-stealing prevention.
+    /// </summary>
+    private static void ActivateWindow(object? parameter)
+    {
+        if (parameter is not TrackedWindow window)
+            return;
+
+        var hwnd = window.Hwnd;
+
+        // Restore minimized windows
+        if (NativeMethods.IsIconic(hwnd))
+            NativeMethods.ShowWindow(hwnd, NativeMethods.SW_RESTORE);
+
+        // Workaround for focus-stealing prevention:
+        // Simulate an Alt key press/release so Windows allows SetForegroundWindow.
+        var input = new NativeMethods.INPUT
+        {
+            Type = NativeMethods.INPUT_KEYBOARD,
+            Union = new NativeMethods.InputUnion
+            {
+                Keyboard = new NativeMethods.KEYBDINPUT { VirtualKey = NativeMethods.VK_MENU },
+            },
+        };
+        NativeMethods.SendInput(1, [input], NativeMethods.INPUT.Size);
+
+        input.Union.Keyboard.Flags = NativeMethods.KEYEVENTF_KEYUP;
+        NativeMethods.SendInput(1, [input], NativeMethods.INPUT.Size);
+
+        NativeMethods.SetForegroundWindow(hwnd);
     }
 
     // ── Polling logic ───────────────────────────────────────────────────

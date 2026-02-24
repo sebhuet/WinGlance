@@ -120,10 +120,7 @@
                     <views:PreviewTab DataContext="{Binding PreviewViewModel}" />
                 </TabItem>
                 <TabItem Header="Applications">
-                    <TextBlock Text="Applications tab — app list will appear here"
-                               Foreground="#FF999999"
-                               HorizontalAlignment="Center"
-                               VerticalAlignment="Center" />
+                    <views:ApplicationsTab DataContext="{Binding ApplicationsViewModel}" />
                 </TabItem>
                 <TabItem Header="Settings">
                     <TextBlock Text="Settings tab — configuration will appear here"

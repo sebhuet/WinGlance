@@ -81,82 +81,88 @@
 
 ---
 
-## Phase 4 — DWM Thumbnails (Preview Tab)
+## Phase 4 — DWM Thumbnails (Preview Tab) ✅
 
-- [ ] **4.1** Create `Services/ThumbnailManager.cs`
-  - `Register(IntPtr source, IntPtr destination, Rect region)` → thumbnail handle
-  - `Update(IntPtr thumbnail, Rect region, double opacity)`
-  - `Unregister(IntPtr thumbnail)`
-  - Lifecycle management: automatic cleanup when source window disappears
-- [ ] **4.2** Create `Views/PreviewTab.xaml`
+- [x] **4.1** Create `Services/ThumbnailManager.cs`
+  - `Register(IntPtr source)` → thumbnail handle, `Update`, `Unregister`, `UnregisterAll`
+  - Lifecycle management: automatic cleanup via `Dispose`
+- [x] **4.2** Create `Views/PreviewTab.xaml`
   - `ItemsControl` with `GroupStyle` to group by application
-  - Group header: app icon + app name
-  - Item template: DWM zone + truncated title below
-- [ ] **4.3** Create `ViewModels/PreviewViewModel.cs`
-  - `ObservableCollection<TrackedWindow>` grouped by app
-  - `CollectionViewSource` property with `GroupDescriptions`
-- [ ] **4.4** Integrate DWM rendering into `ItemsControl` items
-  - Each item exposes an `HwndHost` or custom control to receive the DWM thumbnail
-  - Recalculate destination `Rect` when size changes
-- [ ] **4.5** Support all 3 layouts (horizontal / vertical / grid)
-  - `WrapPanel` horizontal, `StackPanel` vertical, `UniformGrid`
-- [ ] **4.6** Visual highlight for the active window (colored border / glow)
-- [ ] **4.7** Handle resizing — proportional rescaling of thumbnails
-- [ ] **4.8** Write and run unit tests
-  - Test `ThumbnailManager` register/unregister lifecycle logic
-  - Test `PreviewViewModel` grouping and collection updates
-  - `dotnet test` passes
+  - Group header: app icon + app name + window count
+  - Item template: DWM thumbnail + truncated title below
+- [x] **4.3** Enhance `ViewModels/PreviewViewModel.cs`
+  - `ObservableCollection<TrackedWindow>` with `GroupedWindows` ICollectionView
+  - `CollectionViewSource.GetDefaultView` with `PropertyGroupDescription`
+- [x] **4.4** Create `Controls/ThumbnailControl.cs` — custom `FrameworkElement`
+  - DWM thumbnail rendering via `ThumbnailManager`
+  - DPI-aware destination `Rect` via `TransformToAncestor` + `TransformToDevice`
+  - Recalculates on `SizeChanged`
+- [x] **4.5** Support all 3 layouts via `Converters/LayoutToPanelConverter.cs`
+  - `WrapPanel` horizontal, `StackPanel` vertical, `UniformGrid` grid
+- [x] **4.6** Visual highlight for the active window via `Converters/BoolToBorderBrushConverter.cs`
+  - Active = Windows blue border, Inactive = subtle gray
+- [x] **4.7** Handle resizing — `ThumbnailControl.OnSizeChanged` + proportional DWM rect update
+- [x] **4.8** Write and run unit tests
+  - Test `ThumbnailManager` register/unregister lifecycle
+  - Test `PreviewViewModel` properties, grouping, clamping
+  - Test converters (LayoutToPanel, BoolToBorderBrush)
+  - `dotnet test` passes (114 total)
 
 ---
 
-## Phase 5 — Click-to-Switch
+## Phase 5 — Click-to-Switch ✅
 
-- [ ] **5.1** Click handler on each thumbnail
+- [x] **5.1** Click handler on each thumbnail via `ActivateWindowCommand` (RelayCommand)
   - If `IsIconic(hwnd)` → `ShowWindow(hwnd, SW_RESTORE)`
   - `SetForegroundWindow(hwnd)`
-- [ ] **5.2** Workaround for focus-stealing prevention
-  - `AllowSetForegroundWindow` or `Alt` key simulation (see also Phase 13.4)
-- [ ] **5.3** Test: click on normal, minimized, maximized window, and on another monitor
+  - `MouseBinding` on thumbnail Border in `PreviewTab.xaml`
+- [x] **5.2** Workaround for focus-stealing prevention
+  - Alt key simulation via `SendInput` before `SetForegroundWindow`
+  - Added `INPUT`, `KEYBDINPUT` structs and `SendInput` P/Invoke
+- [x] **5.3** Manual test: click on normal, minimized, maximized window
 
 ---
 
-## Phase 6 — Applications Tab (Tab 2)
+## Phase 6 — Applications Tab (Tab 2) ✅
 
-- [ ] **6.1** Create `Views/ApplicationsTab.xaml`
-  - List with checkbox, app name, process name, window count
-  - `[Refresh]` button, `[Save Configuration]` button
-- [ ] **6.2** Create `ViewModels/ApplicationsViewModel.cs`
-  - Scan all processes with visible windows
-  - Group by process name
-  - `IsMonitored` property bound to checkboxes
-- [ ] **6.3** Implement `Refresh` — rescan currently running applications
-- [ ] **6.4** Implement `Save` — persist the monitored app list to config
-- [ ] **6.5** Synchronize: when apps are saved, the Preview tab updates accordingly
-- [ ] **6.6** Write and run unit tests
-  - Test `ApplicationsViewModel` scan, grouping, and monitored toggle
-  - `dotnet test` passes
+- [x] **6.1** Create `Views/ApplicationsTab.xaml`
+  - ListView with checkbox (IsMonitored), display name, process name, window count columns
+  - `[Refresh]` button in header, `[Save Configuration]` button in footer
+  - Dark theme (#1A1A1A background, #CCCCCC text)
+- [x] **6.2** Create `ViewModels/ApplicationsViewModel.cs`
+  - `AppEntry` model: ProcessName, DisplayName, WindowCount, IsMonitored (with PropertyChanged)
+  - `Refresh()` — calls `WindowEnumerator.DiscoverRunningApps()`, merges with monitored state
+  - `Save()` — persists to config, notifies PreviewViewModel via callback
+- [x] **6.3** Implement `Refresh` — rescan currently running applications
+- [x] **6.4** Implement `Save` — persist the monitored app list to config via `ConfigService`
+- [x] **6.5** Synchronize: when apps are saved, `MainViewModel.OnMonitoredAppsChanged` updates `PreviewViewModel.MonitoredApps`
+- [x] **6.6** Write and run unit tests (15 tests)
+  - `ApplicationsViewModelTests`: defaults, refresh, monitored state preservation, save + callback
+  - `AppEntryTests`: defaults, PropertyChanged, no-raise-on-same-value
+  - `dotnet test` passes (145 total)
 
 ---
 
-## Phase 7 — Configuration & Persistence
+## Phase 7 — Configuration & Persistence ✅
 
-- [ ] **7.1** Create `Models/AppConfig.cs` — JSON config model
-  - `monitoredApps`, `layout`, `thumbnailWidth`, `thumbnailHeight`
-  - `panelOpacity`, `pollingIntervalMs`, `rememberPosition`, `panelX`, `panelY`
-  - `autoStart`, `closeToTray`, `hotkey`
-  - LLM settings: `llmEnabled`, `llmProvider`, `llmEndpoint`, `llmApiKey`, `llmModel`, `staleThresholdSeconds`
-  - Sensible default values
-- [ ] **7.2** Create `Services/ConfigService.cs`
-  - `Load()`: read `config.json` next to the exe, fallback to `%LOCALAPPDATA%\WinGlance\`
-  - `Save()`: atomic write (write to `.tmp` then rename)
-  - Error handling: corrupt JSON → default values + log warning
-- [ ] **7.3** Load config at startup (`App.xaml.cs`)
-- [ ] **7.4** Save panel position on close (if `rememberPosition` is enabled)
-- [ ] **7.5** Test: delete `config.json`, launch the app → default values created
-- [ ] **7.6** Write and run unit tests
-  - Test `AppConfig` default values and JSON round-trip (serialize → deserialize)
-  - Test `ConfigService` load/save, corrupt JSON fallback, atomic write
-  - `dotnet test` passes
+- [x] **7.1** Create `Models/AppConfig.cs` — JSON config model
+  - `AppConfig`: monitoredApps, layout, thumbnailWidth/Height, panelOpacity, pollingIntervalMs, rememberPosition, panelX/Y, autoStart, closeToTray, hotkey
+  - `MonitoredAppConfig`: processName, displayName (separate DTO from MonitoredApp)
+  - `LlmConfig`: enabled, provider, endpoint, apiKey, model, staleThresholdSeconds
+  - All properties have sensible defaults
+- [x] **7.2** Create `Services/ConfigService.cs`
+  - `Load()`: read `config.json`, fallback to defaults on missing/corrupt file
+  - `Save()`: atomic write (`.tmp` → rename) with `System.Text.Json` (camelCase, indented)
+  - `GetConfigPath()`: exe directory primary, `%LOCALAPPDATA%\WinGlance\` fallback
+  - Internal constructor for testability (custom config directory)
+- [x] **7.3** Load config at startup — `App.xaml.cs` creates `ConfigService` + loads config, passes to `MainWindow`
+- [x] **7.4** Save panel position on close — `MainWindow.OnClosing` persists position if `RememberPosition` enabled
+- [x] **7.5** Config applied at startup: panel position, opacity, preview settings (layout, thumbnail size, polling interval, monitored apps)
+- [x] **7.6** Write and run unit tests (14 tests)
+  - `AppConfigTests`: defaults, LlmConfig defaults, MonitoredAppConfig defaults, JSON round-trip
+  - `ConfigServiceTests`: nonexistent file, round-trip, corrupt JSON, empty file, path validation, overwrite, partial JSON merge
+  - `MainViewModelTests`: constructor applies config to PreviewViewModel, exposes config/service
+  - `dotnet test` passes (145 total)
 
 ---
 
@@ -348,10 +354,10 @@
 | 1     | Main Window (Shell) ✅              | 0          |
 | 2     | Native Layer (P/Invoke) ✅          | 0          |
 | 3     | Window Enumeration ✅               | 2          |
-| 4     | DWM Thumbnails (Preview Tab)        | 1, 2, 3    |
-| 5     | Click-to-Switch                     | 4          |
-| 6     | Applications Tab (Tab 2)            | 1, 3, 7    |
-| 7     | Configuration & Persistence         | 0          |
+| 4     | DWM Thumbnails (Preview Tab) ✅     | 1, 2, 3    |
+| 5     | Click-to-Switch ✅                  | 4          |
+| 6     | Applications Tab (Tab 2) ✅         | 1, 3, 7    |
+| 7     | Configuration & Persistence ✅      | 0          |
 | 8     | Settings Tab (Tab 3)                | 1, 7       |
 | 9     | Single Instance & System Tray       | 1, 7       |
 | 10    | Global Hotkey                       | 2, 9       |

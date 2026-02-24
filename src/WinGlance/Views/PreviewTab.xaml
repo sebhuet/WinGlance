@@ -55,7 +55,13 @@
                             BorderThickness="2"
                             BorderBrush="{Binding IsActive, Converter={StaticResource ActiveBorderConverter}}"
                             Background="#33000000"
-                            ToolTip="{Binding Title}">
+                            ToolTip="{Binding Title}"
+                            Cursor="Hand">
+                        <Border.InputBindings>
+                            <MouseBinding MouseAction="LeftClick"
+                                          Command="{Binding DataContext.ActivateWindowCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                          CommandParameter="{Binding}" />
+                        </Border.InputBindings>
                         <StackPanel>
                             <!-- DWM thumbnail area -->
                             <controls:ThumbnailControl

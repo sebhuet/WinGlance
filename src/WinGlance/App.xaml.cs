@@ -1,5 +1,6 @@
 using System.Windows;
 using System.Windows.Threading;
+using WinGlance.Services;
 
 namespace WinGlance;
 
@@ -10,6 +11,12 @@ public partial class App : Application
         DispatcherUnhandledException += OnDispatcherUnhandledException;
         AppDomain.CurrentDomain.UnhandledException += OnUnhandledException;
         TaskScheduler.UnobservedTaskException += OnUnobservedTaskException;
+
+        var configService = new ConfigService();
+        var config = configService.Load();
+
+        var mainWindow = new MainWindow(configService, config);
+        mainWindow.Show();
 
         base.OnStartup(e);
     }
