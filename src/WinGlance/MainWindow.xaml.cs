@@ -13,6 +13,7 @@ public partial class MainWindow : Window
 {
     private readonly MainViewModel _viewModel;
     private readonly TaskbarIcon _trayIcon;
+    private readonly HotkeyService _hotkeyService = new();
     private bool _isExiting;
 
     internal MainWindow(ConfigService configService, AppConfig config)
@@ -48,6 +49,11 @@ public partial class MainWindow : Window
         var hwnd = new WindowInteropHelper(this).Handle;
         _viewModel.PreviewViewModel.SetDestinationHwnd(hwnd);
         _viewModel.PreviewViewModel.Start();
+
+        // Register global hotkey
+        _hotkeyService.Initialize(hwnd);
+        _hotkeyService.HotkeyPressed += (_, _) => TogglePanel();
+        _hotkeyService.Register(_viewModel.Config.Hotkey);
     }
 
     private void OnClosing(object? sender, System.ComponentModel.CancelEventArgs e)
@@ -69,6 +75,7 @@ public partial class MainWindow : Window
 
         _viewModel.ConfigService.Save(config);
         _viewModel.PreviewViewModel.Dispose();
+        _hotkeyService.Dispose();
         _trayIcon.Dispose();
     }
 
