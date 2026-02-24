@@ -14,53 +14,46 @@
 - [x] **0.5** Add an application icon (`Assets/icon.ico`)
 - [x] **0.6** Verify that `dotnet build` compiles without errors
 - [x] **0.7** Verify that `dotnet publish` produces a working executable
-- [ ] **0.8** Create test project `WinGlance.Tests` (xUnit) and add to solution
+- [x] **0.8** Create test project `WinGlance.Tests` (xUnit) and add to solution
 
 ---
 
-## Phase 1 — Main Window (Shell)
+## Phase 1 — Main Window (Shell) ✅
 
-- [ ] **1.1** Create `MainWindow.xaml` — borderless, always-on-top window
-  - `WindowStyle="None"`, `Topmost="True"`, `AllowsTransparency="True"`
-  - Custom title bar with `[_]` (minimize) and `[×]` (close) buttons
-- [ ] **1.2** Implement drag-move on the title bar
-- [ ] **1.3** Implement window resizing (resize grip)
-- [ ] **1.4** Add the `TabControl` with 3 tabs (Preview, Applications, Settings)
-  - Placeholder content for each tab
-- [ ] **1.5** Create `MainViewModel.cs` — main orchestrator (MVVM)
-  - Properties for active tab, config, collections
-- [ ] **1.6** Write and run unit tests
-  - Test `MainViewModel` property change notifications
-  - `dotnet test` passes
+- [x] **1.1** Create `MainWindow.xaml` — borderless, always-on-top window
+- [x] **1.2** Implement drag-move on the title bar
+- [x] **1.3** Implement window resizing (resize grip)
+- [x] **1.4** Add the `TabControl` with 3 tabs (Preview, Applications, Settings)
+- [x] **1.5** Create `MainViewModel.cs` — main orchestrator (MVVM)
+- [x] **1.6** Write and run unit tests (7 tests passing)
 
 ---
 
-## Phase 2 — Native Layer (P/Invoke)
+## Phase 2 — Native Layer (P/Invoke) ✅
 
-- [ ] **2.1** Create `NativeApi/NativeMethods.cs` — P/Invoke declarations
+- [x] **2.1** Create `NativeApi/NativeMethods.cs` — P/Invoke declarations
   - `EnumWindows`, `GetWindowThreadProcessId`, `IsWindowVisible`, `GetWindowText`
   - `GetWindowPlacement`, `IsIconic`, `ShowWindow`, `SetForegroundWindow`
   - `GetForegroundWindow`, `AllowSetForegroundWindow`
   - `GetClassLongPtr`, `SendMessage(WM_GETICON)`, `DestroyIcon`
-- [ ] **2.2** Add DWM APIs
+- [x] **2.2** Add DWM APIs
   - `DwmRegisterThumbnail`, `DwmUpdateThumbnailProperties`, `DwmUnregisterThumbnail`
   - `DwmIsCompositionEnabled`
   - Structures: `DWM_THUMBNAIL_PROPERTIES`, `RECT`, `SIZE`
-- [ ] **2.3** Add Hotkey APIs
+- [x] **2.3** Add Hotkey APIs
   - `RegisterHotKey`, `UnregisterHotKey`
-- [ ] **2.4** Add UWP APIs
+- [x] **2.4** Add UWP APIs
   - `GetApplicationUserModelId` (or `SHLoadIndirectString`)
   - Resolve real app name from `ApplicationFrameHost.exe`
-- [ ] **2.5** Add Attention Detection APIs
+- [x] **2.5** Add Attention Detection APIs
   - `RegisterShellHookWindow` — receive `HSHELL_FLASH` notifications
   - `IsHungAppWindow` — detect not-responding windows
   - `IsWindowEnabled` — detect modal-blocked windows
   - `GetWindow(GW_ENABLEDPOPUP)` — find the modal popup
   - `PrintWindow` — capture window content as bitmap
-- [ ] **2.6** Manually test critical P/Invoke calls (DWM enabled, EnumWindows)
-- [ ] **2.7** Write and run unit tests
-  - Test struct sizes and layouts match Win32 expectations
-  - `dotnet test` passes
+- [x] **2.6** Manually test critical P/Invoke calls (DWM enabled, EnumWindows)
+- [x] **2.7** Write and run unit tests (14 tests — struct sizes, P/Invoke smoke tests, constants)
+  - `dotnet test` passes (21 total)
 
 ---
 
@@ -241,7 +234,7 @@
 
 ---
 
-## Phase 12 — DPI & Multi-Monitor
+## Phase 12 — DPI & Multi-Monitor & Multi-Desktop
 
 - [ ] **12.1** Verify that the `PerMonitorV2` manifest is properly applied
 - [ ] **12.2** Test panel positioning on different monitors with different DPI settings
@@ -350,23 +343,23 @@
 
 ## Phase Summary
 
-| Phase | Description                       | Depends on |
-| ----- | --------------------------------- | ---------- |
-| 0     | Scaffolding & Infrastructure ✅   | —          |
-| 1     | Main Window (Shell)               | 0          |
-| 2     | Native Layer (P/Invoke)           | 0          |
-| 3     | Window Enumeration                | 2          |
-| 4     | DWM Thumbnails (Preview Tab)      | 1, 2, 3    |
-| 5     | Click-to-Switch                   | 4          |
-| 6     | Applications Tab (Tab 2)          | 1, 3, 7    |
-| 7     | Configuration & Persistence       | 0          |
-| 8     | Settings Tab (Tab 3)              | 1, 7       |
-| 9     | Single Instance & System Tray     | 1, 7       |
-| 10    | Global Hotkey                     | 2, 9       |
-| 11    | Theme (Light / Dark)              | 1          |
-| 12    | DPI & Multi-Monitor               | 4          |
-| 13    | Error Handling & Resilience       | 3, 4, 7    |
-| 14    | Auto-Start with Windows           | 7, 8       |
-| 15    | Window Attention Detection (FR-9) | 2, 3, 4    |
-| 16    | LLM-Assisted Analysis (FR-10)     | 2, 3, 15   |
-| 17    | Polish & Final Touches            | All        |
+| Phase | Description                         | Depends on |
+| ----- | ----------------------------------- | ---------- |
+| 0     | Scaffolding & Infrastructure ✅     | —          |
+| 1     | Main Window (Shell) ✅              | 0          |
+| 2     | Native Layer (P/Invoke) ✅          | 0          |
+| 3     | Window Enumeration                  | 2          |
+| 4     | DWM Thumbnails (Preview Tab)        | 1, 2, 3    |
+| 5     | Click-to-Switch                     | 4          |
+| 6     | Applications Tab (Tab 2)            | 1, 3, 7    |
+| 7     | Configuration & Persistence         | 0          |
+| 8     | Settings Tab (Tab 3)                | 1, 7       |
+| 9     | Single Instance & System Tray       | 1, 7       |
+| 10    | Global Hotkey                       | 2, 9       |
+| 11    | Theme (Light / Dark)                | 1          |
+| 12    | DPI & Multi-Monitor & Multi-Desktop | 4          |
+| 13    | Error Handling & Resilience         | 3, 4, 7    |
+| 14    | Auto-Start with Windows             | 7, 8       |
+| 15    | Window Attention Detection (FR-9)   | 2, 3, 4    |
+| 16    | LLM-Assisted Analysis (FR-10)       | 2, 3, 15   |
+| 17    | Polish & Final Touches              | All        |
