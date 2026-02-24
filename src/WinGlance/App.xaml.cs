@@ -6,11 +6,26 @@ namespace WinGlance;
 
 public partial class App : Application
 {
+    private Mutex? _mutex;
+
     protected override void OnStartup(StartupEventArgs e)
     {
         DispatcherUnhandledException += OnDispatcherUnhandledException;
         AppDomain.CurrentDomain.UnhandledException += OnUnhandledException;
         TaskScheduler.UnobservedTaskException += OnUnobservedTaskException;
+
+        // Single-instance enforcement via named Mutex
+        _mutex = new Mutex(true, "WinGlance_SingleInstance_Mutex", out var isNewInstance);
+        if (!isNewInstance)
+        {
+            MessageBox.Show(
+                "WinGlance is already running.",
+                "WinGlance",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+            Shutdown();
+            return;
+        }
 
         var configService = new ConfigService();
         var config = configService.Load();
@@ -19,6 +34,13 @@ public partial class App : Application
         mainWindow.Show();
 
         base.OnStartup(e);
+    }
+
+    protected override void OnExit(ExitEventArgs e)
+    {
+        _mutex?.ReleaseMutex();
+        _mutex?.Dispose();
+        base.OnExit(e);
     }
 
     private void OnDispatcherUnhandledException(object sender, DispatcherUnhandledExceptionEventArgs e)

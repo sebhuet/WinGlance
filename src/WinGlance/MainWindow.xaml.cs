@@ -1,6 +1,8 @@
+using System.Drawing;
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Interop;
+using Hardcodet.Wpf.TaskbarNotification;
 using WinGlance.Models;
 using WinGlance.Services;
 using WinGlance.ViewModels;
@@ -10,6 +12,8 @@ namespace WinGlance;
 public partial class MainWindow : Window
 {
     private readonly MainViewModel _viewModel;
+    private readonly TaskbarIcon _trayIcon;
+    private bool _isExiting;
 
     internal MainWindow(ConfigService configService, AppConfig config)
     {
@@ -25,6 +29,16 @@ public partial class MainWindow : Window
         }
 
         Opacity = config.PanelOpacity;
+
+        // System tray icon
+        _trayIcon = new TaskbarIcon
+        {
+            Icon = SystemIcons.Application,
+            ToolTipText = "WinGlance",
+            ContextMenu = CreateTrayContextMenu(),
+        };
+        _trayIcon.TrayMouseDoubleClick += (_, _) => ShowPanel();
+
         Loaded += OnLoaded;
         Closing += OnClosing;
     }
@@ -38,6 +52,13 @@ public partial class MainWindow : Window
 
     private void OnClosing(object? sender, System.ComponentModel.CancelEventArgs e)
     {
+        if (!_isExiting && _viewModel.Config.CloseToTray)
+        {
+            e.Cancel = true;
+            HidePanel();
+            return;
+        }
+
         // Persist panel position if configured
         var config = _viewModel.Config;
         if (config.RememberPosition)
@@ -48,7 +69,65 @@ public partial class MainWindow : Window
 
         _viewModel.ConfigService.Save(config);
         _viewModel.PreviewViewModel.Dispose();
+        _trayIcon.Dispose();
     }
+
+    // ── Panel visibility ─────────────────────────────────────────────
+
+    internal void TogglePanel()
+    {
+        if (IsVisible)
+            HidePanel();
+        else
+            ShowPanel();
+    }
+
+    private void ShowPanel()
+    {
+        Show();
+        WindowState = WindowState.Normal;
+        Activate();
+    }
+
+    private void HidePanel()
+    {
+        Hide();
+    }
+
+    private void ExitApplication()
+    {
+        _isExiting = true;
+        Close();
+    }
+
+    // ── Tray context menu ────────────────────────────────────────────
+
+    private System.Windows.Controls.ContextMenu CreateTrayContextMenu()
+    {
+        var menu = new System.Windows.Controls.ContextMenu();
+
+        var showHide = new System.Windows.Controls.MenuItem { Header = "Show / Hide" };
+        showHide.Click += (_, _) => TogglePanel();
+        menu.Items.Add(showHide);
+
+        var settings = new System.Windows.Controls.MenuItem { Header = "Settings" };
+        settings.Click += (_, _) =>
+        {
+            ShowPanel();
+            _viewModel.SelectedTabIndex = 2; // Settings tab
+        };
+        menu.Items.Add(settings);
+
+        menu.Items.Add(new System.Windows.Controls.Separator());
+
+        var exit = new System.Windows.Controls.MenuItem { Header = "Exit" };
+        exit.Click += (_, _) => ExitApplication();
+        menu.Items.Add(exit);
+
+        return menu;
+    }
+
+    // ── Title bar handlers ───────────────────────────────────────────
 
     private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {

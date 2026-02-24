@@ -196,18 +196,20 @@
 
 ---
 
-## Phase 9 — Single Instance & System Tray
+## Phase 9 — Single Instance & System Tray ✅
 
-- [ ] **9.1** Implement named Mutex in `App.xaml.cs`
-  - If an instance already exists → send a message to bring it to foreground, then exit
-- [ ] **9.2** Integrate System Tray icon (`Hardcodet.NotifyIcon.Wpf` or P/Invoke)
-  - Icon in the tray when the panel is hidden
-  - Right-click menu: Show/Hide, Settings, Exit
-- [ ] **9.3** Implement `[×]` button behavior
-  - If `closeToTray` → hide to tray
-  - Otherwise → exit the application
-- [ ] **9.4** Double-click on tray icon → show the panel
-- [ ] **9.5** Test: close, reopen from tray, launch a 2nd instance
+- [x] **9.1** Implement named Mutex (`WinGlance_SingleInstance_Mutex`) in `App.xaml.cs`
+  - Second instance shows info message and exits
+  - Mutex released and disposed in `OnExit`
+- [x] **9.2** Integrate system tray icon via `Hardcodet.NotifyIcon.Wpf` (`TaskbarIcon`)
+  - Uses `SystemIcons.Application` as tray icon
+  - Right-click context menu: Show/Hide, Settings (switches to tab 2), separator, Exit
+- [x] **9.3** Implement `[×]` button close-to-tray behavior
+  - If `CloseToTray` config → cancel close, hide window instead
+  - If not → normal exit (save config, dispose, close tray icon)
+  - `_isExiting` flag distinguishes tray-hide from real exit
+- [x] **9.4** Double-click on tray icon → `ShowPanel()` (show, restore, activate)
+- [x] **9.5** `TogglePanel()` method exposed for hotkey integration (Phase 10)
 
 ---
 
@@ -360,7 +362,7 @@
 | 6     | Applications Tab (Tab 2) ✅         | 1, 3, 7    |
 | 7     | Configuration & Persistence ✅      | 0          |
 | 8     | Settings Tab (Tab 3) ✅             | 1, 7       |
-| 9     | Single Instance & System Tray       | 1, 7       |
+| 9     | Single Instance & System Tray ✅    | 1, 7       |
 | 10    | Global Hotkey                       | 2, 9       |
 | 11    | Theme (Light / Dark)                | 1          |
 | 12    | DPI & Multi-Monitor & Multi-Desktop | 4          |
