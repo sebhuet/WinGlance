@@ -32,6 +32,9 @@ public partial class MainWindow : Window
 
         Opacity = config.PanelOpacity;
 
+        // Auto-size to content
+        SizeToContent = SizeToContent.WidthAndHeight;
+
         // System tray icon
         _trayIcon = new TaskbarIcon
         {
@@ -113,7 +116,49 @@ public partial class MainWindow : Window
         Close();
     }
 
-    // ── Tray context menu ────────────────────────────────────────────
+    // ── View switching ───────────────────────────────────────────
+
+    private void SwitchToView(int index)
+    {
+        _viewModel.SelectedTabIndex = index;
+        PreviewView.Visibility = index == 0 ? Visibility.Visible : Visibility.Collapsed;
+        ApplicationsView.Visibility = index == 1 ? Visibility.Visible : Visibility.Collapsed;
+        SettingsView.Visibility = index == 2 ? Visibility.Visible : Visibility.Collapsed;
+
+        // Re-measure so the window auto-sizes to the new content
+        InvalidateMeasure();
+        UpdateLayout();
+    }
+
+    // ── Right-click context menu ──────────────────────────────────
+
+    private void Border_MouseRightButtonUp(object sender, MouseButtonEventArgs e)
+    {
+        var menu = new System.Windows.Controls.ContextMenu();
+
+        var preview = new System.Windows.Controls.MenuItem { Header = "Preview" };
+        preview.Click += (_, _) => SwitchToView(0);
+        menu.Items.Add(preview);
+
+        var apps = new System.Windows.Controls.MenuItem { Header = "Applications" };
+        apps.Click += (_, _) => SwitchToView(1);
+        menu.Items.Add(apps);
+
+        var settings = new System.Windows.Controls.MenuItem { Header = "Settings" };
+        settings.Click += (_, _) => SwitchToView(2);
+        menu.Items.Add(settings);
+
+        menu.Items.Add(new System.Windows.Controls.Separator());
+
+        var exit = new System.Windows.Controls.MenuItem { Header = "Exit" };
+        exit.Click += (_, _) => ExitApplication();
+        menu.Items.Add(exit);
+
+        menu.IsOpen = true;
+        e.Handled = true;
+    }
+
+    // ── Tray context menu ────────────────────────────────────────
 
     private System.Windows.Controls.ContextMenu CreateTrayContextMenu()
     {
@@ -127,7 +172,7 @@ public partial class MainWindow : Window
         settings.Click += (_, _) =>
         {
             ShowPanel();
-            _viewModel.SelectedTabIndex = 2; // Settings tab
+            SwitchToView(2);
         };
         menu.Items.Add(settings);
 
@@ -140,7 +185,7 @@ public partial class MainWindow : Window
         return menu;
     }
 
-    // ── Title bar handlers ───────────────────────────────────────────
+    // ── Title bar handlers ───────────────────────────────────────
 
     private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {

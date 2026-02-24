@@ -10,10 +10,7 @@
         AllowsTransparency="True"
         Topmost="True"
         Background="Transparent"
-        MinWidth="300"
-        MinHeight="200"
-        Width="600"
-        Height="400"
+        SizeToContent="WidthAndHeight"
         ResizeMode="CanResizeWithGrip">
 
     <Window.Resources>
@@ -76,7 +73,8 @@
     <Border Background="#E0202020"
             BorderBrush="#FF444444"
             BorderThickness="1"
-            CornerRadius="6">
+            CornerRadius="6"
+            MouseRightButtonUp="Border_MouseRightButtonUp">
         <Grid>
             <Grid.RowDefinitions>
                 <RowDefinition Height="32" />
@@ -111,21 +109,22 @@
                 </StackPanel>
             </Grid>
 
-            <!-- Tab Control -->
-            <TabControl Grid.Row="1"
-                        Margin="4"
-                        Background="Transparent"
-                        BorderThickness="0">
-                <TabItem Header="Preview">
-                    <views:PreviewTab DataContext="{Binding PreviewViewModel}" />
-                </TabItem>
-                <TabItem Header="Applications">
-                    <views:ApplicationsTab DataContext="{Binding ApplicationsViewModel}" />
-                </TabItem>
-                <TabItem Header="Settings">
-                    <views:SettingsTab DataContext="{Binding SettingsViewModel}" />
-                </TabItem>
-            </TabControl>
+            <!-- Content area: views switched by SelectedTabIndex -->
+            <Grid Grid.Row="1" Margin="4">
+                <!-- Preview (always present, index 0) -->
+                <views:PreviewTab x:Name="PreviewView"
+                                  DataContext="{Binding PreviewViewModel}" />
+
+                <!-- Applications overlay (index 1) -->
+                <views:ApplicationsTab x:Name="ApplicationsView"
+                                       DataContext="{Binding ApplicationsViewModel}"
+                                       Visibility="Collapsed" />
+
+                <!-- Settings overlay (index 2) -->
+                <views:SettingsTab x:Name="SettingsView"
+                                   DataContext="{Binding SettingsViewModel}"
+                                   Visibility="Collapsed" />
+            </Grid>
         </Grid>
     </Border>
 
