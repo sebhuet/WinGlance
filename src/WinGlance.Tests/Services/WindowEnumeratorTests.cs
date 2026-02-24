@@ -81,4 +81,67 @@ public class WindowEnumeratorTests
         var result = WindowEnumerator.IsEligibleWindow(IntPtr.Zero);
         Assert.False(result);
     }
+
+    [Fact]
+    public void IsEligibleWindow_InvalidHandle_ReturnsFalse()
+    {
+        // An arbitrary invalid handle should not be eligible
+        var result = WindowEnumerator.IsEligibleWindow((IntPtr)(-1));
+        Assert.False(result);
+    }
+
+    // ── AUMID edge cases ─────────────────────────────────────────────────
+
+    [Theory]
+    [InlineData("Publisher.App_hash", "App")]         // no bang (no entry point)
+    [InlineData("App_hash!Main", "App")]              // no publisher prefix
+    [InlineData("A.B.C_hash!Main", "B.C")]            // multiple dots → only first removed
+    public void ExtractAppNameFromAumid_EdgeCases(string aumid, string expected)
+    {
+        var result = WindowEnumerator.ExtractAppNameFromAumid(aumid);
+        Assert.Equal(expected, result);
+    }
+
+    // ── DiscoveredApp model ──────────────────────────────────────────────
+
+    [Fact]
+    public void DiscoveredApp_Properties()
+    {
+        var app = new DiscoveredApp("notepad", 3);
+        Assert.Equal("notepad", app.ProcessName);
+        Assert.Equal(3, app.WindowCount);
+    }
+
+    [Fact]
+    public void DiscoveredApp_WindowCountIsMutable()
+    {
+        var app = new DiscoveredApp("notepad", 1);
+        app.WindowCount = 5;
+        Assert.Equal(5, app.WindowCount);
+    }
+
+    [Fact]
+    public void DiscoverRunningApps_ResultsAreSortedByProcessName()
+    {
+        var enumerator = new WindowEnumerator();
+        var apps = enumerator.DiscoverRunningApps();
+
+        for (var i = 1; i < apps.Count; i++)
+        {
+            Assert.True(
+                string.Compare(apps[i - 1].ProcessName, apps[i].ProcessName, StringComparison.OrdinalIgnoreCase) <= 0,
+                $"Expected sorted order but '{apps[i - 1].ProcessName}' came before '{apps[i].ProcessName}'");
+        }
+    }
+
+    [Fact]
+    public void GetWindows_UnknownProcess_ReturnsEmpty()
+    {
+        var enumerator = new WindowEnumerator();
+        var apps = new List<MonitoredApp> { new("ThisProcessDoesNotExist_XYZ", "Fake App") };
+
+        var result = enumerator.GetWindows(apps);
+
+        Assert.Empty(result);
+    }
 }

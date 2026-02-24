@@ -21,3 +21,10 @@ node_modules/
 Thumbs.db
 Desktop.ini
 .DS_Store
+
+# Config with secrets (API keys)
+config.json
+
+# Build output
+publish/
+*.exe

@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 using System.Windows.Data;
 using System.Windows.Threading;
 using WinGlance.Models;
@@ -6,17 +7,30 @@ using WinGlance.Services;
 
 namespace WinGlance.ViewModels;
 
+/// <summary>
+/// ViewModel for the Preview tab. Polls monitored windows at a configurable interval
+/// using <see cref="WindowEnumerator"/> and maintains a live <see cref="ObservableCollection{T}"/>
+/// of <see cref="TrackedWindow"/> instances for data binding.
+/// </summary>
 internal sealed class PreviewViewModel : ViewModelBase, IDisposable
 {
     private readonly WindowEnumerator _enumerator = new();
+    private readonly ThumbnailManager _thumbnailManager = new();
     private readonly DispatcherTimer _timer;
-    private readonly object _lock = new();
+    private readonly object _lock = new(); // guards _windows for cross-thread collection sync
 
     private ObservableCollection<TrackedWindow> _windows = [];
+    private string _layout = "horizontal";
+    private int _thumbnailWidth = 200;
+    private int _thumbnailHeight = 150;
 
     public PreviewViewModel()
     {
         BindingOperations.EnableCollectionSynchronization(Windows, _lock);
+
+        GroupedWindows = CollectionViewSource.GetDefaultView(Windows);
+        GroupedWindows.GroupDescriptions.Add(
+            new PropertyGroupDescription(nameof(TrackedWindow.DisplayName)));
 
         _timer = new DispatcherTimer
         {
@@ -27,16 +41,46 @@ internal sealed class PreviewViewModel : ViewModelBase, IDisposable
 
     // ── Public API ──────────────────────────────────────────────────────
 
+    /// <summary>Live collection of tracked windows, bound to the Preview tab ItemsControl.</summary>
     public ObservableCollection<TrackedWindow> Windows
     {
         get => _windows;
         private set => SetProperty(ref _windows, value);
     }
 
+    /// <summary>Grouped view of <see cref="Windows"/> for the ItemsControl.</summary>
+    public ICollectionView GroupedWindows { get; }
+
+    /// <summary>The ThumbnailManager passed down to ThumbnailControls.</summary>
+    public ThumbnailManager ThumbnailManager => _thumbnailManager;
+
     /// <summary>
     /// The apps to monitor. Set by the main view model or settings.
     /// </summary>
     public IReadOnlyList<MonitoredApp> MonitoredApps { get; set; } = [];
+
+    /// <summary>
+    /// Layout mode: "horizontal", "vertical", or "grid".
+    /// </summary>
+    public string Layout
+    {
+        get => _layout;
+        set => SetProperty(ref _layout, value);
+    }
+
+    /// <summary>Desired thumbnail width in device-independent pixels.</summary>
+    public int ThumbnailWidth
+    {
+        get => _thumbnailWidth;
+        set => SetProperty(ref _thumbnailWidth, value);
+    }
+
+    /// <summary>Desired thumbnail height in device-independent pixels.</summary>
+    public int ThumbnailHeight
+    {
+        get => _thumbnailHeight;
+        set => SetProperty(ref _thumbnailHeight, value);
+    }
 
     /// <summary>
     /// Polling interval in milliseconds. Updates the timer when changed.
@@ -54,8 +98,18 @@ internal sealed class PreviewViewModel : ViewModelBase, IDisposable
         }
     }
 
+    /// <summary>True if the polling timer is currently running.</summary>
     public bool IsPolling => _timer.IsEnabled;
 
+    /// <summary>
+    /// Sets the destination HWND on the ThumbnailManager. Call after the window is loaded.
+    /// </summary>
+    public void SetDestinationHwnd(IntPtr hwnd)
+    {
+        _thumbnailManager.SetDestination(hwnd);
+    }
+
+    /// <summary>Starts polling. Performs an immediate first scan then starts the timer.</summary>
     public void Start()
     {
         if (!_timer.IsEnabled)
@@ -65,6 +119,7 @@ internal sealed class PreviewViewModel : ViewModelBase, IDisposable
         }
     }
 
+    /// <summary>Stops the polling timer.</summary>
     public void Stop()
     {
         _timer.Stop();
@@ -73,6 +128,7 @@ internal sealed class PreviewViewModel : ViewModelBase, IDisposable
     public void Dispose()
     {
         _timer.Stop();
+        _thumbnailManager.Dispose();
     }
 
     // ── Polling logic ───────────────────────────────────────────────────
@@ -105,7 +161,10 @@ internal sealed class PreviewViewModel : ViewModelBase, IDisposable
             for (var i = _windows.Count - 1; i >= 0; i--)
             {
                 if (!scannedByHwnd.ContainsKey(_windows[i].Hwnd))
+                {
+                    _thumbnailManager.Unregister(_windows[i].Hwnd);
                     _windows.RemoveAt(i);
+                }
             }
 
             // Update existing or add new

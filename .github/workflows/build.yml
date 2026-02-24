@@ -1,0 +1,37 @@
+name: Build & Test
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore dependencies
+        run: dotnet restore src/WinGlance.slnx
+
+      - name: Build
+        run: dotnet build src/WinGlance.slnx --no-restore -c Release
+
+      - name: Test
+        run: dotnet test src/WinGlance.slnx --no-build -c Release --verbosity normal
+
+      - name: Publish
+        run: dotnet publish src/WinGlance/WinGlance.csproj -c Release -r win-x64 --self-contained -p:PublishSingleFile=true --output ./publish
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: WinGlance-win-x64
+          path: ./publish/WinGlance.exe

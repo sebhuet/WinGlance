@@ -175,6 +175,10 @@ internal sealed class WindowEnumerator
         }
     }
 
+    /// <summary>
+    /// Extracts the app name from an Application User Model ID (AUMID).
+    /// Example: "Microsoft.WindowsCalculator_8wekyb3d8bbwe!App" returns "WindowsCalculator".
+    /// </summary>
     internal static string? ExtractAppNameFromAumid(string aumid)
     {
         // AUMID format: "Publisher.AppName_hash!EntryPoint"
@@ -192,6 +196,10 @@ internal sealed class WindowEnumerator
 
     // ── Icon extraction ─────────────────────────────────────────────────
 
+    /// <summary>
+    /// Extracts the application icon for a window handle.
+    /// The returned <see cref="BitmapSource"/> is frozen for cross-thread usage.
+    /// </summary>
     internal static ImageSource? ExtractIcon(IntPtr hWnd)
     {
         var hIcon = GetWindowIcon(hWnd);
@@ -217,6 +225,10 @@ internal sealed class WindowEnumerator
         }
     }
 
+    /// <summary>
+    /// Tries multiple strategies to get a window icon handle:
+    /// WM_GETICON (ICON_SMALL2 → ICON_SMALL → ICON_BIG) then class icon fallback.
+    /// </summary>
     private static IntPtr GetWindowIcon(IntPtr hWnd)
     {
         // Try WM_GETICON with ICON_SMALL first

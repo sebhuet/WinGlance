@@ -3,6 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:views="clr-namespace:WinGlance.Views"
         mc:Ignorable="d"
         Title="WinGlance"
         WindowStyle="None"
@@ -14,71 +15,6 @@
         Width="600"
         Height="400"
         ResizeMode="CanResizeWithGrip">
-
-    <Border Background="#E0202020"
-            BorderBrush="#FF444444"
-            BorderThickness="1"
-            CornerRadius="6">
-        <Grid>
-            <Grid.RowDefinitions>
-                <RowDefinition Height="32" />
-                <RowDefinition Height="*" />
-            </Grid.RowDefinitions>
-
-            <!-- Custom Title Bar -->
-            <Grid Grid.Row="0"
-                  Background="#FF2D2D2D"
-                  MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="Auto" />
-                </Grid.ColumnDefinitions>
-
-                <TextBlock Grid.Column="0"
-                           Text="WinGlance"
-                           Foreground="#FFCCCCCC"
-                           VerticalAlignment="Center"
-                           Margin="10,0,0,0"
-                           FontSize="13"
-                           FontWeight="SemiBold" />
-
-                <StackPanel Grid.Column="1"
-                            Orientation="Horizontal">
-                    <Button Content="&#x2014;"
-                            Click="MinimizeButton_Click"
-                            Style="{StaticResource TitleBarButtonStyle}" />
-                    <Button Content="&#x2715;"
-                            Click="CloseButton_Click"
-                            Style="{StaticResource CloseButtonStyle}" />
-                </StackPanel>
-            </Grid>
-
-            <!-- Tab Control -->
-            <TabControl Grid.Row="1"
-                        Margin="4"
-                        Background="Transparent"
-                        BorderThickness="0">
-                <TabItem Header="Preview">
-                    <TextBlock Text="Preview tab — thumbnails will appear here"
-                               Foreground="#FF999999"
-                               HorizontalAlignment="Center"
-                               VerticalAlignment="Center" />
-                </TabItem>
-                <TabItem Header="Applications">
-                    <TextBlock Text="Applications tab — app list will appear here"
-                               Foreground="#FF999999"
-                               HorizontalAlignment="Center"
-                               VerticalAlignment="Center" />
-                </TabItem>
-                <TabItem Header="Settings">
-                    <TextBlock Text="Settings tab — configuration will appear here"
-                               Foreground="#FF999999"
-                               HorizontalAlignment="Center"
-                               VerticalAlignment="Center" />
-                </TabItem>
-            </TabControl>
-        </Grid>
-    </Border>
 
     <Window.Resources>
         <Style x:Key="TitleBarButtonStyle" TargetType="Button">
@@ -136,5 +72,68 @@
             </Setter>
         </Style>
     </Window.Resources>
+
+    <Border Background="#E0202020"
+            BorderBrush="#FF444444"
+            BorderThickness="1"
+            CornerRadius="6">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="32" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+
+            <!-- Custom Title Bar -->
+            <Grid Grid.Row="0"
+                  Background="#FF2D2D2D"
+                  MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <TextBlock Grid.Column="0"
+                           Text="WinGlance"
+                           Foreground="#FFCCCCCC"
+                           VerticalAlignment="Center"
+                           Margin="10,0,0,0"
+                           FontSize="13"
+                           FontWeight="SemiBold" />
+
+                <StackPanel Grid.Column="1"
+                            Orientation="Horizontal">
+                    <Button Content="&#x2014;"
+                            Click="MinimizeButton_Click"
+                            Style="{StaticResource TitleBarButtonStyle}" />
+                    <Button Content="&#x2715;"
+                            Click="CloseButton_Click"
+                            Style="{StaticResource CloseButtonStyle}" />
+                </StackPanel>
+            </Grid>
+
+            <!-- Tab Control -->
+            <TabControl Grid.Row="1"
+                        Margin="4"
+                        Background="Transparent"
+                        BorderThickness="0">
+                <TabItem Header="Preview">
+                    <views:PreviewTab DataContext="{Binding PreviewViewModel}" />
+                </TabItem>
+                <TabItem Header="Applications">
+                    <TextBlock Text="Applications tab — app list will appear here"
+                               Foreground="#FF999999"
+                               HorizontalAlignment="Center"
+                               VerticalAlignment="Center" />
+                </TabItem>
+                <TabItem Header="Settings">
+                    <TextBlock Text="Settings tab — configuration will appear here"
+                               Foreground="#FF999999"
+                               HorizontalAlignment="Center"
+                               VerticalAlignment="Center" />
+                </TabItem>
+            </TabControl>
+        </Grid>
+    </Border>
+
 
 </Window>

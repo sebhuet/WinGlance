@@ -92,4 +92,69 @@ public class TrackedWindowTests
         Assert.False(window.Equals((TrackedWindow?)null));
         Assert.False(window.Equals((object?)null));
     }
+
+    [Fact]
+    public void Title_DoesNotRaise_WhenSameValue()
+    {
+        var window = new TrackedWindow(IntPtr.Zero, "test", "Test") { Title = "Hello" };
+        var raised = false;
+        window.PropertyChanged += (_, _) => raised = true;
+
+        window.Title = "Hello"; // same value
+
+        Assert.False(raised);
+    }
+
+    [Fact]
+    public void Icon_DefaultsToNull()
+    {
+        var window = new TrackedWindow(IntPtr.Zero, "test", "Test");
+        Assert.Null(window.Icon);
+    }
+
+    [Fact]
+    public void Equality_SameHwndDifferentProperties_AreEqual()
+    {
+        var a = new TrackedWindow((IntPtr)100, "notepad", "Notepad") { Title = "File A" };
+        var b = new TrackedWindow((IntPtr)100, "notepad", "Notepad") { Title = "File B" };
+
+        Assert.Equal(a, b); // equality based on Hwnd only
+    }
+
+    [Fact]
+    public void Equality_DifferentHwndSameProperties_AreNotEqual()
+    {
+        var a = new TrackedWindow((IntPtr)100, "notepad", "Notepad") { Title = "Same" };
+        var b = new TrackedWindow((IntPtr)200, "notepad", "Notepad") { Title = "Same" };
+
+        Assert.NotEqual(a, b);
+    }
+
+    [Fact]
+    public void Equality_ViaObjectEquals()
+    {
+        var a = new TrackedWindow((IntPtr)100, "notepad", "Notepad");
+        object b = new TrackedWindow((IntPtr)100, "notepad", "Notepad");
+
+        Assert.True(a.Equals(b));
+    }
+
+    [Fact]
+    public void LlmVerdict_DefaultsToNull()
+    {
+        var window = new TrackedWindow(IntPtr.Zero, "test", "Test");
+        Assert.Null(window.LlmVerdict);
+    }
+
+    [Fact]
+    public void AllBooleanFlags_DefaultToFalse()
+    {
+        var window = new TrackedWindow(IntPtr.Zero, "test", "Test");
+
+        Assert.False(window.IsActive);
+        Assert.False(window.IsFlashing);
+        Assert.False(window.IsHung);
+        Assert.False(window.IsModalBlocked);
+        Assert.False(window.IsStale);
+    }
 }
