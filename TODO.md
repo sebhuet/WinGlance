@@ -5,22 +5,16 @@
 
 ---
 
-## Phase 0 — Scaffolding & Infrastructure
+## Phase 0 — Scaffolding & Infrastructure ✅
 
-- [ ] **0.1** Create the solution `WinGlance.sln` and the project `WinGlance.csproj`
-  - Target `net8.0-windows`, `UseWPF`, `PublishSingleFile`, `SelfContained`
-  - Add NuGet package `Hardcodet.NotifyIcon.Wpf`
-- [ ] **0.2** Create the folder structure
-  - `Models/`, `Services/`, `ViewModels/`, `Views/`, `NativeApi/`, `Converters/`, `Assets/`
-- [ ] **0.3** Add the application manifest (`app.manifest`)
-  - DPI awareness `PerMonitorV2`
-  - Requested execution level `asInvoker`
-- [ ] **0.4** Configure `App.xaml` / `App.xaml.cs`
-  - Entry point, unhandled exception handling
-- [ ] **0.5** Add an application icon (`Assets/icon.ico`)
-  - Temporary placeholder icon, to be replaced later
-- [ ] **0.6** Verify that `dotnet build` compiles without errors
-- [ ] **0.7** Verify that `dotnet publish -c Release -r win-x64 --self-contained -p:PublishSingleFile=true` produces a working executable
+- [x] **0.1** Create the solution `WinGlance.sln` and the project `WinGlance.csproj`
+- [x] **0.2** Create the folder structure
+- [x] **0.3** Add the application manifest (`app.manifest`)
+- [x] **0.4** Configure `App.xaml` / `App.xaml.cs`
+- [x] **0.5** Add an application icon (`Assets/icon.ico`)
+- [x] **0.6** Verify that `dotnet build` compiles without errors
+- [x] **0.7** Verify that `dotnet publish` produces a working executable
+- [ ] **0.8** Create test project `WinGlance.Tests` (xUnit) and add to solution
 
 ---
 
@@ -35,6 +29,9 @@
   - Placeholder content for each tab
 - [ ] **1.5** Create `MainViewModel.cs` — main orchestrator (MVVM)
   - Properties for active tab, config, collections
+- [ ] **1.6** Write and run unit tests
+  - Test `MainViewModel` property change notifications
+  - `dotnet test` passes
 
 ---
 
@@ -54,7 +51,16 @@
 - [ ] **2.4** Add UWP APIs
   - `GetApplicationUserModelId` (or `SHLoadIndirectString`)
   - Resolve real app name from `ApplicationFrameHost.exe`
-- [ ] **2.5** Manually test critical P/Invoke calls (DWM enabled, EnumWindows)
+- [ ] **2.5** Add Attention Detection APIs
+  - `RegisterShellHookWindow` — receive `HSHELL_FLASH` notifications
+  - `IsHungAppWindow` — detect not-responding windows
+  - `IsWindowEnabled` — detect modal-blocked windows
+  - `GetWindow(GW_ENABLEDPOPUP)` — find the modal popup
+  - `PrintWindow` — capture window content as bitmap
+- [ ] **2.6** Manually test critical P/Invoke calls (DWM enabled, EnumWindows)
+- [ ] **2.7** Write and run unit tests
+  - Test struct sizes and layouts match Win32 expectations
+  - `dotnet test` passes
 
 ---
 
@@ -62,6 +68,8 @@
 
 - [ ] **3.1** Create `Models/TrackedWindow.cs`
   - Properties: `IntPtr Hwnd`, `string Title`, `string ProcessName`, `string DisplayName`, `ImageSource Icon`, `bool IsActive`
+  - Attention properties: `bool IsFlashing`, `bool IsHung`, `bool IsModalBlocked`
+  - LLM properties: `bool IsStale`, `string LlmVerdict` (awaiting_action / idle / null)
 - [ ] **3.2** Create `Models/MonitoredApp.cs`
   - Properties: `string ProcessName`, `string DisplayName`
 - [ ] **3.3** Create `Services/WindowEnumerator.cs`
@@ -74,6 +82,10 @@
   - Diff between current state and new scan → add/remove
   - Run scan on background thread, update UI via Dispatcher
 - [ ] **3.6** Detect the active window (`GetForegroundWindow`) for highlight
+- [ ] **3.7** Write and run unit tests
+  - Test `TrackedWindow` / `MonitoredApp` model properties and equality
+  - Test `WindowEnumerator` filtering logic (mock-friendly interface)
+  - `dotnet test` passes
 
 ---
 
@@ -98,6 +110,10 @@
   - `WrapPanel` horizontal, `StackPanel` vertical, `UniformGrid`
 - [ ] **4.6** Visual highlight for the active window (colored border / glow)
 - [ ] **4.7** Handle resizing — proportional rescaling of thumbnails
+- [ ] **4.8** Write and run unit tests
+  - Test `ThumbnailManager` register/unregister lifecycle logic
+  - Test `PreviewViewModel` grouping and collection updates
+  - `dotnet test` passes
 
 ---
 
@@ -124,6 +140,9 @@
 - [ ] **6.3** Implement `Refresh` — rescan currently running applications
 - [ ] **6.4** Implement `Save` — persist the monitored app list to config
 - [ ] **6.5** Synchronize: when apps are saved, the Preview tab updates accordingly
+- [ ] **6.6** Write and run unit tests
+  - Test `ApplicationsViewModel` scan, grouping, and monitored toggle
+  - `dotnet test` passes
 
 ---
 
@@ -133,6 +152,7 @@
   - `monitoredApps`, `layout`, `thumbnailWidth`, `thumbnailHeight`
   - `panelOpacity`, `pollingIntervalMs`, `rememberPosition`, `panelX`, `panelY`
   - `autoStart`, `closeToTray`, `hotkey`
+  - LLM settings: `llmEnabled`, `llmProvider`, `llmEndpoint`, `llmApiKey`, `llmModel`, `staleThresholdSeconds`
   - Sensible default values
 - [ ] **7.2** Create `Services/ConfigService.cs`
   - `Load()`: read `config.json` next to the exe, fallback to `%LOCALAPPDATA%\WinGlance\`
@@ -141,6 +161,10 @@
 - [ ] **7.3** Load config at startup (`App.xaml.cs`)
 - [ ] **7.4** Save panel position on close (if `rememberPosition` is enabled)
 - [ ] **7.5** Test: delete `config.json`, launch the app → default values created
+- [ ] **7.6** Write and run unit tests
+  - Test `AppConfig` default values and JSON round-trip (serialize → deserialize)
+  - Test `ConfigService` load/save, corrupt JSON fallback, atomic write
+  - `dotnet test` passes
 
 ---
 
@@ -154,16 +178,22 @@
   - Polling interval: slider 500ms-5000ms
   - Global hotkey: TextBox + `[Record]` button
   - Checkboxes: remember position, close to tray, auto-start
+  - LLM Analysis section: enabled checkbox, provider dropdown, endpoint, API key, model, stale threshold slider, Edit Prompt button
   - `[Save Configuration]` button
 - [ ] **8.2** Create `ViewModels/SettingsViewModel.cs`
   - Properties bound to config
-  - Commands: `Save`, `RecordHotkey`
+  - Commands: `Save`, `RecordHotkey`, `EditPrompt`
 - [ ] **8.3** Implement hotkey recording (keyboard capture in the TextBox)
 - [ ] **8.4** Apply changes live when relevant
   - Layout change → rearrange thumbnails immediately
   - Opacity change → apply immediately
   - Polling interval change → restart the timer
-- [ ] **8.5** Create `Converters/BoolToVisibilityConverter.cs` and other necessary converters
+- [ ] **8.5** Implement `EditPrompt` — open `prompt.txt` in default text editor
+- [ ] **8.6** Create `Converters/BoolToVisibilityConverter.cs` and other necessary converters
+- [ ] **8.7** Write and run unit tests
+  - Test `SettingsViewModel` property bindings and save command
+  - Test converters (BoolToVisibility, etc.)
+  - `dotnet test` passes
 
 ---
 
@@ -248,40 +278,95 @@
 
 ---
 
-## Phase 15 — Polish & Final Touches
+## Phase 15 — Window Attention Detection (FR-9)
 
-- [ ] **15.1** Animations and transitions
+- [ ] **15.1** Create `Services/AttentionDetector.cs`
+  - `RegisterShellHookWindow` to receive `HSHELL_FLASH` notifications
+  - WndProc handler for shell hook messages
+  - Track which windows are currently flashing
+- [ ] **15.2** Integrate `IsHungAppWindow` check into polling cycle
+  - Set `TrackedWindow.IsHung` flag on each enumeration pass
+- [ ] **15.3** Integrate `IsWindowEnabled` check into polling cycle
+  - If disabled, use `GetWindow(GW_ENABLEDPOPUP)` to find the blocking modal
+  - Set `TrackedWindow.IsModalBlocked` flag
+- [ ] **15.4** Add visual indicators in Preview tab
+  - Flashing: pulsating orange border (WPF animation)
+  - Not responding: "(Not Responding)" overlay on thumbnail
+  - Modal blocked: attention icon / distinct border style
+- [ ] **15.5** Auto-clear indicators when condition resolves
+- [ ] **15.6** Write and run unit tests
+  - Test `AttentionDetector` state tracking and auto-clear logic
+  - `dotnet test` passes
+- [ ] **15.7** Manual test: trigger flash, hang an app, open a modal dialog — verify indicators
+
+---
+
+## Phase 16 — LLM-Assisted Analysis (FR-10)
+
+- [ ] **16.1** Create `Services/ScreenshotComparer.cs`
+  - Capture window screenshot via `PrintWindow` API
+  - Implement perceptual hashing (pHash) for image comparison
+  - Detect stale windows (no visual change for configurable threshold, default 30s)
+- [ ] **16.2** Create `Services/LlmAnalyzer.cs`
+  - Abstract provider interface for LLM calls
+  - OpenAI implementation (GPT-4o / GPT-4o-mini with vision)
+  - Google Gemini implementation (Gemini Pro/Flash with vision)
+  - Ollama implementation (local, optional vision)
+- [ ] **16.3** Load system prompt from `prompt.txt` next to the executable
+  - Create default `prompt.txt` if not present
+- [ ] **16.4** Trigger LLM call when window is flagged stale
+  - Send screenshot + window title + system prompt
+  - Parse response: "awaiting_action" or "idle"
+  - Set `TrackedWindow.LlmVerdict` accordingly
+  - One call per stale window — no repeat until content changes
+- [ ] **16.5** Add visual indicators in Preview tab
+  - Awaiting action: orange pulsating border
+  - Idle: dimmed/grayed border
+- [ ] **16.6** Write and run unit tests
+  - Test `ScreenshotComparer` pHash comparison logic (with synthetic bitmaps)
+  - Test `LlmAnalyzer` request formatting and response parsing per provider
+  - Test stale detection threshold logic
+  - `dotnet test` passes
+- [ ] **16.7** Manual test: with each provider, stale a window → verify LLM call and indicator
+
+---
+
+## Phase 17 — Polish & Final Touches
+
+- [ ] **17.1** Animations and transitions
   - Smooth panel appear/disappear (fade in/out)
   - Tab transitions
-- [ ] **15.2** Tooltips on thumbnails (full window title)
-- [ ] **15.3** Verify performance
+- [ ] **17.2** Tooltips on thumbnails (full window title)
+- [ ] **17.3** Verify performance
   - CPU < 2% at idle
   - RAM < 50 MB
   - Profile if necessary
-- [ ] **15.4** Run the 18-point verification plan (SPECIFICATION.md § Verification Plan)
-- [ ] **15.5** Clean up code, remove remaining placeholders and TODOs
-- [ ] **15.6** Replace placeholder icon with the final icon
-- [ ] **15.7** Final single-file build and standalone exe test
+- [ ] **17.4** Run the 21-point verification plan (SPECIFICATION.md § Verification Plan)
+- [ ] **17.5** Clean up code, remove remaining placeholders and TODOs
+- [ ] **17.6** Replace placeholder icon with the final icon
+- [ ] **17.7** Final single-file build and standalone exe test
 
 ---
 
 ## Phase Summary
 
-| Phase | Description                   | Depends on |
-| ----- | ----------------------------- | ---------- |
-| 0     | Scaffolding & Infrastructure  | —          |
-| 1     | Main Window (Shell)           | 0          |
-| 2     | Native Layer (P/Invoke)       | 0          |
-| 3     | Window Enumeration            | 2          |
-| 4     | DWM Thumbnails (Preview Tab)  | 1, 2, 3    |
-| 5     | Click-to-Switch               | 4          |
-| 6     | Applications Tab (Tab 2)      | 1, 3, 7    |
-| 7     | Configuration & Persistence   | 0          |
-| 8     | Settings Tab (Tab 3)          | 1, 7       |
-| 9     | Single Instance & System Tray | 1, 7       |
-| 10    | Global Hotkey                 | 2, 9       |
-| 11    | Theme (Light / Dark)          | 1          |
-| 12    | DPI & Multi-Monitor           | 4          |
-| 13    | Error Handling & Resilience   | 3, 4, 7    |
-| 14    | Auto-Start with Windows       | 7, 8       |
-| 15    | Polish & Final Touches        | All        |
+| Phase | Description                       | Depends on |
+| ----- | --------------------------------- | ---------- |
+| 0     | Scaffolding & Infrastructure ✅   | —          |
+| 1     | Main Window (Shell)               | 0          |
+| 2     | Native Layer (P/Invoke)           | 0          |
+| 3     | Window Enumeration                | 2          |
+| 4     | DWM Thumbnails (Preview Tab)      | 1, 2, 3    |
+| 5     | Click-to-Switch                   | 4          |
+| 6     | Applications Tab (Tab 2)          | 1, 3, 7    |
+| 7     | Configuration & Persistence       | 0          |
+| 8     | Settings Tab (Tab 3)              | 1, 7       |
+| 9     | Single Instance & System Tray     | 1, 7       |
+| 10    | Global Hotkey                     | 2, 9       |
+| 11    | Theme (Light / Dark)              | 1          |
+| 12    | DPI & Multi-Monitor               | 4          |
+| 13    | Error Handling & Resilience       | 3, 4, 7    |
+| 14    | Auto-Start with Windows           | 7, 8       |
+| 15    | Window Attention Detection (FR-9) | 2, 3, 4    |
+| 16    | LLM-Assisted Analysis (FR-10)     | 2, 3, 15   |
+| 17    | Polish & Final Touches            | All        |
