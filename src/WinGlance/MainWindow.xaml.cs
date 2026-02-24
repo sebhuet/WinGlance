@@ -14,6 +14,7 @@ public partial class MainWindow : Window
     private readonly MainViewModel _viewModel;
     private readonly TaskbarIcon _trayIcon;
     private readonly HotkeyService _hotkeyService = new();
+    private readonly AttentionDetector _attentionDetector = new();
     private bool _isExiting;
 
     internal MainWindow(ConfigService configService, AppConfig config)
@@ -54,6 +55,10 @@ public partial class MainWindow : Window
         _hotkeyService.Initialize(hwnd);
         _hotkeyService.HotkeyPressed += (_, _) => TogglePanel();
         _hotkeyService.Register(_viewModel.Config.Hotkey);
+
+        // Attention detection (shell hook for flashing)
+        _attentionDetector.Initialize(hwnd);
+        _viewModel.PreviewViewModel.AttentionDetector = _attentionDetector;
     }
 
     private void OnClosing(object? sender, System.ComponentModel.CancelEventArgs e)
@@ -75,6 +80,7 @@ public partial class MainWindow : Window
 
         _viewModel.ConfigService.Save(config);
         _viewModel.PreviewViewModel.Dispose();
+        _attentionDetector.Dispose();
         _hotkeyService.Dispose();
         _trayIcon.Dispose();
     }

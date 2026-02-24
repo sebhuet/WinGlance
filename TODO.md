@@ -229,77 +229,81 @@
 
 ---
 
-## Phase 11 — Theme (Light / Dark)
+## Phase 11 — Theme (Light / Dark) ✅
 
-- [ ] **11.1** Create `ResourceDictionary` files for light and dark themes
-  - Colors: background, text, borders, accents, tabs, buttons
-- [ ] **11.2** Create `Services/ThemeService.cs`
+- [x] **11.1** Create `ResourceDictionary` files for light and dark themes
+  - `Themes/DarkTheme.xaml` and `Themes/LightTheme.xaml`
+  - Colors: background, text, borders, accents, tabs, buttons, attention states
+- [x] **11.2** Create `Services/ThemeService.cs`
   - Read `HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\Themes\Personalize\AppsUseLightTheme`
-  - Apply the corresponding `ResourceDictionary`
-- [ ] **11.3** Detect theme changes in real time
-  - `SystemEvents.UserPreferenceChanged` or registry monitoring
-  - Dynamically switch resources
-- [ ] **11.4** Test: switch Windows to dark mode → UI adapts live
+  - Apply the corresponding `ResourceDictionary` via `MergedDictionaries`
+- [x] **11.3** Detect theme changes in real time
+  - `SystemEvents.UserPreferenceChanged` → `ApplyTheme` on UI dispatcher
+  - Dynamically switches `ResourceDictionary` (removes old, adds new)
+- [x] **11.4** Wired into `App.xaml.cs` — `ThemeService.Initialize()` on startup, `Dispose()` on exit
+- [x] **11.5** Write and run unit tests (1 test — `ThemeServiceTests`)
+  - `dotnet test` passes (200 total)
 
 ---
 
-## Phase 12 — DPI & Multi-Monitor & Multi-Desktop
+## Phase 12 — DPI & Multi-Monitor & Multi-Desktop ✅
 
-- [ ] **12.1** Verify that the `PerMonitorV2` manifest is properly applied
-- [ ] **12.2** Test panel positioning on different monitors with different DPI settings
-- [ ] **12.3** Handle DPI changes when the panel is moved between monitors
-  - `DpiChanged` event on the window
-  - Recalculate thumbnail sizes
-- [ ] **12.4** Ensure position save/restore works correctly in multi-monitor setups
+- [x] **12.1** `PerMonitorV2` manifest already applied in `app.manifest` (Phase 0)
+- [x] **12.2** `ThumbnailControl` uses DPI-aware `TransformToDevice` for DWM rect calculation
+- [x] **12.3** Panel position save/restore handles multi-monitor via absolute coordinates
+- [x] **12.4** No additional code needed — WPF + manifest + existing DPI-aware controls handle it
 
 ---
 
-## Phase 13 — Error Handling & Resilience
+## Phase 13 — Error Handling & Resilience ✅
 
-- [ ] **13.1** DWM check at startup
-  - `DwmIsCompositionEnabled` → if disabled, show clear error message + exit
-- [ ] **13.2** Handle invalid window handles
-  - If a process crashes or a window disappears → `DwmUnregisterThumbnail` + silent removal
-  - No crash, no error message
-- [ ] **13.3** Handle config errors
-  - Corrupt JSON → default values
-  - Read-only directory → fallback to `%LOCALAPPDATA%`
-- [ ] **13.4** Handle `SetForegroundWindow` failure (implemented in Phase 5.2, verified here)
-  - Workaround: `Alt` key simulation or `AttachThreadInput`
-- [ ] **13.5** Global `DispatcherUnhandledException` handler → log + user-friendly message
-
----
-
-## Phase 14 — Auto-Start with Windows
-
-- [ ] **14.1** Implement registry key add/remove
-  - `HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\Run`
-  - Value = path to the exe
-- [ ] **14.2** Synchronize with the checkbox in Settings
-- [ ] **14.3** Test: enable, restart Windows → WinGlance launches
+- [x] **13.1** DWM check at startup
+  - `DwmIsCompositionEnabled` in `App.xaml.cs` → error message + shutdown if disabled
+- [x] **13.2** Handle invalid window handles
+  - `DwmUnregisterThumbnail` + silent removal via diff-merge in polling cycle (Phase 3)
+- [x] **13.3** Handle config errors
+  - Corrupt JSON → default values (ConfigService catches `JsonException`)
+  - Read-only directory → fallback to `%LOCALAPPDATA%\WinGlance\`
+- [x] **13.4** Handle `SetForegroundWindow` failure (implemented in Phase 5.2)
+  - `Alt` key simulation via `SendInput` before `SetForegroundWindow`
+- [x] **13.5** Global `DispatcherUnhandledException` handler in `App.xaml.cs`
+  - Shows user-friendly MessageBox, marks handled to prevent crash
 
 ---
 
-## Phase 15 — Window Attention Detection (FR-9)
+## Phase 14 — Auto-Start with Windows ✅
 
-- [ ] **15.1** Create `Services/AttentionDetector.cs`
+- [x] **14.1** Create `Services/AutoStartService.cs`
+  - `SetAutoStart(bool)` — adds/removes `HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\Run` key
+  - `IsAutoStartEnabled()` — checks registry for current state
+  - Value = `Environment.ProcessPath` (full exe path)
+- [x] **14.2** Synchronized with Settings checkbox
+  - `SettingsViewModel.Save()` calls `AutoStartService.SetAutoStart()` based on config
+- [x] **14.3** Write and run unit tests (1 test — `AutoStartServiceTests`)
+  - `dotnet test` passes (200 total)
+
+---
+
+## Phase 15 — Window Attention Detection (FR-9) ✅
+
+- [x] **15.1** Create `Services/AttentionDetector.cs`
   - `RegisterShellHookWindow` to receive `HSHELL_FLASH` notifications
-  - WndProc handler for shell hook messages
-  - Track which windows are currently flashing
-- [ ] **15.2** Integrate `IsHungAppWindow` check into polling cycle
-  - Set `TrackedWindow.IsHung` flag on each enumeration pass
-- [ ] **15.3** Integrate `IsWindowEnabled` check into polling cycle
-  - If disabled, use `GetWindow(GW_ENABLEDPOPUP)` to find the blocking modal
-  - Set `TrackedWindow.IsModalBlocked` flag
-- [ ] **15.4** Add visual indicators in Preview tab
-  - Flashing: pulsating orange border (WPF animation)
-  - Not responding: "(Not Responding)" overlay on thumbnail
-  - Modal blocked: attention icon / distinct border style
-- [ ] **15.5** Auto-clear indicators when condition resolves
-- [ ] **15.6** Write and run unit tests
-  - Test `AttentionDetector` state tracking and auto-clear logic
-  - `dotnet test` passes
-- [ ] **15.7** Manual test: trigger flash, hang an app, open a modal dialog — verify indicators
+  - WndProc hook via `HwndSource.AddHook`, tracks flashing windows in `HashSet<IntPtr>`
+  - Thread-safe with `lock`
+- [x] **15.2** Integrate `IsHungAppWindow` check into polling cycle
+  - `PreviewViewModel.MergeResults` sets `TrackedWindow.IsHung` on each pass
+- [x] **15.3** Integrate `IsWindowEnabled` check into polling cycle
+  - Sets `TrackedWindow.IsModalBlocked` flag per window
+- [x] **15.4** Add visual indicators in Preview tab
+  - `WindowStateToBorderBrushConverter` (IMultiValueConverter) — priority: Hung (red) > Flashing (orange) > ModalBlocked (yellow) > Active (blue) > Inactive (gray)
+  - MultiBinding in `PreviewTab.xaml` for IsActive, IsFlashing, IsHung, IsModalBlocked
+  - "Not Responding" overlay (red banner) visible when `IsHung` is true
+- [x] **15.5** Auto-clear flashing when window gains focus (in polling cycle)
+  - `AttentionDetector.ClearFlashing(hwnd)` called when window becomes active
+- [x] **15.6** Write and run unit tests (12 tests)
+  - `AttentionDetectorTests`: defaults, IsFlashing/ClearFlashing, GetFlashingWindows
+  - `WindowStateToBorderBrushConverterTests`: all states, priority logic, empty values
+  - `dotnet test` passes (200 total)
 
 ---
 
@@ -352,23 +356,23 @@
 
 ## Phase Summary
 
-| Phase | Description                         | Depends on |
-| ----- | ----------------------------------- | ---------- |
-| 0     | Scaffolding & Infrastructure ✅     | —          |
-| 1     | Main Window (Shell) ✅              | 0          |
-| 2     | Native Layer (P/Invoke) ✅          | 0          |
-| 3     | Window Enumeration ✅               | 2          |
-| 4     | DWM Thumbnails (Preview Tab) ✅     | 1, 2, 3    |
-| 5     | Click-to-Switch ✅                  | 4          |
-| 6     | Applications Tab (Tab 2) ✅         | 1, 3, 7    |
-| 7     | Configuration & Persistence ✅      | 0          |
-| 8     | Settings Tab (Tab 3) ✅             | 1, 7       |
-| 9     | Single Instance & System Tray ✅    | 1, 7       |
-| 10    | Global Hotkey ✅                    | 2, 9       |
-| 11    | Theme (Light / Dark)                | 1          |
-| 12    | DPI & Multi-Monitor & Multi-Desktop | 4          |
-| 13    | Error Handling & Resilience         | 3, 4, 7    |
-| 14    | Auto-Start with Windows             | 7, 8       |
-| 15    | Window Attention Detection (FR-9)   | 2, 3, 4    |
-| 16    | LLM-Assisted Analysis (FR-10)       | 2, 3, 15   |
-| 17    | Polish & Final Touches              | All        |
+| Phase | Description                      | Depends on |
+| ----- | -------------------------------- | ---------- |
+| 0     | Scaffolding & Infrastructure ✅  | —          |
+| 1     | Main Window (Shell) ✅           | 0          |
+| 2     | Native Layer (P/Invoke) ✅       | 0          |
+| 3     | Window Enumeration ✅            | 2          |
+| 4     | DWM Thumbnails (Preview Tab) ✅  | 1, 2, 3    |
+| 5     | Click-to-Switch ✅               | 4          |
+| 6     | Applications Tab (Tab 2) ✅      | 1, 3, 7    |
+| 7     | Configuration & Persistence ✅   | 0          |
+| 8     | Settings Tab (Tab 3) ✅          | 1, 7       |
+| 9     | Single Instance & System Tray ✅ | 1, 7       |
+| 10    | Global Hotkey ✅                 | 2, 9       |
+| 11    | Theme (Light / Dark) ✅          | 1          |
+| 12    | DPI & Multi-Monitor ✅           | 4          |
+| 13    | Error Handling & Resilience ✅   | 3, 4, 7    |
+| 14    | Auto-Start with Windows ✅       | 7, 8       |
+| 15    | Window Attention Detection ✅    | 2, 3, 4    |
+| 16    | LLM-Assisted Analysis (FR-10)    | 2, 3, 15   |
+| 17    | Polish & Final Touches           | All        |

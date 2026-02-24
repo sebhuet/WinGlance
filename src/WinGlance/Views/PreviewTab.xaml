@@ -10,7 +10,8 @@
 
     <UserControl.Resources>
         <converters:LayoutToPanelConverter x:Key="LayoutToPanelConverter" />
-        <converters:BoolToBorderBrushConverter x:Key="ActiveBorderConverter" />
+        <converters:WindowStateToBorderBrushConverter x:Key="StateBorderConverter" />
+        <converters:BoolToVisibilityConverter x:Key="BoolToVisibility" />
 
         <!-- Group header: app icon + app name -->
         <DataTemplate x:Key="GroupHeaderTemplate">
@@ -53,31 +54,55 @@
                             Padding="2"
                             CornerRadius="4"
                             BorderThickness="2"
-                            BorderBrush="{Binding IsActive, Converter={StaticResource ActiveBorderConverter}}"
                             Background="#33000000"
                             ToolTip="{Binding Title}"
                             Cursor="Hand">
+                        <!-- Multi-value border: IsActive, IsFlashing, IsHung, IsModalBlocked -->
+                        <Border.BorderBrush>
+                            <MultiBinding Converter="{StaticResource StateBorderConverter}">
+                                <Binding Path="IsActive" />
+                                <Binding Path="IsFlashing" />
+                                <Binding Path="IsHung" />
+                                <Binding Path="IsModalBlocked" />
+                            </MultiBinding>
+                        </Border.BorderBrush>
                         <Border.InputBindings>
                             <MouseBinding MouseAction="LeftClick"
                                           Command="{Binding DataContext.ActivateWindowCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                           CommandParameter="{Binding}" />
                         </Border.InputBindings>
-                        <StackPanel>
-                            <!-- DWM thumbnail area -->
-                            <controls:ThumbnailControl
-                                SourceHwnd="{Binding Hwnd}"
-                                ThumbnailManager="{Binding DataContext.ThumbnailManager, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                Width="{Binding DataContext.ThumbnailWidth, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                Height="{Binding DataContext.ThumbnailHeight, RelativeSource={RelativeSource AncestorType=UserControl}}" />
+                        <Grid>
+                            <StackPanel>
+                                <!-- DWM thumbnail area -->
+                                <controls:ThumbnailControl
+                                    SourceHwnd="{Binding Hwnd}"
+                                    ThumbnailManager="{Binding DataContext.ThumbnailManager, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                    Width="{Binding DataContext.ThumbnailWidth, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                    Height="{Binding DataContext.ThumbnailHeight, RelativeSource={RelativeSource AncestorType=UserControl}}" />
 
-                            <!-- Window title -->
-                            <TextBlock Text="{Binding Title}"
-                                       Foreground="#FFAAAAAA"
-                                       FontSize="11"
-                                       Margin="4,2,4,2"
-                                       TextTrimming="CharacterEllipsis"
-                                       MaxWidth="{Binding DataContext.ThumbnailWidth, RelativeSource={RelativeSource AncestorType=UserControl}}" />
-                        </StackPanel>
+                                <!-- Window title -->
+                                <TextBlock Text="{Binding Title}"
+                                           Foreground="#FFAAAAAA"
+                                           FontSize="11"
+                                           Margin="4,2,4,2"
+                                           TextTrimming="CharacterEllipsis"
+                                           MaxWidth="{Binding DataContext.ThumbnailWidth, RelativeSource={RelativeSource AncestorType=UserControl}}" />
+                            </StackPanel>
+
+                            <!-- Not Responding overlay -->
+                            <Border Background="#88FF0000"
+                                    CornerRadius="3"
+                                    Visibility="{Binding IsHung, Converter={StaticResource BoolToVisibility}}"
+                                    VerticalAlignment="Top"
+                                    HorizontalAlignment="Center"
+                                    Margin="0,4,0,0"
+                                    Padding="6,2">
+                                <TextBlock Text="Not Responding"
+                                           Foreground="White"
+                                           FontSize="10"
+                                           FontWeight="Bold" />
+                            </Border>
+                        </Grid>
                     </Border>
                 </DataTemplate>
             </ItemsControl.ItemTemplate>

@@ -64,6 +64,11 @@ internal sealed class PreviewViewModel : ViewModelBase, IDisposable
     public IReadOnlyList<MonitoredApp> MonitoredApps { get; set; } = [];
 
     /// <summary>
+    /// Optional attention detector for flash notifications. Set by MainWindow after shell hook init.
+    /// </summary>
+    public AttentionDetector? AttentionDetector { get; set; }
+
+    /// <summary>
     /// Layout mode: "horizontal", "vertical", or "grid".
     /// </summary>
     public string Layout
@@ -222,6 +227,19 @@ internal sealed class PreviewViewModel : ViewModelBase, IDisposable
                     existing.IsActive = scannedWindow.IsActive;
                     existing.IsHung = scannedWindow.IsHung;
                     existing.IsModalBlocked = scannedWindow.IsModalBlocked;
+
+                    // Flash detection via shell hook
+                    if (AttentionDetector is not null)
+                    {
+                        existing.IsFlashing = AttentionDetector.IsFlashing(existing.Hwnd);
+                        // Auto-clear flashing when window gains focus
+                        if (existing.IsActive && existing.IsFlashing)
+                        {
+                            AttentionDetector.ClearFlashing(existing.Hwnd);
+                            existing.IsFlashing = false;
+                        }
+                    }
+
                     // Icon only updated if it was null
                     if (existing.Icon is null && scannedWindow.Icon is not null)
                         existing.Icon = scannedWindow.Icon;

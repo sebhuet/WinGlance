@@ -218,6 +218,9 @@ internal sealed class SettingsViewModel : ViewModelBase
         _config.Llm.StaleThresholdSeconds = LlmStaleThresholdSeconds;
 
         _configService.Save(_config);
+
+        // Sync auto-start registry entry
+        Services.AutoStartService.SetAutoStart(AutoStart);
     }
 
     /// <summary>

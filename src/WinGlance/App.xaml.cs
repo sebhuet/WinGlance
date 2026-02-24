@@ -7,6 +7,7 @@ namespace WinGlance;
 public partial class App : Application
 {
     private Mutex? _mutex;
+    private ThemeService? _themeService;
 
     protected override void OnStartup(StartupEventArgs e)
     {
@@ -27,6 +28,17 @@ public partial class App : Application
             return;
         }
 
+        // DWM composition check (Phase 13)
+        if (!DwmCompositionCheck())
+        {
+            Shutdown();
+            return;
+        }
+
+        // Theme detection
+        _themeService = new ThemeService();
+        _themeService.Initialize();
+
         var configService = new ConfigService();
         var config = configService.Load();
 
@@ -38,9 +50,26 @@ public partial class App : Application
 
     protected override void OnExit(ExitEventArgs e)
     {
+        _themeService?.Dispose();
         _mutex?.ReleaseMutex();
         _mutex?.Dispose();
         base.OnExit(e);
+    }
+
+    private static bool DwmCompositionCheck()
+    {
+        var hr = NativeApi.NativeMethods.DwmIsCompositionEnabled(out var enabled);
+        if (hr != 0 || !enabled)
+        {
+            MessageBox.Show(
+                "DWM desktop composition is not enabled.\nWinGlance requires DWM to display live window thumbnails.",
+                "WinGlance — DWM Required",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+            return false;
+        }
+
+        return true;
     }
 
     private void OnDispatcherUnhandledException(object sender, DispatcherUnhandledExceptionEventArgs e)
