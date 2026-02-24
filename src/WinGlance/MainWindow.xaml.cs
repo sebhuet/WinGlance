@@ -2,6 +2,7 @@ using System.Drawing;
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Interop;
+using System.Windows.Media.Animation;
 using Hardcodet.Wpf.TaskbarNotification;
 using WinGlance.Models;
 using WinGlance.Services;
@@ -107,11 +108,15 @@ public partial class MainWindow : Window
         Show();
         WindowState = WindowState.Normal;
         Activate();
+        var fadeIn = new DoubleAnimation(0, _viewModel.Config.PanelOpacity, TimeSpan.FromMilliseconds(150));
+        BeginAnimation(OpacityProperty, fadeIn);
     }
 
     private void HidePanel()
     {
-        Hide();
+        var fadeOut = new DoubleAnimation(_viewModel.Config.PanelOpacity, 0, TimeSpan.FromMilliseconds(150));
+        fadeOut.Completed += (_, _) => Hide();
+        BeginAnimation(OpacityProperty, fadeOut);
     }
 
     private void ExitApplication()
