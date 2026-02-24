@@ -132,7 +132,7 @@ Extends FR-9 with intelligent window analysis via an external LLM.
 - **Google Gemini** — API-compatible (Gemini Pro/Flash with vision)
 - **Ollama** (local) — for privacy-conscious users, local models with optional vision support
 - Provider, endpoint, API key, and model name are configurable in Tab 3 — Settings
-- The prompt is stored in a separate editable file: `prompt.txt` (not in `config.json`)
+- The prompt is stored in `config.json` and editable via the in-app **Prompt Editor** screen
 
 #### Configuration (Tab 3 — Settings)
 
@@ -142,7 +142,17 @@ Extends FR-9 with intelligent window analysis via an external LLM.
 - **API key**: password field (not needed for Ollama)
 - **Model**: text field (e.g., `gpt-4o-mini`, `gemini-2.0-flash`, `llava`)
 - **Stale threshold**: slider (10s–120s, default: 30s)
-- **Edit prompt**: button that opens `prompt.txt` in the default text editor
+- **Edit Prompt & Debug Log**: button that navigates to the Prompt Editor screen
+
+#### Prompt Editor Screen
+
+- Dedicated screen accessible from Settings ("Edit Prompt & Debug Log" button) or right-click context menu
+- **Editable prompt**: monospace multi-line text field with the system prompt sent to the LLM
+- **Save Prompt**: persists the prompt to `config.json` and hot-reloads it into the active LLM service
+- **Reset to Default**: restores the built-in default prompt
+- **Debug mode**: checkbox to enable/disable real-time debug logging
+- **Debug log**: scrollable list displaying each LLM analysis result — window title, verdict (`awaiting_action` / `idle`), and the LLM's reasoning (second line of response)
+- Log is capped at 200 entries (oldest removed first) and can be cleared manually
 
 ---
 

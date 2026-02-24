@@ -66,7 +66,14 @@ public partial class MainWindow : Window
 
         // LLM analysis service
         if (_viewModel.Config.Llm.Enabled)
-            _viewModel.PreviewViewModel.LlmService = new LlmService(_viewModel.Config.Llm);
+        {
+            var llmService = new LlmService(_viewModel.Config.Llm);
+            llmService.DebugLogger = _viewModel.PromptEditorViewModel;
+            _viewModel.PreviewViewModel.LlmService = llmService;
+        }
+
+        // Allow settings to navigate to prompt editor
+        _viewModel.SettingsViewModel.NavigateToPromptEditor = () => SwitchToView(3);
     }
 
     private void OnClosing(object? sender, System.ComponentModel.CancelEventArgs e)
@@ -133,6 +140,19 @@ public partial class MainWindow : Window
         PreviewView.Visibility = index == 0 ? Visibility.Visible : Visibility.Collapsed;
         ApplicationsView.Visibility = index == 1 ? Visibility.Visible : Visibility.Collapsed;
         SettingsView.Visibility = index == 2 ? Visibility.Visible : Visibility.Collapsed;
+        PromptEditorView.Visibility = index == 3 ? Visibility.Visible : Visibility.Collapsed;
+
+        // DWM thumbnails are rendered by the OS compositor and ignore WPF Visibility.
+        // We must unregister them when leaving Preview; they re-register on the next poll.
+        if (index == 0)
+        {
+            _viewModel.PreviewViewModel.Start();
+        }
+        else
+        {
+            _viewModel.PreviewViewModel.Stop();
+            _viewModel.PreviewViewModel.ThumbnailManager.UnregisterAll();
+        }
 
         // Re-measure so the window auto-sizes to the new content
         InvalidateMeasure();
@@ -156,6 +176,10 @@ public partial class MainWindow : Window
         var settings = new System.Windows.Controls.MenuItem { Header = "Settings" };
         settings.Click += (_, _) => SwitchToView(2);
         menu.Items.Add(settings);
+
+        var prompt = new System.Windows.Controls.MenuItem { Header = "Prompt Editor" };
+        prompt.Click += (_, _) => SwitchToView(3);
+        menu.Items.Add(prompt);
 
         menu.Items.Add(new System.Windows.Controls.Separator());
 

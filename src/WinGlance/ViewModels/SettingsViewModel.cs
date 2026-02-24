@@ -1,5 +1,3 @@
-using System.Diagnostics;
-using System.IO;
 using System.Windows.Input;
 using WinGlance.Models;
 using WinGlance.Services;
@@ -190,6 +188,13 @@ internal sealed class SettingsViewModel : ViewModelBase
         set => SetProperty(ref _llmStaleThresholdSeconds, value);
     }
 
+    // ── Navigation ──────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Callback set by MainWindow to navigate to the Prompt Editor screen.
+    /// </summary>
+    public Action? NavigateToPromptEditor { get; set; }
+
     // ── Commands ────────────────────────────────────────────────────────
 
     public ICommand SaveCommand { get; }
@@ -224,25 +229,10 @@ internal sealed class SettingsViewModel : ViewModelBase
     }
 
     /// <summary>
-    /// Opens the prompt.txt file in the default text editor.
-    /// Creates a default file if it doesn't exist.
+    /// Navigates to the in-app Prompt Editor screen.
     /// </summary>
     private void EditPrompt()
     {
-        var configDir = Path.GetDirectoryName(_configService.ConfigPath);
-        if (configDir is null)
-            return;
-
-        var promptPath = Path.Combine(configDir, "prompt.txt");
-        if (!File.Exists(promptPath))
-        {
-            File.WriteAllText(promptPath, """
-                You are analyzing a screenshot of an application window.
-                Determine if the window requires user action or is idle.
-                Respond with exactly one of: "awaiting_action" or "idle".
-                """);
-        }
-
-        Process.Start(new ProcessStartInfo(promptPath) { UseShellExecute = true });
+        NavigateToPromptEditor?.Invoke();
     }
 }

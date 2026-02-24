@@ -5,6 +5,7 @@ using System.IO;
 using System.Runtime.InteropServices;
 using WinGlance.Models;
 using WinGlance.NativeApi;
+using WinGlance.ViewModels;
 
 namespace WinGlance.Services;
 
@@ -21,14 +22,21 @@ internal sealed class LlmService : IDisposable
     private readonly HashSet<IntPtr> _pendingAnalysis = [];
     private LlmAnalyzer? _analyzer;
     private LlmConfig _config;
-    private string _systemPrompt;
+
+    /// <summary>
+    /// Optional reference to the prompt editor for debug logging.
+    /// Set after construction by the MainWindow.
+    /// </summary>
+    public PromptEditorViewModel? DebugLogger { get; set; }
 
     public LlmService(LlmConfig config)
     {
         _config = config;
-        _systemPrompt = LoadPrompt();
+        var prompt = string.IsNullOrWhiteSpace(config.Prompt)
+            ? LlmConfig.DefaultPrompt
+            : config.Prompt;
         if (config.Enabled)
-            _analyzer = new LlmAnalyzer(config, _systemPrompt);
+            _analyzer = new LlmAnalyzer(config, prompt);
     }
 
     /// <summary>
@@ -69,15 +77,20 @@ internal sealed class LlmService : IDisposable
                 return;
             }
 
-            var verdict = await _analyzer.AnalyzeAsync(screenshot, window.Title);
+            var (verdict, reason) = await _analyzer.AnalyzeWithReasonAsync(screenshot, window.Title);
             screenshot.Dispose();
 
-            window.LlmVerdict = verdict ?? "idle";
+            var finalVerdict = verdict ?? "idle";
+            window.LlmVerdict = finalVerdict;
+
+            // Emit debug log
+            DebugLogger?.AppendLog(window.Title, finalVerdict, reason);
         }
         catch (Exception ex)
         {
             Trace.TraceWarning($"LLM analysis failed for {window.Hwnd}: {ex.Message}");
             window.LlmVerdict = "idle";
+            DebugLogger?.AppendLog(window.Title, "idle", $"Error: {ex.Message}");
         }
         finally
         {
@@ -94,46 +107,24 @@ internal sealed class LlmService : IDisposable
         _pendingAnalysis.Remove(hwnd);
     }
 
+    /// <summary>
+    /// Reloads the prompt from the current config (called after Save in prompt editor).
+    /// </summary>
+    public void ReloadPrompt(string prompt)
+    {
+        var effectivePrompt = string.IsNullOrWhiteSpace(prompt) ? LlmConfig.DefaultPrompt : prompt;
+        _analyzer?.Dispose();
+        _analyzer = _config.Enabled ? new LlmAnalyzer(_config, effectivePrompt) : null;
+    }
+
     public void Dispose()
     {
         _analyzer?.Dispose();
     }
 
-    // ── Prompt loading ───────────────────────────────────────────────────
-
-    private static string LoadPrompt()
-    {
-        var dir = Path.GetDirectoryName(Environment.ProcessPath) ?? ".";
-        var promptPath = Path.Combine(dir, "prompt.txt");
-
-        if (File.Exists(promptPath))
-            return File.ReadAllText(promptPath);
-
-        // Create default prompt
-        const string defaultPrompt = """
-            You are analyzing a screenshot of a desktop application window.
-            Determine whether the window requires user attention or is idle.
-
-            Respond with EXACTLY one of:
-            - "awaiting_action" — if the window shows a dialog, prompt, error, notification, or anything that needs user input
-            - "idle" — if the window appears to be in a normal, inactive state with no pending action
-            """;
-
-        try
-        {
-            File.WriteAllText(promptPath, defaultPrompt);
-        }
-        catch
-        {
-            // Non-critical — use default in memory
-        }
-
-        return defaultPrompt;
-    }
-
     private static Bitmap? CaptureWindow(IntPtr hwnd)
     {
-        var placement = new NativeMethods.WINDOWPLACEMENT { Length = (uint)System.Runtime.InteropServices.Marshal.SizeOf<NativeMethods.WINDOWPLACEMENT>() };
+        var placement = new NativeMethods.WINDOWPLACEMENT { Length = (uint)Marshal.SizeOf<NativeMethods.WINDOWPLACEMENT>() };
         NativeMethods.GetWindowPlacement(hwnd, ref placement);
         var rect = placement.NormalPosition;
         var width = rect.Right - rect.Left;

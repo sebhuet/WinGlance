@@ -32,9 +32,11 @@ internal class MainViewModel : ViewModelBase
 
         SettingsViewModel = new SettingsViewModel(
             configService, config, PreviewViewModel, onOpacityChanged);
+
+        PromptEditorViewModel = new PromptEditorViewModel(configService, config);
     }
 
-    /// <summary>Index of the currently selected tab (0=Preview, 1=Applications, 2=Settings).</summary>
+    /// <summary>Index of the currently selected tab (0=Preview, 1=Applications, 2=Settings, 3=Prompt).</summary>
     public int SelectedTabIndex
     {
         get => _selectedTabIndex;
@@ -49,6 +51,9 @@ internal class MainViewModel : ViewModelBase
 
     /// <summary>ViewModel for the Settings tab.</summary>
     public SettingsViewModel SettingsViewModel { get; }
+
+    /// <summary>ViewModel for the Prompt Editor screen.</summary>
+    public PromptEditorViewModel PromptEditorViewModel { get; }
 
     /// <summary>The configuration service for load/save operations.</summary>
     public ConfigService ConfigService { get; }

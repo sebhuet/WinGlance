@@ -33,6 +33,16 @@ internal sealed class LlmAnalyzer : IDisposable
     /// </summary>
     public async Task<string?> AnalyzeAsync(Bitmap screenshot, string windowTitle)
     {
+        var (verdict, _) = await AnalyzeWithReasonAsync(screenshot, windowTitle);
+        return verdict;
+    }
+
+    /// <summary>
+    /// Analyzes a window screenshot and returns (verdict, reason).
+    /// The reason is the optional second line from the LLM response.
+    /// </summary>
+    public async Task<(string? Verdict, string? Reason)> AnalyzeWithReasonAsync(Bitmap screenshot, string windowTitle)
+    {
         try
         {
             var base64 = BitmapToBase64(screenshot);
@@ -42,11 +52,13 @@ internal sealed class LlmAnalyzer : IDisposable
                 "ollama" => await CallOllamaAsync(base64, windowTitle),
                 _ => await CallOpenAiAsync(base64, windowTitle),
             };
-            return ParseVerdict(response);
+            var verdict = ParseVerdict(response);
+            var reason = ParseReason(response);
+            return (verdict, reason);
         }
         catch
         {
-            return null;
+            return (null, null);
         }
     }
 
@@ -185,6 +197,15 @@ internal sealed class LlmAnalyzer : IDisposable
             return "idle";
         // Default to idle if unrecognized
         return "idle";
+    }
+
+    /// <summary>
+    /// Extracts the optional reason from the second line of the LLM response.
+    /// </summary>
+    internal static string? ParseReason(string response)
+    {
+        var lines = response.Split('\n', StringSplitOptions.RemoveEmptyEntries);
+        return lines.Length > 1 ? lines[1].Trim() : null;
     }
 
     private static string BitmapToBase64(Bitmap bitmap)

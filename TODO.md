@@ -186,7 +186,7 @@
   - `EditPrompt()` creates default `prompt.txt` if missing, opens in default editor
 - [x] **8.3** Hotkey text input (full keyboard recording deferred to Phase 10 HotkeyService)
 - [x] **8.4** Apply changes live: layout → PreviewViewModel, opacity → Window.Opacity callback, polling → PreviewViewModel, thumbnail size → PreviewViewModel
-- [x] **8.5** Implement `EditPrompt` — opens `prompt.txt` via `Process.Start` with `UseShellExecute`
+- [x] **8.5** Implement `EditPrompt` — navigates to in-app Prompt Editor screen (view index 3)
 - [x] **8.6** Create converters: `BoolToVisibilityConverter`, `LayoutRadioConverter`
 - [x] **8.7** Write and run unit tests (25 tests)
   - `SettingsViewModelTests`: constructor init, live-apply to preview, opacity callback, PropertyChanged (8 properties via Theory), save persistence, commands
@@ -320,9 +320,10 @@
   - Ollama API (generate with images, local)
   - `ParseVerdict()` extracts "awaiting_action" or "idle" from response
 - [x] **16.3** Create `Services/LlmService.cs` — orchestrator
-  - Loads `prompt.txt` from exe directory (creates default if missing)
+  - Reads prompt from `LlmConfig.Prompt` (stored in `config.json`)
   - `EvaluateAsync()` checks staleness, triggers LLM call once per stale window
   - Auto-resets verdict when window content changes
+  - `DebugLogger` property emits analysis results to PromptEditorViewModel
 - [x] **16.4** Integrated into `PreviewViewModel` polling cycle
   - `LlmService.EvaluateAsync()` called after merge for each window
   - Cleanup on window removal via `LlmService.Remove()`
@@ -331,7 +332,13 @@
   - `LlmVerdictToOpacityConverter`: idle → 0.5 opacity (dimmed), else 1.0
   - `LlmVerdictToBorderBrushConverter`: awaiting_action → orange, idle → dim gray
   - "Awaiting Action" overlay badge via DataTrigger on LlmVerdict
-- [x] **16.6** Write and run unit tests (23 tests)
+- [x] **16.6** Create `ViewModels/PromptEditorViewModel.cs` + `Views/PromptEditorTab.xaml`
+  - In-app editable prompt field (replaces external `prompt.txt`)
+  - Save Prompt / Reset to Default commands with hot-reload via `LlmService.ReloadPrompt()`
+  - Debug checkbox enables real-time log of LLM analysis (window title, verdict, reason)
+  - Thread-safe `AppendLog()` marshals to UI thread, caps at 200 entries
+  - Accessible from Settings ("Edit Prompt & Debug Log") and right-click context menu
+- [x] **16.7** Write and run unit tests (23 tests)
   - `ScreenshotComparerTests`: hash consistency, different images, hamming distance, edge cases
   - `LlmAnalyzerTests`: ParseVerdict for all cases, priority, case insensitivity
   - `LlmVerdictConverterTests`: brush + opacity converters for all states

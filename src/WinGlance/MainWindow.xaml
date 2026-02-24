@@ -124,6 +124,11 @@
                 <views:SettingsTab x:Name="SettingsView"
                                    DataContext="{Binding SettingsViewModel}"
                                    Visibility="Collapsed" />
+
+                <!-- Prompt Editor overlay (index 3) -->
+                <views:PromptEditorTab x:Name="PromptEditorView"
+                                       DataContext="{Binding PromptEditorViewModel}"
+                                       Visibility="Collapsed" />
             </Grid>
         </Grid>
     </Border>

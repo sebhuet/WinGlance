@@ -187,7 +187,7 @@
                     </StackPanel>
                 </Grid>
 
-                <Button Content="Edit Prompt File"
+                <Button Content="Edit Prompt &amp; Debug Log"
                         Command="{Binding EditPromptCommand}"
                         Padding="10,3" Margin="0,4,0,0"
                         HorizontalAlignment="Left"
