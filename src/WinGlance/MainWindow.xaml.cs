@@ -318,7 +318,13 @@ public partial class MainWindow : Window
 
     private void Border_MouseRightButtonUp(object sender, MouseButtonEventArgs e)
     {
-        var menu = new System.Windows.Controls.ContextMenu();
+        // Placed on the panel so that the menu takes the DPI of the panel's monitor: without
+        // a placement target, WPF scales the popup for the primary monitor
+        var menu = new System.Windows.Controls.ContextMenu
+        {
+            PlacementTarget = (UIElement)sender,
+            Placement = PlacementMode.MousePoint,
+        };
 
         var preview = new System.Windows.Controls.MenuItem { Header = "Preview" };
         preview.Click += (_, _) => SwitchToView(0);

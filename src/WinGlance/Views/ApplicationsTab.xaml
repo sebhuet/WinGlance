@@ -6,6 +6,44 @@
              mc:Ignorable="d"
              d:DesignHeight="300" d:DesignWidth="400">
 
+    <UserControl.Resources>
+        <!-- The default column header stays light whatever the theme -->
+        <Style TargetType="GridViewColumnHeader">
+            <Setter Property="Background" Value="{DynamicResource TitleBarBackground}" />
+            <Setter Property="Foreground" Value="{DynamicResource PrimaryText}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource WindowBorder}" />
+            <Setter Property="Padding" Value="6,4" />
+            <Setter Property="HorizontalContentAlignment" Value="Left" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="GridViewColumnHeader">
+                        <Grid>
+                            <Border Background="{TemplateBinding Background}"
+                                    BorderBrush="{TemplateBinding BorderBrush}"
+                                    BorderThickness="0,0,1,1"
+                                    Padding="{TemplateBinding Padding}">
+                                <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                                  VerticalAlignment="Center" />
+                            </Border>
+                            <!-- Keeps the columns resizable by dragging their edge -->
+                            <Thumb x:Name="PART_HeaderGripper"
+                                   HorizontalAlignment="Right"
+                                   Width="8"
+                                   Margin="0,0,-4,0"
+                                   Cursor="SizeWE">
+                                <Thumb.Template>
+                                    <ControlTemplate TargetType="Thumb">
+                                        <Border Background="Transparent" />
+                                    </ControlTemplate>
+                                </Thumb.Template>
+                            </Thumb>
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </UserControl.Resources>
+
     <Grid Margin="8">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
@@ -63,7 +101,7 @@
                     </GridViewColumn>
                     <GridViewColumn Header="Process" Width="130"
                                     DisplayMemberBinding="{Binding ProcessName}" />
-                    <GridViewColumn Header="Windows" Width="60"
+                    <GridViewColumn Header="Windows" Width="70"
                                     DisplayMemberBinding="{Binding WindowCount}" />
                 </GridView>
             </ListView.View>
