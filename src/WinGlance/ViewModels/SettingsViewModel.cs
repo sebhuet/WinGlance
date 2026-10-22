@@ -209,10 +209,26 @@ internal sealed class SettingsViewModel : ViewModelBase
         set => SetProperty(ref _llmEnabled, value);
     }
 
+    /// <summary>
+    /// LLM provider. Switching provider also switches the endpoint and model when they still
+    /// hold a provider default: Gemini requests used to go to the OpenAI endpoint.
+    /// Custom values are kept.
+    /// </summary>
     public string LlmProvider
     {
         get => _llmProvider;
-        set => SetProperty(ref _llmProvider, value);
+        set
+        {
+            if (!SetProperty(ref _llmProvider, value)
+                || !LlmConfig.ProviderDefaults.TryGetValue(value ?? "", out var defaults))
+                return;
+
+            var knownDefaults = LlmConfig.ProviderDefaults.Values;
+            if (string.IsNullOrWhiteSpace(LlmEndpoint) || knownDefaults.Any(d => d.Endpoint == LlmEndpoint))
+                LlmEndpoint = defaults.Endpoint;
+            if (string.IsNullOrWhiteSpace(LlmModel) || knownDefaults.Any(d => d.Model == LlmModel))
+                LlmModel = defaults.Model;
+        }
     }
 
     public string LlmEndpoint
@@ -246,6 +262,12 @@ internal sealed class SettingsViewModel : ViewModelBase
     /// </summary>
     public Action? NavigateToPromptEditor { get; set; }
 
+    /// <summary>
+    /// Called after <see cref="Save"/> when an LLM setting changed, so that the analysis
+    /// service is started, stopped or rebuilt without a restart.
+    /// </summary>
+    public Action? LlmSettingsChanged { get; set; }
+
     // ── Commands ────────────────────────────────────────────────────────
 
     public ICommand SaveCommand { get; }
@@ -267,6 +289,10 @@ internal sealed class SettingsViewModel : ViewModelBase
         _config.Hotkey = Hotkey;
         _config.AgentDetection.Enabled = AgentDetectionEnabled;
 
+        var llm = _config.Llm;
+        var llmChanged = (llm.Enabled, llm.Provider, llm.Endpoint, llm.ApiKey, llm.Model, llm.StaleThresholdSeconds)
+            != (LlmEnabled, LlmProvider, LlmEndpoint, LlmApiKey, LlmModel, LlmStaleThresholdSeconds);
+
         _config.Llm.Enabled = LlmEnabled;
         _config.Llm.Provider = LlmProvider;
         _config.Llm.Endpoint = LlmEndpoint;
@@ -282,6 +308,9 @@ internal sealed class SettingsViewModel : ViewModelBase
         // The hotkey applies immediately, not at next launch
         if (ApplyHotkey is { } applyHotkey)
             ReportHotkeyResult(applyHotkey(Hotkey));
+
+        if (llmChanged)
+            LlmSettingsChanged?.Invoke();
     }
 
     /// <summary>

@@ -14,6 +14,8 @@ internal sealed class ScreenshotComparer
 {
     private const int HashSize = 8; // 8×8 = 64-bit hash
     private const uint PW_RENDERFULLCONTENT = 0x00000002;
+    // Beyond 8K a capture is a bogus window size, not a screen
+    private const int MaxCaptureSide = 8192;
 
     private readonly Dictionary<IntPtr, ulong> _lastHash = [];
     private readonly Dictionary<IntPtr, DateTime> _lastChangeTime = [];
@@ -68,32 +70,65 @@ internal sealed class ScreenshotComparer
     /// </summary>
     internal static ulong? CaptureAndHash(IntPtr hwnd)
     {
-        var placement = new NativeMethods.WINDOWPLACEMENT
-        {
-            Length = (uint)Marshal.SizeOf<NativeMethods.WINDOWPLACEMENT>(),
-        };
-        NativeMethods.GetWindowPlacement(hwnd, ref placement);
-        var rect = placement.NormalPosition;
-        var width = rect.Right - rect.Left;
-        var height = rect.Bottom - rect.Top;
-        if (width <= 0 || height <= 0)
+        using var bitmap = CaptureWindow(hwnd);
+        return bitmap is null ? null : ComputeAverageHash(bitmap);
+    }
+
+    /// <summary>
+    /// Captures the window at its current size with PrintWindow. Returns null for a minimized
+    /// window (it renders nothing useful) or when the capture fails.
+    /// </summary>
+    /// <remarks>
+    /// The size comes from GetWindowRect, not WINDOWPLACEMENT.NormalPosition: the latter is the
+    /// restored size, which cropped maximized windows.
+    /// </remarks>
+    internal static Bitmap? CaptureWindow(IntPtr hwnd)
+    {
+        if (NativeMethods.IsIconic(hwnd) || !NativeMethods.GetWindowRect(hwnd, out var rect))
             return null;
 
-        // Cap size to avoid excessive memory use
-        width = Math.Min(width, 1920);
-        height = Math.Min(height, 1080);
+        var width = rect.Right - rect.Left;
+        var height = rect.Bottom - rect.Top;
+        if (width <= 0 || height <= 0 || width > MaxCaptureSide || height > MaxCaptureSide)
+            return null;
 
-        using var bmp = new Bitmap(width, height, PixelFormat.Format32bppArgb);
-        using (var g = Graphics.FromImage(bmp))
+        var bitmap = new Bitmap(width, height, PixelFormat.Format32bppArgb);
+        bool ok;
+        using (var g = Graphics.FromImage(bitmap))
         {
             var hdc = g.GetHdc();
-            var ok = NativeMethods.PrintWindow(hwnd, hdc, PW_RENDERFULLCONTENT);
-            g.ReleaseHdc(hdc);
-            if (!ok)
-                return null;
+            try
+            {
+                ok = NativeMethods.PrintWindow(hwnd, hdc, PW_RENDERFULLCONTENT);
+            }
+            finally
+            {
+                g.ReleaseHdc(hdc);
+            }
         }
 
-        return ComputeAverageHash(bmp);
+        if (ok)
+            return bitmap;
+
+        bitmap.Dispose();
+        return null;
+    }
+
+    /// <summary>
+    /// Returns a copy scaled down so that its longest side is at most <paramref name="maxSide"/>,
+    /// or a plain copy when it already fits.
+    /// </summary>
+    internal static Bitmap ScaleToFit(Bitmap source, int maxSide)
+    {
+        var scale = Math.Min(1.0, (double)maxSide / Math.Max(source.Width, source.Height));
+        var width = Math.Max(1, (int)Math.Round(source.Width * scale));
+        var height = Math.Max(1, (int)Math.Round(source.Height * scale));
+
+        var scaled = new Bitmap(width, height, PixelFormat.Format32bppArgb);
+        using var g = Graphics.FromImage(scaled);
+        g.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.HighQualityBicubic;
+        g.DrawImage(source, 0, 0, width, height);
+        return scaled;
     }
 
     /// <summary>

@@ -85,30 +85,6 @@ public partial class MainWindow : Window
         _attentionDetector.Initialize(hwnd);
         _viewModel.PreviewViewModel.AttentionDetector = _attentionDetector;
 
-        // LLM analysis service
-        if (_viewModel.Config.Llm.Enabled)
-        {
-            var llmService = new LlmService(_viewModel.Config.Llm);
-            llmService.DebugLogger = _viewModel.PromptEditorViewModel;
-            _viewModel.PreviewViewModel.LlmService = llmService;
-
-            // Wire "Run" button in Prompt Editor
-            _viewModel.PromptEditorViewModel.RunAnalysisFunc = async () =>
-            {
-                llmService.ReloadPrompt(_viewModel.PromptEditorViewModel.PromptText);
-                var windows = _viewModel.PreviewViewModel.GetWindowsSnapshot();
-                if (windows.Length == 0)
-                {
-                    _viewModel.PromptEditorViewModel.AppendLog("—", "—", "No monitored windows found");
-                    return;
-                }
-                foreach (var w in windows)
-                {
-                    await llmService.ForceEvaluateAsync(w);
-                }
-            };
-        }
-
         // Allow settings to navigate to prompt editor
         _viewModel.SettingsViewModel.NavigateToPromptEditor = () => SwitchToView(3);
     }

@@ -186,10 +186,11 @@
                              BorderBrush="#FF555555" Padding="4,3" Margin="0,2" />
 
                     <TextBlock Grid.Row="2" Grid.Column="0" Text="API Key" Style="{StaticResource Label}" Margin="0,3" />
-                    <TextBox Grid.Row="2" Grid.Column="1"
-                             Text="{Binding LlmApiKey, UpdateSourceTrigger=PropertyChanged}"
-                             Background="#FF2A2A2A" Foreground="#FFCCCCCC"
-                             BorderBrush="#FF555555" Padding="4,3" Margin="0,2" />
+                    <!-- PasswordBox.Password cannot be bound: synced in code-behind -->
+                    <PasswordBox x:Name="ApiKeyBox" Grid.Row="2" Grid.Column="1"
+                                 PasswordChanged="ApiKeyBox_PasswordChanged"
+                                 Background="#FF2A2A2A" Foreground="#FFCCCCCC"
+                                 BorderBrush="#FF555555" Padding="4,3" Margin="0,2" />
 
                     <TextBlock Grid.Row="3" Grid.Column="0" Text="Model" Style="{StaticResource Label}" Margin="0,3" />
                     <TextBox Grid.Row="3" Grid.Column="1"

@@ -221,6 +221,48 @@ public class SettingsViewModelTests : IDisposable
         Assert.NotNull(vm.EditPromptCommand);
     }
 
+    // ── LLM provider ─────────────────────────────────────────────────
+
+    [Theory]
+    [InlineData("google", "https://generativelanguage.googleapis.com/v1beta", "gemini-2.0-flash")]
+    [InlineData("ollama", "http://localhost:11434", "llava")]
+    public void LlmProvider_Switch_AppliesTheProviderDefaults(string provider, string endpoint, string model)
+    {
+        var vm = CreateVm(); // openai defaults
+
+        vm.LlmProvider = provider;
+
+        Assert.Equal(endpoint, vm.LlmEndpoint);
+        Assert.Equal(model, vm.LlmModel);
+    }
+
+    [Fact]
+    public void LlmProvider_Switch_KeepsCustomValues()
+    {
+        var vm = CreateVm();
+        vm.LlmEndpoint = "https://my-proxy.example/v1";
+        vm.LlmModel = "my-model";
+
+        vm.LlmProvider = "ollama";
+
+        Assert.Equal("https://my-proxy.example/v1", vm.LlmEndpoint);
+        Assert.Equal("my-model", vm.LlmModel);
+    }
+
+    [Fact]
+    public void Save_LlmSettingChanged_NotifiesOnce()
+    {
+        var vm = CreateVm();
+        var notifications = 0;
+        vm.LlmSettingsChanged = () => notifications++;
+
+        vm.LlmEnabled = true;
+        vm.Save();
+        vm.Save(); // nothing changed since
+
+        Assert.Equal(1, notifications);
+    }
+
     // ── Hotkey ───────────────────────────────────────────────────────
 
     [Fact]

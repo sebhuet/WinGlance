@@ -37,6 +37,59 @@ internal class MainViewModel : ViewModelBase
             configService, config, PreviewViewModel, onOpacityChanged);
 
         PromptEditorViewModel = new PromptEditorViewModel(configService, config);
+
+        // LLM analysis follows the settings live, and a saved prompt applies immediately
+        SettingsViewModel.LlmSettingsChanged = ApplyLlmSettings;
+        PromptEditorViewModel.PromptSaved = prompt => PreviewViewModel.LlmService?.ReloadPrompt(prompt);
+        ApplyLlmSettings();
+    }
+
+    /// <summary>
+    /// Starts, rebuilds or stops the LLM service to match <see cref="AppConfig.Llm"/>.
+    /// Turning analysis off also clears the verdicts it left on the thumbnails.
+    /// </summary>
+    internal void ApplyLlmSettings()
+    {
+        if (PreviewViewModel.LlmService is { } previous)
+        {
+            PreviewViewModel.LlmService = null;
+            previous.Dispose(); // cancels its calls in flight
+
+            foreach (var window in PreviewViewModel.GetWindowsSnapshot())
+            {
+                window.LlmVerdict = null;
+                window.IsStale = false;
+            }
+        }
+
+        if (!Config.Llm.Enabled)
+        {
+            PromptEditorViewModel.RunAnalysisFunc = null;
+            return;
+        }
+
+        var service = new LlmService(Config.Llm) { DebugLogger = PromptEditorViewModel };
+        PreviewViewModel.LlmService = service;
+        PromptEditorViewModel.RunAnalysisFunc = () => RunAnalysisAsync(service);
+    }
+
+    /// <summary>
+    /// "Run" button of the Prompt Editor: analyzes every tracked window now, off the UI thread.
+    /// </summary>
+    private async Task RunAnalysisAsync(LlmService service)
+    {
+        var windows = PreviewViewModel.GetWindowsSnapshot();
+        if (windows.Length == 0)
+        {
+            PromptEditorViewModel.AppendLog("—", "—", "No monitored windows found");
+            return;
+        }
+
+        await Task.Run(async () =>
+        {
+            foreach (var window in windows)
+                await service.ForceEvaluateAsync(window).ConfigureAwait(false);
+        });
     }
 
     /// <summary>Index of the currently selected tab (0=Preview, 1=Applications, 2=Settings, 3=Prompt).</summary>

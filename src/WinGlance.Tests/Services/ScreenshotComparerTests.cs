@@ -84,6 +84,26 @@ public class ScreenshotComparerTests
         comparer.Remove(new IntPtr(999));
     }
 
+    // ── Capture ──────────────────────────────────────────────────────────
+
+    [Fact]
+    public void CaptureWindow_InvalidHandle_ReturnsNull()
+    {
+        Assert.Null(ScreenshotComparer.CaptureWindow(IntPtr.Zero));
+    }
+
+    [Theory]
+    [InlineData(3000, 1000, 1500, 500)]
+    [InlineData(800, 600, 800, 600)] // already fits: unchanged
+    public void ScaleToFit_KeepsTheAspectRatio(int width, int height, int expectedWidth, int expectedHeight)
+    {
+        using var source = new Bitmap(width, height);
+
+        using var scaled = ScreenshotComparer.ScaleToFit(source, 1500);
+
+        Assert.Equal((expectedWidth, expectedHeight), (scaled.Width, scaled.Height));
+    }
+
     // ── Staleness over time ──────────────────────────────────────────────
 
     private static readonly IntPtr Window = new(42);

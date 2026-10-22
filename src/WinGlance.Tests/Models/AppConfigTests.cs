@@ -26,6 +26,55 @@ public class AppConfigTests
         Assert.NotNull(config.AgentDetection);
     }
 
+    // ── API key at rest ──────────────────────────────────────────────────
+
+    private static readonly JsonSerializerOptions CamelCase = new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
+
+    [Fact]
+    public void Json_StoresTheApiKeyEncrypted_NeverInClear()
+    {
+        var config = new AppConfig { Llm = { ApiKey = "sk-live-123" } };
+
+        var json = JsonSerializer.Serialize(config, CamelCase);
+
+        Assert.DoesNotContain("sk-live-123", json);
+        Assert.DoesNotContain("\"apiKey\"", json);
+        Assert.Contains("\"apiKeyProtected\"", json);
+        Assert.Equal("sk-live-123", JsonSerializer.Deserialize<AppConfig>(json, CamelCase)!.Llm.ApiKey);
+    }
+
+    [Fact]
+    public void Json_PlaintextKeyFromAnOlderConfig_IsStillRead()
+    {
+        var config = JsonSerializer.Deserialize<AppConfig>("""{"llm":{"apiKey":"sk-old"}}""", CamelCase)!;
+
+        Assert.Equal("sk-old", config.Llm.ApiKey);
+    }
+
+    [Fact]
+    public void Json_EmptyProtectedKey_DoesNotEraseAPlaintextKey()
+    {
+        var config = JsonSerializer.Deserialize<AppConfig>(
+            """{"llm":{"apiKey":"sk-typed-by-hand","apiKeyProtected":""}}""", CamelCase)!;
+
+        Assert.Equal("sk-typed-by-hand", config.Llm.ApiKey);
+    }
+
+    [Fact]
+    public void Json_KeyEncryptedElsewhere_ReadsAsEmpty()
+    {
+        // config.json copied with the portable exe to another machine or user
+        var config = JsonSerializer.Deserialize<AppConfig>("""{"llm":{"apiKeyProtected":"AQIDBA=="}}""", CamelCase)!;
+
+        Assert.Equal("", config.Llm.ApiKey);
+    }
+
+    [Fact]
+    public void ProviderDefaults_CoverEveryProvider()
+    {
+        Assert.Equal(["google", "ollama", "openai"], LlmConfig.ProviderDefaults.Keys.Order());
+    }
+
     [Fact]
     public void AgentDetectionConfig_Defaults_AreCorrect()
     {

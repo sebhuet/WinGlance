@@ -54,10 +54,64 @@ internal sealed class MonitoredAppConfig
 /// </summary>
 internal sealed class LlmConfig
 {
+    /// <summary>
+    /// Default endpoint and model of each provider, applied when the provider changes.
+    /// </summary>
+    internal static readonly IReadOnlyDictionary<string, (string Endpoint, string Model)> ProviderDefaults =
+        new Dictionary<string, (string, string)>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["openai"] = ("https://api.openai.com/v1", "gpt-4o-mini"),
+            ["google"] = ("https://generativelanguage.googleapis.com/v1beta", "gemini-2.0-flash"),
+            ["ollama"] = ("http://localhost:11434", "llava"),
+        };
+
     public bool Enabled { get; set; }
     public string Provider { get; set; } = "openai";
     public string Endpoint { get; set; } = "https://api.openai.com/v1";
+
+    /// <summary>
+    /// The API key, in clear in memory only: config.json stores <see cref="ApiKeyProtected"/>.
+    /// </summary>
+    [System.Text.Json.Serialization.JsonIgnore]
     public string ApiKey { get; set; } = "";
+
+    /// <summary>
+    /// The API key encrypted with DPAPI for the current Windows user, as stored in config.json.
+    /// A key that cannot be decrypted (file copied to another machine or user) reads as empty
+    /// and must be entered again.
+    /// </summary>
+    public string ApiKeyProtected
+    {
+        get => Services.SecretProtector.Protect(ApiKey);
+        set
+        {
+            // Empty means "no encrypted key": keep a plaintext apiKey read from the same file
+            if (string.IsNullOrEmpty(value))
+                return;
+
+            var key = Services.SecretProtector.Unprotect(value);
+            if (key is null)
+                Services.Log.Warning("The saved LLM API key could not be decrypted (config.json from another user or machine); enter it again in Settings");
+            ApiKey = key ?? "";
+        }
+    }
+
+    /// <summary>
+    /// Plaintext key of configurations written before encryption (or typed in by hand):
+    /// read once, encrypted at the next save, never written back.
+    /// </summary>
+    [System.Text.Json.Serialization.JsonPropertyName("apiKey")]
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public string? LegacyApiKey
+    {
+        get => null;
+        set
+        {
+            if (!string.IsNullOrEmpty(value))
+                ApiKey = value;
+        }
+    }
+
     public string Model { get; set; } = "gpt-4o-mini";
     public int StaleThresholdSeconds { get; set; } = 30;
     public string Prompt { get; set; } = DefaultPrompt;
