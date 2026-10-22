@@ -1,10 +1,12 @@
 using System.Drawing;
+using System.IO;
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media.Animation;
 using Hardcodet.Wpf.TaskbarNotification;
 using WinGlance.Models;
+using WinGlance.NativeApi;
 using WinGlance.Services;
 using WinGlance.ViewModels;
 
@@ -16,6 +18,8 @@ public partial class MainWindow : Window
     private readonly TaskbarIcon _trayIcon;
     private readonly HotkeyService _hotkeyService = new();
     private readonly AttentionDetector _attentionDetector = new();
+    private readonly uint _showPanelMessage = NativeMethods.RegisterWindowMessage(App.ShowPanelMessageName);
+    private HwndSource? _hwndSource;
     private bool _isExiting;
 
     internal MainWindow(ConfigService configService, AppConfig config)
@@ -24,11 +28,20 @@ public partial class MainWindow : Window
         _viewModel = new MainViewModel(configService, config, opacity => Opacity = opacity);
         DataContext = _viewModel;
 
-        // Restore saved panel position
-        if (config.RememberPosition)
+        // Restore the saved position only if the title bar would be reachable: the monitor it
+        // was on may have been disconnected since
+        var virtualScreen = new Rect(
+            SystemParameters.VirtualScreenLeft, SystemParameters.VirtualScreenTop,
+            SystemParameters.VirtualScreenWidth, SystemParameters.VirtualScreenHeight);
+        if (MainViewModel.GetRestorablePosition(config, virtualScreen) is { } position)
         {
-            Left = config.PanelX;
-            Top = config.PanelY;
+            WindowStartupLocation = WindowStartupLocation.Manual;
+            Left = position.X;
+            Top = position.Y;
+        }
+        else
+        {
+            WindowStartupLocation = WindowStartupLocation.CenterScreen;
         }
 
         Opacity = config.PanelOpacity;
@@ -39,7 +52,7 @@ public partial class MainWindow : Window
         // System tray icon
         _trayIcon = new TaskbarIcon
         {
-            Icon = SystemIcons.Application,
+            Icon = LoadApplicationIcon(),
             ToolTipText = "WinGlance",
             ContextMenu = CreateTrayContextMenu(),
         };
@@ -55,10 +68,18 @@ public partial class MainWindow : Window
         _viewModel.PreviewViewModel.SetDestinationHwnd(hwnd);
         _viewModel.PreviewViewModel.Start();
 
-        // Register global hotkey
+        // A second instance broadcasts _showPanelMessage instead of starting
+        _hwndSource = HwndSource.FromHwnd(hwnd);
+        _hwndSource?.AddHook(WndProc);
+
+        // Register global hotkey; Settings re-registers it on Save
         _hotkeyService.Initialize(hwnd);
         _hotkeyService.HotkeyPressed += (_, _) => TogglePanel();
-        _hotkeyService.Register(_viewModel.Config.Hotkey);
+        _viewModel.SettingsViewModel.ApplyHotkey = _hotkeyService.Register;
+        var hotkeyRegistered = _hotkeyService.Register(_viewModel.Config.Hotkey);
+        if (!hotkeyRegistered)
+            Log.Warning($"Global hotkey '{_viewModel.Config.Hotkey}' could not be registered");
+        _viewModel.SettingsViewModel.ReportHotkeyResult(hotkeyRegistered);
 
         // Attention detection (shell hook for flashing)
         _attentionDetector.Initialize(hwnd);
@@ -92,6 +113,17 @@ public partial class MainWindow : Window
         _viewModel.SettingsViewModel.NavigateToPromptEditor = () => SwitchToView(3);
     }
 
+    private IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
+    {
+        if ((uint)msg == _showPanelMessage)
+        {
+            ShowPanel();
+            handled = true;
+        }
+
+        return IntPtr.Zero;
+    }
+
     private void OnClosing(object? sender, System.ComponentModel.CancelEventArgs e)
     {
         if (!_isExiting && _viewModel.Config.CloseToTray)
@@ -101,19 +133,37 @@ public partial class MainWindow : Window
             return;
         }
 
-        // Persist panel position if configured
+        PersistState();
+        _viewModel.PreviewViewModel.Dispose();
+        _attentionDetector.Dispose();
+        _hotkeyService.Dispose();
+        _hwndSource?.RemoveHook(WndProc);
+        _trayIcon.Dispose();
+    }
+
+    /// <summary>
+    /// Saves the panel position (if enabled) with the configuration. Called on exit, when the
+    /// panel is hidden to the tray and when Windows ends the session: WPF raises no Closing
+    /// event on logoff, and with close-to-tray the user may never pick Exit.
+    /// </summary>
+    internal void PersistState()
+    {
         var config = _viewModel.Config;
-        if (config.RememberPosition)
+        if (config.RememberPosition && WindowState == WindowState.Normal)
         {
             config.PanelX = Left;
             config.PanelY = Top;
         }
 
-        _viewModel.ConfigService.Save(config);
-        _viewModel.PreviewViewModel.Dispose();
-        _attentionDetector.Dispose();
-        _hotkeyService.Dispose();
-        _trayIcon.Dispose();
+        try
+        {
+            _viewModel.ConfigService.Save(config);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            // Must not prevent the cleanup that follows on exit
+            Log.Warning("Could not save the configuration", ex);
+        }
     }
 
     // ── Panel visibility ─────────────────────────────────────────────
@@ -131,14 +181,28 @@ public partial class MainWindow : Window
         Show();
         WindowState = WindowState.Normal;
         Activate();
-        var fadeIn = new DoubleAnimation(0, _viewModel.Config.PanelOpacity, TimeSpan.FromMilliseconds(150));
-        BeginAnimation(OpacityProperty, fadeIn);
+
+        // The live slider value, not the last saved one. FillBehavior.Stop hands the property
+        // back to its local value once the fade ends: a held animation would freeze the
+        // opacity and ignore the Settings slider from then on.
+        var opacity = _viewModel.SettingsViewModel.PanelOpacity;
+        Opacity = opacity;
+        BeginAnimation(OpacityProperty, new DoubleAnimation(0, opacity, TimeSpan.FromMilliseconds(150))
+        {
+            FillBehavior = FillBehavior.Stop,
+        });
     }
 
     private void HidePanel()
     {
-        var fadeOut = new DoubleAnimation(_viewModel.Config.PanelOpacity, 0, TimeSpan.FromMilliseconds(150));
-        fadeOut.Completed += (_, _) => Hide();
+        PersistState();
+
+        var fadeOut = new DoubleAnimation(Opacity, 0, TimeSpan.FromMilliseconds(150));
+        fadeOut.Completed += (_, _) =>
+        {
+            Hide();
+            BeginAnimation(OpacityProperty, null); // release the property for the next show
+        };
         BeginAnimation(OpacityProperty, fadeOut);
     }
 
@@ -146,6 +210,22 @@ public partial class MainWindow : Window
     {
         _isExiting = true;
         Close();
+    }
+
+    /// <summary>The executable's icon (Assets/icon.ico), or the generic one if unavailable.</summary>
+    private static Icon LoadApplicationIcon()
+    {
+        try
+        {
+            if (Environment.ProcessPath is { } exePath && System.Drawing.Icon.ExtractAssociatedIcon(exePath) is { } icon)
+                return icon;
+        }
+        catch (Exception ex) when (ex is ArgumentException or IOException)
+        {
+            Log.Warning("Could not load the application icon", ex);
+        }
+
+        return SystemIcons.Application;
     }
 
     // ── View switching ───────────────────────────────────────────
@@ -164,6 +244,10 @@ public partial class MainWindow : Window
         // (the Prompt Editor's debug log shows live analyses).
         if (index != 0)
             _viewModel.PreviewViewModel.ThumbnailManager.UnregisterAll();
+
+        // The list is empty until scanned: scan whenever the view opens
+        if (index == 1)
+            _viewModel.ApplicationsViewModel.Refresh();
 
         // Force SizeToContent recalculation (WPF resets it to Manual after user resize)
         SizeToContent = SizeToContent.Manual;

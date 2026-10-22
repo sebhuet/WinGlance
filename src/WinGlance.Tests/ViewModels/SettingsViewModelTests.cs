@@ -221,6 +221,48 @@ public class SettingsViewModelTests : IDisposable
         Assert.NotNull(vm.EditPromptCommand);
     }
 
+    // ── Hotkey ───────────────────────────────────────────────────────
+
+    [Fact]
+    public void Save_RegistersTheHotkeyImmediately()
+    {
+        var vm = CreateVm();
+        string? applied = null;
+        vm.ApplyHotkey = hotkey =>
+        {
+            applied = hotkey;
+            return true;
+        };
+        vm.Hotkey = "Ctrl+Shift+W";
+
+        vm.Save();
+
+        Assert.Equal("Ctrl+Shift+W", applied);
+        Assert.Equal(string.Empty, vm.HotkeyStatus);
+    }
+
+    [Fact]
+    public void Save_HotkeyRejected_ShowsAStatusMessage()
+    {
+        var vm = CreateVm();
+        vm.ApplyHotkey = _ => false;
+
+        vm.Save();
+
+        Assert.StartsWith("Not registered", vm.HotkeyStatus);
+    }
+
+    [Fact]
+    public void ReportHotkeyResult_Success_ClearsTheStatus()
+    {
+        var vm = CreateVm();
+        vm.ReportHotkeyResult(false);
+
+        vm.ReportHotkeyResult(true);
+
+        Assert.Equal(string.Empty, vm.HotkeyStatus);
+    }
+
     // ── Coding agents ────────────────────────────────────────────────
 
     [Theory]

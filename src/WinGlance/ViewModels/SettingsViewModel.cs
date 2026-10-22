@@ -25,6 +25,7 @@ internal sealed class SettingsViewModel : ViewModelBase
     private bool _autoStart;
     private bool _closeToTray;
     private string _hotkey;
+    private string _hotkeyStatus = string.Empty;
     private bool _agentDetectionEnabled;
 
     // LLM settings
@@ -159,6 +160,27 @@ internal sealed class SettingsViewModel : ViewModelBase
         set => SetProperty(ref _hotkey, value);
     }
 
+    /// <summary>Error shown under the hotkey field; empty while the hotkey is registered.</summary>
+    public string HotkeyStatus
+    {
+        get => _hotkeyStatus;
+        private set => SetProperty(ref _hotkeyStatus, value);
+    }
+
+    /// <summary>
+    /// Registers a hotkey string globally; returns false if it is invalid or taken.
+    /// Set by MainWindow, which owns the window the hotkey is bound to.
+    /// </summary>
+    public Func<string, bool>? ApplyHotkey { get; set; }
+
+    /// <summary>Updates <see cref="HotkeyStatus"/> after a registration attempt.</summary>
+    internal void ReportHotkeyResult(bool registered)
+    {
+        HotkeyStatus = registered
+            ? string.Empty
+            : "Not registered: use Modifier+Key (e.g. Ctrl+Alt+G). The combination may be used by another application.";
+    }
+
     // ── Coding agents ──────────────────────────────────────────────────
 
     /// <summary>
@@ -256,6 +278,10 @@ internal sealed class SettingsViewModel : ViewModelBase
 
         // Sync auto-start registry entry
         _applyAutoStart(AutoStart);
+
+        // The hotkey applies immediately, not at next launch
+        if (ApplyHotkey is { } applyHotkey)
+            ReportHotkeyResult(applyHotkey(Hotkey));
     }
 
     /// <summary>

@@ -125,6 +125,21 @@
                      Background="#FF2A2A2A" Foreground="#FFCCCCCC"
                      BorderBrush="#FF555555" Padding="4,3"
                      Width="180" HorizontalAlignment="Left" />
+            <TextBlock Text="{Binding HotkeyStatus}"
+                       Foreground="#FFFF6B6B"
+                       FontSize="11"
+                       TextWrapping="Wrap"
+                       Margin="0,4,0,0">
+                <TextBlock.Style>
+                    <Style TargetType="TextBlock">
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding HotkeyStatus}" Value="">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </TextBlock.Style>
+            </TextBlock>
 
             <!-- ── Coding Agents ──────────────────────────── -->
             <TextBlock Text="Coding Agents" Style="{StaticResource SectionHeader}" />

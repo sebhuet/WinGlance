@@ -64,6 +64,23 @@ internal class MainViewModel : ViewModelBase
     /// <summary>The current in-memory configuration.</summary>
     public AppConfig Config { get; }
 
+    /// <summary>
+    /// Returns the saved panel position when it should be restored and the title bar would be
+    /// reachable on the current screens; null to let the window center itself instead.
+    /// </summary>
+    /// <param name="virtualScreen">Bounding box of all monitors, in device-independent pixels.</param>
+    internal static System.Windows.Point? GetRestorablePosition(AppConfig config, System.Windows.Rect virtualScreen)
+    {
+        if (!config.RememberPosition || !double.IsFinite(config.PanelX) || !double.IsFinite(config.PanelY))
+            return null;
+
+        // A point inside the title bar, left of the buttons: it must be on screen to drag the panel
+        var titleBarPoint = new System.Windows.Point(config.PanelX + 40, config.PanelY + 16);
+        return virtualScreen.Contains(titleBarPoint)
+            ? new System.Windows.Point(config.PanelX, config.PanelY)
+            : null;
+    }
+
     private void OnMonitoredAppsChanged(IReadOnlyList<MonitoredApp> apps)
     {
         PreviewViewModel.MonitoredApps = apps;

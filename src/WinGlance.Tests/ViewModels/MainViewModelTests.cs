@@ -98,6 +98,38 @@ public class MainViewModelTests
         Assert.Equal(TimeSpan.FromSeconds(3), vm.PreviewViewModel.AgentMonitor.RefreshInterval);
     }
 
+    // ── Panel position restore ───────────────────────────────────────────
+
+    private static readonly System.Windows.Rect TwoMonitors = new(0, 0, 3840, 1080);
+
+    [Fact]
+    public void GetRestorablePosition_OnScreen_ReturnsTheSavedPosition()
+    {
+        var config = new AppConfig { PanelX = 2500, PanelY = 300 };
+
+        Assert.Equal(new System.Windows.Point(2500, 300), MainViewModel.GetRestorablePosition(config, TwoMonitors));
+    }
+
+    [Theory]
+    [InlineData(4000, 300)] // second monitor disconnected
+    [InlineData(100, -200)] // title bar above the screen
+    [InlineData(-500, 100)]
+    [InlineData(double.NaN, 100)]
+    public void GetRestorablePosition_TitleBarOffScreen_ReturnsNull(double x, double y)
+    {
+        var config = new AppConfig { PanelX = x, PanelY = y };
+
+        Assert.Null(MainViewModel.GetRestorablePosition(config, TwoMonitors));
+    }
+
+    [Fact]
+    public void GetRestorablePosition_RememberPositionOff_ReturnsNull()
+    {
+        var config = new AppConfig { RememberPosition = false, PanelX = 100, PanelY = 100 };
+
+        Assert.Null(MainViewModel.GetRestorablePosition(config, TwoMonitors));
+    }
+
     [Fact]
     public void Constructor_AgentDetectionDisabled_LeavesPreviewWithoutMonitor()
     {

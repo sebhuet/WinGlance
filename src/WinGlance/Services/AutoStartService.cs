@@ -40,4 +40,27 @@ internal static class AutoStartService
         using var key = Registry.CurrentUser.OpenSubKey(RunKeyPath);
         return key?.GetValue(AppName) is not null;
     }
+
+    /// <summary>
+    /// Points the auto-start entry at the running executable when the registered one no longer
+    /// exists (the portable exe was moved). A valid entry for another copy is left alone.
+    /// </summary>
+    public static void RepairIfStale()
+    {
+        string? registered;
+        using (var key = Registry.CurrentUser.OpenSubKey(RunKeyPath))
+            registered = key?.GetValue(AppName) as string;
+
+        if (registered is not null && IsStale(registered, System.IO.File.Exists))
+            SetAutoStart(true);
+    }
+
+    /// <summary>
+    /// True if a Run entry ("C:\path\WinGlance.exe", quoted or not) names a missing file.
+    /// </summary>
+    internal static bool IsStale(string runValue, Func<string, bool> fileExists)
+    {
+        var path = runValue.Trim().Trim('"');
+        return path.Length > 0 && !fileExists(path);
+    }
 }
