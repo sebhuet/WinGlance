@@ -28,6 +28,9 @@ config.json
 # Build output
 publish/
 *.exe
+
+# Test results and coverage reports
+TestResults/
 # Claude Code: only the project memory is versioned
 .claude/*
 !.claude/memory/

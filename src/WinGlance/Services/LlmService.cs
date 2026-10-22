@@ -1,3 +1,4 @@
+using System.Drawing;
 using WinGlance.Models;
 using WinGlance.ViewModels;
 
@@ -11,7 +12,10 @@ namespace WinGlance.Services;
 /// </summary>
 internal sealed class LlmService : IDisposable
 {
-    // A failed call (bad key, endpoint down) is retried after this delay, not on every tick
+    /// <summary>
+    /// Delay before a failed call (bad key, endpoint down) is retried, so that it is not
+    /// repeated on every polling tick.
+    /// </summary>
     internal static readonly TimeSpan RetryDelay = TimeSpan.FromMinutes(1);
 
     private readonly ScreenshotComparer _comparer = new();
@@ -20,6 +24,10 @@ internal sealed class LlmService : IDisposable
     private readonly object _stateLock = new();
     private readonly CancellationTokenSource _cancellation = new();
     private readonly LlmConfig _config;
+    private readonly Func<IntPtr, ulong?> _hashWindow;
+    private readonly Func<IntPtr, Bitmap?> _captureWindow;
+    private readonly Func<string, LlmAnalyzer> _createAnalyzer;
+    private readonly Func<DateTime> _utcNow;
     private LlmAnalyzer? _analyzer;
 
     /// <summary>
@@ -27,9 +35,41 @@ internal sealed class LlmService : IDisposable
     /// </summary>
     public PromptEditorViewModel? DebugLogger { get; set; }
 
+    /// <summary>
+    /// Creates a service that captures the real windows and calls the configured provider
+    /// with the configured prompt.
+    /// </summary>
     public LlmService(LlmConfig config)
+        : this(
+            config,
+            ScreenshotComparer.CaptureAndHash,
+            ScreenshotComparer.CaptureWindow,
+            prompt => new LlmAnalyzer(config, prompt),
+            () => DateTime.UtcNow)
+    {
+    }
+
+    /// <summary>
+    /// Creates a service whose window capture, analyzer and clock are supplied by the caller,
+    /// so that tests run without windows, network or waiting.
+    /// </summary>
+    /// <param name="config">LLM settings; <see cref="LlmConfig.Enabled"/> and the stale threshold are read on each evaluation.</param>
+    /// <param name="hashWindow">Perceptual hash of a window's content, or null when it cannot be captured.</param>
+    /// <param name="captureWindow">Screenshot sent to the model, or null when the window cannot be captured.</param>
+    /// <param name="createAnalyzer">Builds the analyzer for a system prompt.</param>
+    /// <param name="utcNow">Current time, for the stale threshold and the retry delay.</param>
+    internal LlmService(
+        LlmConfig config,
+        Func<IntPtr, ulong?> hashWindow,
+        Func<IntPtr, Bitmap?> captureWindow,
+        Func<string, LlmAnalyzer> createAnalyzer,
+        Func<DateTime> utcNow)
     {
         _config = config;
+        _hashWindow = hashWindow;
+        _captureWindow = captureWindow;
+        _createAnalyzer = createAnalyzer;
+        _utcNow = utcNow;
         ReloadPrompt(config.Prompt);
     }
 
@@ -44,8 +84,8 @@ internal sealed class LlmService : IDisposable
             return;
 
         // Captured outside the lock: a capture can be slow
-        var hash = ScreenshotComparer.CaptureAndHash(window.Hwnd);
-        var now = DateTime.UtcNow;
+        var hash = _hashWindow(window.Hwnd);
+        var now = _utcNow();
 
         lock (_stateLock)
         {
@@ -82,7 +122,7 @@ internal sealed class LlmService : IDisposable
             else
             {
                 lock (_stateLock)
-                    _retryAfter[window.Hwnd] = DateTime.UtcNow + RetryDelay;
+                    _retryAfter[window.Hwnd] = _utcNow() + RetryDelay;
             }
         }
         finally
@@ -124,7 +164,7 @@ internal sealed class LlmService : IDisposable
     public void ReloadPrompt(string prompt)
     {
         var effectivePrompt = string.IsNullOrWhiteSpace(prompt) ? LlmConfig.DefaultPrompt : prompt;
-        _analyzer = new LlmAnalyzer(_config, effectivePrompt);
+        _analyzer = _createAnalyzer(effectivePrompt);
     }
 
     /// <summary>Cancels the calls in flight; the service does nothing afterwards.</summary>
@@ -144,7 +184,7 @@ internal sealed class LlmService : IDisposable
         if (analyzer is null || _cancellation.IsCancellationRequested)
             return null;
 
-        using var screenshot = ScreenshotComparer.CaptureWindow(window.Hwnd);
+        using var screenshot = _captureWindow(window.Hwnd);
         if (screenshot is null)
             return null;
 

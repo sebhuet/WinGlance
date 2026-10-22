@@ -1,4 +1,5 @@
 using WinGlance.Models;
+using WinGlance.Services;
 using WinGlance.ViewModels;
 
 namespace WinGlance.Tests.ViewModels;
@@ -610,5 +611,146 @@ public class PreviewViewModelTests
         PreviewViewModel.ApplyAgentState(window, Badge(AgentStatus.Waiting));
 
         Assert.True(window.NeedsAgentAttention);
+    }
+
+    // ── MergeResults (one polling scan) ──────────────────────────────────
+
+    private static TrackedWindow Scanned(int hwnd, string title = "Readme - Project") =>
+        new((IntPtr)hwnd, "Code", "VS Code") { Title = title, AspectRatio = 1.6 };
+
+    [Fact]
+    public void MergeResults_NewWindows_AreAddedInScanOrder()
+    {
+        using var vm = new PreviewViewModel();
+
+        vm.MergeResults([Scanned(1), Scanned(2)]);
+
+        Assert.Equal(new[] { (IntPtr)1, (IntPtr)2 }, vm.Windows.Select(w => w.Hwnd));
+    }
+
+    [Fact]
+    public void MergeResults_ClosedWindow_IsRemovedAndForgetsItsFlash()
+    {
+        // Window handles are reused: a later window with the same handle must not start flashing
+        var detector = new AttentionDetector();
+        using var vm = new PreviewViewModel { AttentionDetector = detector };
+        vm.MergeResults([Scanned(1), Scanned(2)]);
+        detector.HandleShellMessage(WinGlance.NativeApi.NativeMethods.HSHELL_FLASH, (IntPtr)2);
+
+        vm.MergeResults([Scanned(1)]);
+
+        Assert.Equal(new[] { (IntPtr)1 }, vm.Windows.Select(w => w.Hwnd));
+        Assert.False(detector.IsFlashing((IntPtr)2));
+    }
+
+    [Fact]
+    public void MergeResults_KnownWindow_UpdatesTheSameInstance()
+    {
+        // The thumbnail stays registered on the existing instance: it must not be replaced
+        using var vm = new PreviewViewModel();
+        vm.MergeResults([Scanned(1, "Old title")]);
+        var original = vm.Windows.Single();
+
+        var rescanned = Scanned(1, "New title");
+        rescanned.IsActive = true;
+        rescanned.IsHung = true;
+        rescanned.IsModalBlocked = true;
+        vm.MergeResults([rescanned]);
+
+        var window = Assert.Single(vm.Windows);
+        Assert.Same(original, window);
+        Assert.Equal("New title", window.Title);
+        Assert.True(window.IsActive);
+        Assert.True(window.IsHung);
+        Assert.True(window.IsModalBlocked);
+    }
+
+    [Fact]
+    public void MergeResults_MinimizedWindow_KeepsTheLastAspectRatio()
+    {
+        // A minimized window reports an empty client area, hence a ratio of 0
+        using var vm = new PreviewViewModel();
+        vm.MergeResults([Scanned(1)]);
+
+        var minimized = Scanned(1);
+        minimized.AspectRatio = 0;
+        vm.MergeResults([minimized]);
+
+        Assert.Equal(1.6, vm.Windows.Single().AspectRatio);
+    }
+
+    [Fact]
+    public void MergeResults_FlashingWindow_IsFlaggedUntilItGetsTheFocus()
+    {
+        var detector = new AttentionDetector();
+        using var vm = new PreviewViewModel { AttentionDetector = detector };
+        vm.MergeResults([Scanned(1)]);
+        detector.HandleShellMessage(WinGlance.NativeApi.NativeMethods.HSHELL_FLASH, (IntPtr)1);
+
+        vm.MergeResults([Scanned(1)]);
+        Assert.True(vm.Windows.Single().IsFlashing);
+
+        var focused = Scanned(1);
+        focused.IsActive = true;
+        vm.MergeResults([focused]);
+
+        Assert.False(vm.Windows.Single().IsFlashing);
+        Assert.False(detector.IsFlashing((IntPtr)1));
+    }
+
+    [Fact]
+    public void MergeResults_Icon_IsOnlyFilledWhenMissing()
+    {
+        // The enumerator skips the icon of windows that already have one
+        var first = System.Windows.Media.Imaging.BitmapSource.Create(
+            1, 1, 96, 96, System.Windows.Media.PixelFormats.Bgra32, null, new byte[4], 4);
+        var second = System.Windows.Media.Imaging.BitmapSource.Create(
+            1, 1, 96, 96, System.Windows.Media.PixelFormats.Bgra32, null, new byte[4], 4);
+        using var vm = new PreviewViewModel();
+        vm.MergeResults([Scanned(1)]);
+
+        var withIcon = Scanned(1);
+        withIcon.Icon = first;
+        vm.MergeResults([withIcon]);
+        var withOtherIcon = Scanned(1);
+        withOtherIcon.Icon = second;
+        vm.MergeResults([withOtherIcon]);
+
+        Assert.Same(first, vm.Windows.Single().Icon);
+    }
+
+    [Theory]
+    [InlineData(false, true)]
+    [InlineData(true, false)] // in front: the question is asked where the user looks
+    public void MergeResults_NewWindowWithWaitingAgent_NeedsAttentionUnlessInFront(bool isActive, bool expected)
+    {
+        using var vm = new PreviewViewModel();
+        var window = Scanned(1);
+        window.IsActive = isActive;
+        window.Agent = Badge(AgentStatus.Waiting);
+
+        vm.MergeResults([window]);
+
+        Assert.Equal(expected, vm.Windows.Single().NeedsAgentAttention);
+    }
+
+    [Fact]
+    public void MergeResults_AgentFinishesTurn_RaisesAgentNeedsAttentionOnce()
+    {
+        using var vm = new PreviewViewModel();
+        var busy = Scanned(1);
+        busy.Agent = Badge(AgentStatus.Busy);
+        vm.MergeResults([busy]);
+        var raised = new List<(IntPtr Hwnd, AgentTransition Transition)>();
+        vm.AgentNeedsAttention += (window, transition) => raised.Add((window.Hwnd, transition));
+
+        var idle = Scanned(1);
+        idle.Agent = Badge(AgentStatus.Idle);
+        vm.MergeResults([idle]);
+        var stillIdle = Scanned(1);
+        stillIdle.Agent = Badge(AgentStatus.Idle);
+        vm.MergeResults([stillIdle]);
+
+        Assert.Equal(new[] { ((IntPtr)1, AgentTransition.Finished) }, raised);
     }
 }

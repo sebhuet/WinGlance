@@ -11,7 +11,21 @@ internal class MainViewModel : ViewModelBase
 {
     private int _selectedTabIndex;
 
-    public MainViewModel(ConfigService configService, AppConfig config, Action<double>? onOpacityChanged = null)
+    /// <summary>
+    /// Builds the child ViewModels from the configuration and links them: the monitored applications feed the preview, and the settings drive it live.
+    /// </summary>
+    /// <param name="configService">Persists the configuration.</param>
+    /// <param name="config">The loaded configuration, shared with the child ViewModels.</param>
+    /// <param name="onOpacityChanged">Called with the new opacity when the panel opacity setting changes, so that the window follows it.</param>
+    /// <param name="applyAutoStart">
+    /// Writes the "Start with Windows" registry entry on save; defaults to <see cref="AutoStartService.SetAutoStart"/>.
+    /// Tests replace it so that they never touch the user's Run key.
+    /// </param>
+    public MainViewModel(
+        ConfigService configService,
+        AppConfig config,
+        Action<double>? onOpacityChanged = null,
+        Action<bool>? applyAutoStart = null)
     {
         ConfigService = configService;
         Config = config;
@@ -34,7 +48,7 @@ internal class MainViewModel : ViewModelBase
             configService, config, OnMonitoredAppsChanged);
 
         SettingsViewModel = new SettingsViewModel(
-            configService, config, PreviewViewModel, onOpacityChanged);
+            configService, config, PreviewViewModel, onOpacityChanged, applyAutoStart);
 
         PromptEditorViewModel = new PromptEditorViewModel(configService, config);
 

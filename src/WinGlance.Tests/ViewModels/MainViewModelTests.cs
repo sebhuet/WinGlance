@@ -11,7 +11,8 @@ public class MainViewModelTests
         var tempDir = Path.Combine(Path.GetTempPath(), $"WinGlance_Test_{Guid.NewGuid():N}");
         Directory.CreateDirectory(tempDir);
         var svc = new ConfigService(tempDir);
-        return new MainViewModel(svc, config ?? new AppConfig());
+        // Saving the settings must not write the developer's "Start with Windows" registry entry
+        return new MainViewModel(svc, config ?? new AppConfig(), applyAutoStart: _ => { });
     }
 
     [Fact]
@@ -228,5 +229,46 @@ public class MainViewModelTests
         var vm = CreateVm(config);
 
         Assert.Null(vm.PreviewViewModel.AgentMonitor);
+    }
+
+    // ── Wiring between the views ─────────────────────────────────────────
+
+    [Fact]
+    public async Task RunAnalysis_NoMonitoredWindow_SaysSoInTheDebugLog()
+    {
+        var vm = CreateVm(new AppConfig { Llm = { Enabled = true, DebugEnabled = true } });
+
+        await vm.PromptEditorViewModel.RunAnalysisFunc!();
+
+        Assert.Contains("No monitored windows found", Assert.Single(vm.PromptEditorViewModel.DebugLog));
+    }
+
+    [Fact]
+    public void SavingApplications_UpdatesThePreviewWithoutRestart()
+    {
+        var vm = CreateVm(new AppConfig { MonitoredApps = [new MonitoredAppConfig { ProcessName = "NotRunningApp", DisplayName = "Not Running" }] });
+        vm.PreviewViewModel.MonitoredApps = [];
+
+        // A monitored application that is not running is listed too, so saving keeps it
+        vm.ApplicationsViewModel.Refresh();
+        vm.ApplicationsViewModel.SaveCommand.Execute(null);
+
+        var app = Assert.Single(vm.PreviewViewModel.MonitoredApps);
+        Assert.Equal("NotRunningApp", app.ProcessName);
+        Assert.Equal("Not Running", app.DisplayName);
+    }
+
+    [Fact]
+    public void SavingSettings_PassesStartWithWindowsToTheRegistryWriter()
+    {
+        var calls = new List<bool>();
+        var tempDir = Path.Combine(Path.GetTempPath(), $"WinGlance_Test_{Guid.NewGuid():N}");
+        Directory.CreateDirectory(tempDir);
+        var vm = new MainViewModel(new ConfigService(tempDir), new AppConfig(), applyAutoStart: calls.Add);
+
+        vm.SettingsViewModel.AutoStart = true;
+        vm.SettingsViewModel.Save();
+
+        Assert.Equal(new[] { true }, calls);
     }
 }
