@@ -46,7 +46,8 @@ internal sealed class WindowStateToBorderBrushConverter : IMultiValueConverter
             return ModalBrush;
         if (isActive)
             return ActiveBrush;
-        return InactiveBrush;
+        // The neutral border follows the light/dark theme; the state colors do not
+        return System.Windows.Application.Current?.TryFindResource("InactiveBorder") as Brush ?? InactiveBrush;
     }
 
     public object[] ConvertBack(object value, Type[] targetTypes, object parameter, CultureInfo culture)

@@ -23,11 +23,11 @@
                        Margin="0,0,6,0"
                        VerticalAlignment="Center" />
                 <TextBlock Text="{Binding Name}"
-                           Foreground="#FFCCCCCC"
+                           Foreground="{DynamicResource PrimaryText}"
                            FontWeight="SemiBold"
                            FontSize="12"
                            VerticalAlignment="Center" />
-                <TextBlock Foreground="#FF888888"
+                <TextBlock Foreground="{DynamicResource DimText}"
                            FontSize="11"
                            VerticalAlignment="Center"
                            Margin="6,0,0,0">
@@ -55,7 +55,7 @@
                             Padding="2"
                             CornerRadius="4"
                             BorderThickness="2"
-                            Background="#33000000"
+                            Background="{DynamicResource ItemBackground}"
                             ToolTip="{Binding Title}"
                             Cursor="Hand"
                             Opacity="{Binding LlmVerdict, Converter={StaticResource LlmVerdictToOpacity}}">
@@ -161,7 +161,7 @@
 
                                 <!-- Window title -->
                                 <TextBlock Text="{Binding Title}"
-                                           Foreground="#FFAAAAAA"
+                                           Foreground="{DynamicResource SecondaryText}"
                                            FontSize="11"
                                            Margin="4,2,4,2"
                                            VerticalAlignment="Center"

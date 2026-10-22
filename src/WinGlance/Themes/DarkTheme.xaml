@@ -31,4 +31,13 @@
     <SolidColorBrush x:Key="HungOverlay" Color="#88FF0000" />
     <SolidColorBrush x:Key="ModalBorder" Color="#FFFFCC00" />
 
+    <!-- Headings, messages and the Prompt Editor -->
+    <SolidColorBrush x:Key="HeaderText" Color="#FFDDDDDD" />
+    <SolidColorBrush x:Key="ErrorText" Color="#FFFF6B6B" />
+    <SolidColorBrush x:Key="EditorBackground" Color="#FF1E1E1E" />
+    <SolidColorBrush x:Key="EditorText" Color="#FFD4D4D4" />
+    <SolidColorBrush x:Key="LogBackground" Color="#FF0D0D0D" />
+    <SolidColorBrush x:Key="LogText" Color="#FF88CC88" />
+    <SolidColorBrush x:Key="RunButtonBackground" Color="#FF2E5D3A" />
+
 </ResourceDictionary>

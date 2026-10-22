@@ -16,7 +16,7 @@
         <!-- Header -->
         <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,8">
             <TextBlock Text="Currently running applications:"
-                       Foreground="#FFCCCCCC"
+                       Foreground="{DynamicResource PrimaryText}"
                        FontSize="13"
                        VerticalAlignment="Center" />
             <Button Content="Refresh"
@@ -24,9 +24,9 @@
                     Margin="12,0,0,0"
                     Padding="10,3"
                     FontSize="12"
-                    Background="#FF3A3A3A"
-                    Foreground="#FFCCCCCC"
-                    BorderBrush="#FF555555"
+                    Background="{DynamicResource ButtonBackground}"
+                    Foreground="{DynamicResource PrimaryText}"
+                    BorderBrush="{DynamicResource InputBorder}"
                     BorderThickness="1"
                     Cursor="Hand" />
         </StackPanel>
@@ -34,9 +34,9 @@
         <!-- App list -->
         <ListView Grid.Row="1"
                   ItemsSource="{Binding Apps}"
-                  Background="#FF1A1A1A"
-                  Foreground="#FFCCCCCC"
-                  BorderBrush="#FF444444"
+                  Background="{DynamicResource PanelBackground}"
+                  Foreground="{DynamicResource PrimaryText}"
+                  BorderBrush="{DynamicResource WindowBorder}"
                   BorderThickness="1">
             <ListView.View>
                 <GridView>
@@ -54,9 +54,9 @@
                             <DataTemplate>
                                 <TextBox Text="{Binding DisplayName, UpdateSourceTrigger=PropertyChanged}"
                                          MinWidth="140"
-                                         Background="#FF2A2A2A"
-                                         Foreground="#FFCCCCCC"
-                                         BorderBrush="#FF555555"
+                                         Background="{DynamicResource InputBackground}"
+                                         Foreground="{DynamicResource PrimaryText}"
+                                         BorderBrush="{DynamicResource InputBorder}"
                                          Padding="2,1" />
                             </DataTemplate>
                         </GridViewColumn.CellTemplate>
@@ -77,9 +77,9 @@
                 Margin="0,8,0,0"
                 Padding="14,5"
                 FontSize="12"
-                Background="#FF3A3A3A"
-                Foreground="#FFCCCCCC"
-                BorderBrush="#FF555555"
+                Background="{DynamicResource ButtonBackground}"
+                Foreground="{DynamicResource PrimaryText}"
+                BorderBrush="{DynamicResource InputBorder}"
                 BorderThickness="1"
                 Cursor="Hand" />
     </Grid>
