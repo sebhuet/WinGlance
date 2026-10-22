@@ -27,6 +27,13 @@ internal static partial class NativeMethods
     public const uint SMTO_ABORTIFHUNG = 0x0002;
 
     public const int DWMWA_CLOAKED = 14;
+    public const int DWMWA_EXTENDED_FRAME_BOUNDS = 9;
+
+    public const int WS_EX_TRANSPARENT = 0x00000020;
+    public const int WS_EX_LAYERED = 0x00080000;
+
+    public static readonly IntPtr HWND_TOPMOST = new(-1);
+    public const uint SWP_NOACTIVATE = 0x0010;
 
     public static readonly IntPtr HWND_BROADCAST = new(0xFFFF);
 
@@ -249,6 +256,12 @@ internal static partial class NativeMethods
     public static extern bool GetClientRect(IntPtr hWnd, out RECT lpRect);
 
     [DllImport("user32.dll")]
+    public static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter, int x, int y, int cx, int cy, uint uFlags);
+
+    [DllImport("user32.dll", EntryPoint = "SetWindowLongW")]
+    public static extern int SetWindowLong(IntPtr hWnd, int nIndex, int dwNewLong);
+
+    [DllImport("user32.dll")]
     public static extern bool DestroyIcon(IntPtr hIcon);
 
     [DllImport("user32.dll", EntryPoint = "GetWindowLongW")]
@@ -307,6 +320,9 @@ internal static partial class NativeMethods
 
     [DllImport("dwmapi.dll")]
     public static extern int DwmGetWindowAttribute(IntPtr hwnd, int dwAttribute, out int pvAttribute, int cbAttribute);
+
+    [DllImport("dwmapi.dll")]
+    public static extern int DwmGetWindowAttribute(IntPtr hwnd, int dwAttribute, out RECT pvAttribute, int cbAttribute);
 
     // ── Crypt32 (DPAPI) ───────────────────────────────────────────────
 
@@ -491,7 +507,20 @@ internal static partial class NativeMethods
     /// closed UWP frame kept alive by ApplicationFrameHost. Such windows give black thumbnails.
     /// </summary>
     public static bool IsCloaked(IntPtr hWnd) =>
-        DwmGetWindowAttribute(hWnd, DWMWA_CLOAKED, out var cloaked, sizeof(int)) == 0 && cloaked != 0;
+        DwmGetWindowAttribute(hWnd, DWMWA_CLOAKED, out int cloaked, sizeof(int)) == 0 && cloaked != 0;
+
+    /// <summary>
+    /// Visible bounds of a window in physical pixels. GetWindowRect includes the invisible
+    /// resize borders of Windows 10/11; DWM's extended frame bounds do not.
+    /// </summary>
+    public static bool TryGetVisibleBounds(IntPtr hWnd, out RECT bounds)
+    {
+        if (DwmGetWindowAttribute(hWnd, DWMWA_EXTENDED_FRAME_BOUNDS, out bounds, Marshal.SizeOf<RECT>()) == 0
+            && bounds.Right > bounds.Left && bounds.Bottom > bounds.Top)
+            return true;
+
+        return GetWindowRect(hWnd, out bounds) && bounds.Right > bounds.Left && bounds.Bottom > bounds.Top;
+    }
 
     /// <summary>
     /// Encrypts data with DPAPI for the current Windows user. Returns null on failure.

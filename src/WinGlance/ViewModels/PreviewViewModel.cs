@@ -89,6 +89,12 @@ internal sealed class PreviewViewModel : ViewModelBase, IDisposable
     public AgentMonitor? AgentMonitor { get; set; }
 
     /// <summary>
+    /// Called with the window brought to the foreground by a thumbnail click; MainWindow
+    /// uses it to outline the window on its screen.
+    /// </summary>
+    public Action<IntPtr>? WindowActivated { get; set; }
+
+    /// <summary>
     /// Layout mode: "fit" (thumbnails follow the panel size), "horizontal", "vertical", or "grid".
     /// </summary>
     public string Layout
@@ -260,7 +266,7 @@ internal sealed class PreviewViewModel : ViewModelBase, IDisposable
     /// Activates the given window: restores it if minimized, then brings it to the foreground.
     /// Uses an Alt key simulation workaround to bypass Windows focus-stealing prevention.
     /// </summary>
-    private static void ActivateWindow(object? parameter)
+    private void ActivateWindow(object? parameter)
     {
         if (parameter is not TrackedWindow window)
             return;
@@ -287,6 +293,8 @@ internal sealed class PreviewViewModel : ViewModelBase, IDisposable
         NativeMethods.SendInput(1, [input], NativeMethods.INPUT.Size);
 
         NativeMethods.SetForegroundWindow(hwnd);
+
+        WindowActivated?.Invoke(hwnd);
     }
 
     // ── Polling logic ───────────────────────────────────────────────────

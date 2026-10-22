@@ -427,6 +427,7 @@ An audit of the code against the specification (October 2026) found bugs in ever
 - [x] **20.3** Vertical scrollbar width kept free, so that a scrollbar shown during a layout pass cannot lock in an extra row
 - [x] **20.4** Idle Claude sessions with background commands shown as working ("N background tasks")
 - [x] **20.5** Tests: calculator maximality, offscreen rendering of the view without overflow
+- [x] **20.6** `Services/WindowHighlighter.cs`: red frame blinking around the window activated from a thumbnail (click-through overlay, prepared at startup); Settings option
 
 ---
 

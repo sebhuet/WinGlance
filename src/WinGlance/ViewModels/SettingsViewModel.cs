@@ -24,6 +24,7 @@ internal sealed class SettingsViewModel : ViewModelBase
     private bool _rememberPosition;
     private bool _autoStart;
     private bool _closeToTray;
+    private bool _highlightOnSwitch;
     private string _hotkey;
     private string _hotkeyStatus = string.Empty;
     private bool _agentDetectionEnabled;
@@ -62,6 +63,7 @@ internal sealed class SettingsViewModel : ViewModelBase
         _rememberPosition = config.RememberPosition;
         _autoStart = config.AutoStart;
         _closeToTray = config.CloseToTray;
+        _highlightOnSwitch = config.HighlightOnSwitch;
         _hotkey = config.Hotkey;
         _agentDetectionEnabled = config.AgentDetection.Enabled;
 
@@ -158,6 +160,16 @@ internal sealed class SettingsViewModel : ViewModelBase
     {
         get => _closeToTray;
         set => SetProperty(ref _closeToTray, value);
+    }
+
+    /// <summary>
+    /// Outlines the window switched to from a thumbnail with a blinking red frame.
+    /// Read live by MainWindow at each switch.
+    /// </summary>
+    public bool HighlightOnSwitch
+    {
+        get => _highlightOnSwitch;
+        set => SetProperty(ref _highlightOnSwitch, value);
     }
 
     public string Hotkey
@@ -292,6 +304,7 @@ internal sealed class SettingsViewModel : ViewModelBase
         _config.RememberPosition = RememberPosition;
         _config.AutoStart = AutoStart;
         _config.CloseToTray = CloseToTray;
+        _config.HighlightOnSwitch = HighlightOnSwitch;
         _config.Hotkey = Hotkey;
         _config.AgentDetection.Enabled = AgentDetectionEnabled;
 

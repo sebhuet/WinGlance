@@ -147,6 +147,7 @@ Windows on another virtual desktop are not shown (their preview would be black);
 
 - If the window is minimized, it is automatically restored first.
 - WinGlance uses a workaround to reliably bring the window to the foreground, even when Windows would normally prevent focus stealing.
+- A **red frame blinks three times** around the window, on whichever screen it is, so your eye finds it at once. The frame lets mouse clicks through. Turn it off in **Settings > General**.
 
 ### 3.6 Window State Indicators
 
@@ -275,11 +276,12 @@ How frequently WinGlance scans for window changes (new windows opened, windows c
 
 ### 5.5 General Options
 
-| Option                       | Default | Description                                                                   |
-| ---------------------------- | ------- | ----------------------------------------------------------------------------- |
-| **Remember window position** | On      | Saves the panel's position on screen and restores it on next launch.          |
-| **Close to system tray**     | On      | Clicking the close button (×) hides the panel to the tray instead of exiting. |
-| **Start with Windows**       | Off     | WinGlance launches automatically when you log in to Windows.                  |
+| Option                                                             | Default | Description                                                                   |
+| ------------------------------------------------------------------ | ------- | ----------------------------------------------------------------------------- |
+| **Remember window position**                                       | On      | Saves the panel's position on screen and restores it on next launch.          |
+| **Close to system tray**                                           | On      | Clicking the close button (×) hides the panel to the tray instead of exiting. |
+| **Start with Windows**                                             | Off     | WinGlance launches automatically when you log in to Windows.                  |
+| **Outline the window with a blinking frame after switching to it** | On      | After a thumbnail click, a red frame blinks around the window.                |
 
 ### 5.6 Global Hotkey
 

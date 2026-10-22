@@ -263,6 +263,21 @@ public class SettingsViewModelTests : IDisposable
         Assert.Equal(1, notifications);
     }
 
+    // ── Highlight on switch ──────────────────────────────────────────
+
+    [Fact]
+    public void HighlightOnSwitch_IsReadFromConfig_AndSaved()
+    {
+        _config.HighlightOnSwitch = true;
+        var vm = CreateVm();
+        Assert.True(vm.HighlightOnSwitch);
+
+        vm.HighlightOnSwitch = false;
+        vm.Save();
+
+        Assert.False(_configService.Load().HighlightOnSwitch);
+    }
+
     // ── Hotkey ───────────────────────────────────────────────────────
 
     [Fact]

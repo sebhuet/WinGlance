@@ -134,6 +134,9 @@
             <CheckBox Content="Start with Windows"
                       IsChecked="{Binding AutoStart}"
                       Foreground="{DynamicResource PrimaryText}" Margin="0,2" />
+            <CheckBox Content="Outline the window with a blinking frame after switching to it"
+                      IsChecked="{Binding HighlightOnSwitch}"
+                      Foreground="{DynamicResource PrimaryText}" Margin="0,2" />
 
             <!-- ── Hotkey ─────────────────────────────────── -->
             <TextBlock Text="Global Hotkey" Style="{StaticResource SectionHeader}" />

@@ -18,6 +18,7 @@ public partial class MainWindow : Window
     private readonly TaskbarIcon _trayIcon;
     private readonly HotkeyService _hotkeyService = new();
     private readonly AttentionDetector _attentionDetector = new();
+    private readonly WindowHighlighter _windowHighlighter = new();
     private readonly uint _showPanelMessage = NativeMethods.RegisterWindowMessage(App.ShowPanelMessageName);
     private HwndSource? _hwndSource;
     private bool _isExiting;
@@ -92,6 +93,14 @@ public partial class MainWindow : Window
         _attentionDetector.Initialize(hwnd);
         _viewModel.PreviewViewModel.AttentionDetector = _attentionDetector;
 
+        // Outline the window a thumbnail click switched to (the checkbox applies without saving)
+        _windowHighlighter.Prepare();
+        _viewModel.PreviewViewModel.WindowActivated = target =>
+        {
+            if (_viewModel.SettingsViewModel.HighlightOnSwitch)
+                _windowHighlighter.Flash(target);
+        };
+
         // Allow settings to navigate to prompt editor
         _viewModel.SettingsViewModel.NavigateToPromptEditor = () => SwitchToView(3);
     }
@@ -119,6 +128,7 @@ public partial class MainWindow : Window
         PersistState();
         _viewModel.PreviewViewModel.Dispose();
         _attentionDetector.Dispose();
+        _windowHighlighter.Dispose();
         _hotkeyService.Dispose();
         _hwndSource?.RemoveHook(WndProc);
         _trayIcon.Dispose();

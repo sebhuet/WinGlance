@@ -19,6 +19,7 @@ When working with multiple windows of the same application (e.g., VS Code), the 
 
 - Clicking on a thumbnail must immediately **bring the corresponding window to the foreground** and give it focus
 - If the window is minimized, it must be restored before receiving focus
+- The activated window is then outlined by a **red frame blinking three times** (about one second) over its visible bounds (DWM extended frame bounds), on its own monitor: a click-through, non-activating topmost overlay, created off-screen at startup so that the first flash is immediate. Setting: `highlightOnSwitch` (default: on)
 
 ### FR-3: Dynamic Window Tracking
 

@@ -24,6 +24,9 @@ internal sealed class AppConfig
     public double PanelHeight { get; set; } = 560;
     public bool AutoStart { get; set; }
     public bool CloseToTray { get; set; } = true;
+
+    /// <summary>Outlines a window with a blinking red frame after switching to it from a thumbnail.</summary>
+    public bool HighlightOnSwitch { get; set; } = true;
     public string Hotkey { get; set; } = "Ctrl+Alt+G";
     public LlmConfig Llm { get; set; } = new();
     public AgentDetectionConfig AgentDetection { get; set; } = new();

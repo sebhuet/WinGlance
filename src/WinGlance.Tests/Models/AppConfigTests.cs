@@ -24,6 +24,8 @@ public class AppConfigTests
         Assert.Equal("Ctrl+Alt+G", config.Hotkey);
         Assert.NotNull(config.Llm);
         Assert.NotNull(config.AgentDetection);
+        Assert.True(config.HighlightOnSwitch);
+        Assert.Equal((900, 560), (config.PanelWidth, config.PanelHeight));
     }
 
     // ── API key at rest ──────────────────────────────────────────────────
