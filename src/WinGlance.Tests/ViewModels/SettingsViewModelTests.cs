@@ -392,6 +392,40 @@ public class SettingsViewModelTests : IDisposable
         Assert.Equal(string.Empty, vm.HotkeyStatus);
     }
 
+    // ── Next agent hotkey and notifications ──────────────────────────
+
+    [Fact]
+    public void Save_RegistersTheNextAgentHotkey_AndReportsFailures()
+    {
+        var vm = CreateVm();
+        string? applied = null;
+        vm.ApplyNextAgentHotkey = hotkey =>
+        {
+            applied = hotkey;
+            return false;
+        };
+        vm.NextAgentHotkey = " Ctrl+Alt+J ";
+
+        vm.Save();
+
+        Assert.Equal("Ctrl+Alt+J", applied);
+        Assert.StartsWith("Not registered", vm.NextAgentHotkeyStatus);
+        Assert.Equal("Ctrl+Alt+J", _configService.Load().NextAgentHotkey);
+    }
+
+    [Fact]
+    public void AgentNotifications_AreReadFromConfig_AndSavedByTheOptionsPanel()
+    {
+        _config.AgentDetection.Notify = true;
+        var vm = CreateVm();
+        Assert.True(vm.AgentNotifications);
+
+        vm.AgentNotifications = false;
+        vm.SaveQuickOptions();
+
+        Assert.False(_configService.Load().AgentDetection.Notify);
+    }
+
     // ── Coding agents ────────────────────────────────────────────────
 
     [Theory]

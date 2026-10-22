@@ -1,6 +1,10 @@
 # WinGlance — User Manual
 
-WinGlance is a portable, always-on-top floating panel for Windows 10 and Windows 11 that displays **live thumbnail previews** of your monitored application windows. It enables instant **one-click window switching**, making it ideal for power users who work with multiple instances of the same application (e.g., several VS Code editors, Chrome windows, or File Explorer instances).
+WinGlance is a portable, always-on-top floating panel for Windows 10 and Windows 11 that displays **live thumbnail previews** of your monitored application windows. It enables instant **one-click window switching**, making it ideal for power users who work with multiple instances of the same application (e.g., several VS Code editors, Chrome windows, or terminals), and shows at a glance which coding agent is working, done, or waiting for you.
+
+<img src="images/preview.png" alt="The WinGlance panel showing two groups of live window thumbnails, Windows PowerShell and Terminal, with colored borders and coding agent badges" width="1020">
+
+In this example, WinGlance monitors two applications. In the **Windows PowerShell** group, `db-backup` has a yellow border because a confirmation dialog blocks it, and `nightly-build` an orange one because it flashes for attention. In the **Terminal** group, `api-server` is the active window (blue) where Claude Code is working, `web-client` waits for a permission answer (orange), Claude has finished in `docs-site`, and OpenCode runs in `infra`.
 
 ---
 
@@ -12,7 +16,7 @@ WinGlance is a portable, always-on-top floating panel for Windows 10 and Windows
 4. [Applications View](#4-applications-view)
 5. [Settings View](#5-settings-view)
 6. [LLM-Assisted Analysis](#6-llm-assisted-analysis)
-7. [Global Hotkey](#7-global-hotkey)
+7. [Global Hotkeys](#7-global-hotkeys)
 8. [Keyboard Shortcuts Reference](#8-keyboard-shortcuts-reference)
 9. [Configuration Files](#9-configuration-files)
 10. [Default Settings Reference](#10-default-settings-reference)
@@ -33,7 +37,7 @@ WinGlance is a portable, always-on-top floating panel for Windows 10 and Windows
 
 WinGlance is a **portable single-file application**. There is no installer.
 
-1. Download `WinGlance.exe`.
+1. Download `WinGlance.exe`, or build it from source (see the [README](../README.md#build-from-source)).
 2. Place it anywhere on your computer — your Desktop, a dedicated folder, or even a USB drive.
 3. That's it. Double-click to run.
 
@@ -54,7 +58,7 @@ When you start WinGlance for the first time:
 3. Select **Applications**.
 4. **Check** the applications you want to monitor in the list.
 5. Click **Save Configuration**.
-6. **Right-click** the panel again and select **Preview**.
+6. Click the **←** button in the title bar (or press **Esc**) to go back to the Preview view.
 7. Live thumbnails of all windows from your selected applications now appear. **Click any thumbnail** to instantly switch to that window.
 
 ---
@@ -63,7 +67,7 @@ When you start WinGlance for the first time:
 
 ### 2.1 The Floating Panel
 
-WinGlance appears as a borderless, semi-transparent window that stays **always on top** of other windows. Key characteristics:
+WinGlance appears as a borderless window that stays **always on top** of other windows. Key characteristics:
 
 - **Drag** the title bar to move the panel anywhere on screen.
 - A **resize grip** at the bottom-right corner lets you resize the panel. In the **Fit to panel** layout (default), thumbnails grow and shrink with it.
@@ -75,6 +79,8 @@ WinGlance appears as a borderless, semi-transparent window that stays **always o
 WinGlance has four views: **Preview**, **Applications**, **Settings**, and **Prompt Editor**.
 
 To switch between views, **right-click anywhere on the panel**. A context menu appears with the following options:
+
+<img src="images/context-menu.png" alt="The panel's context menu with the items Preview, Applications, Settings, Prompt Editor and Exit" width="220">
 
 | Menu Item         | Action                                         |
 | ----------------- | ---------------------------------------------- |
@@ -90,12 +96,17 @@ Window tracking continues while another view is open, so indicators are up to da
 
 ### 2.3 Title Bar Buttons
 
-- **Options** (⚙): opens the Options panel, a quick settings panel under the title bar. Its first option is the panel's **Transparency** (0 % opaque to 70 %), applied as you move the slider; it also switches the red frame and the side click played when you switch to a window. Changes are saved when the panel closes. **All settings…** opens the full Settings view.
+- **Options** (⚙): opens the Options panel, a quick settings panel under the title bar. Changes apply at once and are saved when the panel closes. **All settings…** opens the full Settings view.
+  - **Transparency**, from 0 % (opaque) to 70 %, applied as you move the slider.
+  - **When switching to a window**: the blinking red frame and the side click played when you switch to a window (see [Section 3.5](#35-switching-windows)).
+  - **Coding agents**: the notifications sent when an agent finishes or needs you (see [Section 3.8](#38-coding-agent-indicators)).
 - **Minimize** (—): minimizes the panel to the Windows taskbar.
 - **Full screen** (□): the panel covers its whole screen; in the Fit to panel layout the thumbnails grow to fill it. Click again (❐), press **F11** or **Esc**, or double-click the title bar to go back. Clicking a thumbnail also leaves full screen, so that the window you switch to is not hidden behind the panel.
 - **Close** (×): behavior depends on your settings:
   - If **Close to system tray** is enabled (default): hides the panel to the system tray.
   - If disabled: exits the application entirely.
+
+<img src="images/options.png" alt="The Options panel with the Transparency slider, the switching options, the agent notification option and the All settings button" width="272">
 
 ### 2.4 System Tray
 
@@ -114,7 +125,7 @@ The tray icon remains visible even when the panel is hidden, so you can always b
 
 ### 3.1 Overview
 
-The Preview view is the main view of WinGlance. It displays **live thumbnail previews** of all windows from your monitored applications. Thumbnails are rendered in real time by the Windows Desktop Window Manager — they are not static screenshots and update continuously with zero CPU cost.
+The Preview view is the main view of WinGlance (see the screenshot at the top of this manual). It displays **live thumbnail previews** of all windows from your monitored applications. Thumbnails are rendered in real time by the Windows Desktop Window Manager — they are not static screenshots and update continuously with zero CPU cost.
 
 ### 3.2 Thumbnail Grouping
 
@@ -151,7 +162,7 @@ Windows on another virtual desktop are not shown (their preview would be black);
 
 - If the window is minimized, it is automatically restored first.
 - WinGlance uses a workaround to reliably bring the window to the foreground, even when Windows would normally prevent focus stealing.
-- A **red frame blinks three times** around the window, on whichever screen it is, so your eye finds it at once. The frame lets mouse clicks through. Turn it off in **Settings > General**.
+- A **red frame blinks three times** around the window, on whichever screen it is, so your eye finds it at once. The frame lets mouse clicks through. Turn it off in **Settings > General** or in the **⚙ Options** panel.
 - A short, quiet **click** (a dry "tic", not a beep) tells you which screen the window is on: heard on the left for the leftmost screen, on the right for the rightmost one, in the center for a middle screen (with two screens: left and right; with one: center). Screens are ordered from left to right as Windows arranges them. Turn it off in **Settings > General** or in the **⚙ Options** panel.
 
 ### 3.6 Window State Indicators
@@ -185,6 +196,8 @@ When an analysis fails (wrong key, endpoint unreachable, timeout), no indicator 
 
 When **Claude Code** or **OpenCode** runs in a monitored window, a badge appears next to the window title, under the thumbnail:
 
+<img src="images/agent-badges.png" alt="Four terminal thumbnails with the badges Claude · working in blue, OpenCode · running in teal, Claude · idle in orange and Claude · permission prompt in orange" width="1018">
+
 | Badge                                 | Meaning                                                                                  |
 | ------------------------------------- | ---------------------------------------------------------------------------------------- |
 | Blue **Claude · working**             | Claude is working on a turn.                                                             |
@@ -203,6 +216,10 @@ It works with the Claude Code extension for VS Code, the `claude` command in a t
 
 Badges refresh every 5 seconds. Turn them off in **Settings > Coding Agents**.
 
+**Notifications.** When an agent finishes its turn or starts waiting for you (permission prompt, question) while its window is not in front, WinGlance shows a Windows notification, e.g. "Claude finished · BookAmPlus" or "Claude needs you · BookAmPlus" with the reason. Click it to switch to the window. Agents already waiting when WinGlance starts are not notified. Turn notifications off in **Settings > Coding Agents** or in the **⚙ Options** panel; Windows' Do not disturb mode also silences them.
+
+**Next agent hotkey.** Press **Ctrl+Alt+N** (configurable in **Settings > Global Hotkeys**) from anywhere to switch to the next window whose agent needs you: agents waiting for an answer first, then turns you have not seen yet, then idle agents. Press it again to go on to the next one; working agents are skipped.
+
 ### 3.9 Dynamic Window Tracking
 
 - When a new window opens for a monitored application, its thumbnail appears automatically (within approximately one second).
@@ -216,6 +233,8 @@ Badges refresh every 5 seconds. Turn them off in **Settings > Coding Agents**.
 ### 4.1 Overview
 
 The Applications view lists all currently running applications that have visible windows. Use this view to choose which applications WinGlance should monitor. The list is scanned each time the view opens.
+
+<img src="images/applications.png" alt="The Applications view listing running applications with a checkbox, an editable display name, the process name and the window count; Windows PowerShell and Terminal are checked" width="700">
 
 ### 4.2 Application List
 
@@ -245,7 +264,9 @@ The list is scanned when the view opens. Click the **Refresh** button to re-scan
 
 ## 5. Settings View
 
-Open the Settings view by right-clicking the panel and selecting **Settings**, or by right-clicking the tray icon and choosing **Settings**.
+Open the Settings view by right-clicking the panel and selecting **Settings**, by clicking **All settings…** in the **⚙ Options** panel, or by right-clicking the tray icon and choosing **Settings**.
+
+<img src="images/settings.png" alt="The Settings view with the Layout, Thumbnail Size, Panel Opacity, Polling Interval, General, Global Hotkeys, Coding Agents and LLM Analysis sections" width="600">
 
 ### 5.1 Layout
 
@@ -281,27 +302,38 @@ How frequently WinGlance scans for window changes (new windows opened, windows c
 
 ### 5.5 General Options
 
-| Option                                                             | Default | Description                                                                   |
-| ------------------------------------------------------------------ | ------- | ----------------------------------------------------------------------------- |
-| **Remember window position**                                       | On      | Saves the panel's position on screen and restores it on next launch.          |
-| **Close to system tray**                                           | On      | Clicking the close button (×) hides the panel to the tray instead of exiting. |
-| **Start with Windows**                                             | Off     | WinGlance launches automatically when you log in to Windows.                  |
-| **Outline the window with a blinking frame after switching to it** | On      | After a thumbnail click, a red frame blinks around the window.                |
+| Option                                                                   | Default | Description                                                                     |
+| ------------------------------------------------------------------------ | ------- | ------------------------------------------------------------------------------- |
+| **Remember window position**                                             | On      | Saves the panel's position on screen and restores it on next launch.            |
+| **Close to system tray**                                                 | On      | Clicking the close button (×) hides the panel to the tray instead of exiting.   |
+| **Start with Windows**                                                   | Off     | WinGlance launches automatically when you log in to Windows.                    |
+| **Outline the window with a blinking frame after switching to it**       | On      | After a thumbnail click, a red frame blinks around the window.                  |
+| **Click sound on the side of the window's screen (left, center, right)** | On      | After a thumbnail click, a short click tells you which screen the window is on. |
 
-### 5.6 Global Hotkey
+### 5.6 Global Hotkeys
 
-A text field showing the current hotkey combination (default: `Ctrl+Alt+G`).
+Two text fields hold the system-wide shortcuts:
+
+| Field                                                 | Default      | Action                                                                            |
+| ----------------------------------------------------- | ------------ | --------------------------------------------------------------------------------- |
+| **Show / hide the panel**                             | `Ctrl+Alt+G` | Toggles the panel (see [Section 7](#7-global-hotkeys)).                           |
+| **Go to the next agent that needs you (empty: none)** | `Ctrl+Alt+N` | Switches to the next window whose agent needs you; leave it empty to turn it off. |
 
 - Type the desired key combination using the format: `Modifier+Modifier+Key`
 - **Supported modifiers**: `Ctrl`, `Alt`, `Shift`, `Win`. At least one is required.
 - **Supported keys**: letters `A`–`Z`, digits `0`–`9`, function keys `F1`–`F24`, and named keys such as `Space` or `Home`
 - Examples: `Ctrl+Alt+G`, `Ctrl+Shift+F1`, `Win+Alt+W`
 
-The hotkey is applied when you click **Save Configuration**. If it cannot be registered (invalid, or already used by another application), a red message appears under the field and the previous hotkey stays active.
+The hotkeys are applied when you click **Save Configuration**. If one cannot be registered (invalid, or already used by another application), a red message appears under its field and the previous hotkey stays active.
 
 ### 5.7 Coding Agents
 
-**Show Claude Code / OpenCode status on thumbnails** (default: on) shows the agent badges described in [Section 3.8](#38-coding-agent-indicators). The change applies immediately. The refresh interval (`agentDetection.refreshIntervalMs`, default 5000 ms) can be changed in `config.json`.
+| Option                                               | Default | Description                                                                                    |
+| ---------------------------------------------------- | ------- | ---------------------------------------------------------------------------------------------- |
+| **Show Claude Code / OpenCode status on thumbnails** | On      | Shows the agent badges described in [Section 3.8](#38-coding-agent-indicators).                |
+| **Notify me when an agent finishes or needs me**     | On      | Shows a Windows notification when an agent finishes or starts waiting while you are elsewhere. |
+
+Changes apply immediately. The refresh interval (`agentDetection.refreshIntervalMs`, default 5000 ms) can be changed in `config.json`.
 
 ### 5.8 LLM Analysis Settings
 
@@ -334,9 +366,11 @@ Here is how it works:
 ### 6.2 Enabling LLM Analysis
 
 1. Open the **Settings** view.
-2. Check **Enable LLM analysis**.
+2. Check **Enable LLM analysis**: the provider settings appear below it.
 3. Configure your preferred provider (see below). Choosing a provider fills in its default endpoint and model, unless you changed them.
 4. Click **Save Configuration**. Analysis starts (or stops) right away; no restart is needed.
+
+<img src="images/settings-llm.png" alt="The LLM Analysis section of the Settings view with the Provider, Endpoint, API Key, Model and Stale threshold fields, and the Edit Prompt and Debug Log button" width="598">
 
 LLM analysis is **disabled by default**.
 
@@ -389,16 +423,18 @@ Controls how long a window must remain visually unchanged before triggering an L
 
 Open the **Prompt Editor** view: right-click the panel and select **Prompt Editor**, or click **Edit Prompt & Debug Log** in the LLM settings section. The text area contains the instructions sent to the AI model, telling it how to classify windows.
 
+<img src="images/prompt-editor.png" alt="The Prompt Editor view with the default LLM system prompt, the Save Prompt, Reset to Default and Run Analysis buttons, and the Enable Debug Log checkbox" width="700">
+
 You can customize the classification rules — for example, to add application-specific patterns or change what counts as "awaiting action".
 
 - **Save Prompt** stores the prompt in `config.json` and uses it from the next analysis on (no restart needed).
 - **Reset to Default** restores the built-in prompt.
-- **Enable Debug Log** lists each analysis: window title, verdict (`awaiting_action`, `idle` or `error`) and the model's reason or the error.
-- **Run** analyzes every monitored window now, to try a prompt without waiting for the stale threshold.
+- **Enable Debug Log** lists each analysis below the buttons: window title, verdict (`awaiting_action`, `idle` or `error`) and the model's reason or the error.
+- **Run Analysis** analyzes every monitored window now, to try a prompt without waiting for the stale threshold.
 
 ---
 
-## 7. Global Hotkey
+## 7. Global Hotkeys
 
 ### 7.1 Usage
 
@@ -407,12 +443,14 @@ Press **Ctrl+Alt+G** (default) from anywhere on your desktop to toggle the WinGl
 - If the panel is **visible**, it hides with a short fade-out animation.
 - If the panel is **hidden**, it appears with a fade-in animation.
 
-The hotkey works **system-wide**, regardless of which application currently has focus.
+Press **Ctrl+Alt+N** (default) to switch to the next window whose coding agent needs you (see [Section 3.8](#38-coding-agent-indicators)).
 
-### 7.2 Changing the Hotkey
+Both hotkeys work **system-wide**, regardless of which application currently has focus.
+
+### 7.2 Changing the Hotkeys
 
 1. Open the Settings view.
-2. Edit the **Global Hotkey** text field (e.g., type `Ctrl+Shift+W`).
+2. Edit the field under **Global Hotkeys** (e.g., type `Ctrl+Shift+W`). Leave the next agent field empty to turn that hotkey off.
 3. Click **Save Configuration**.
 
 The new hotkey takes effect immediately after saving.
@@ -423,12 +461,15 @@ If the combination is invalid or already used by another application, a red mess
 
 ## 8. Keyboard Shortcuts Reference
 
-| Shortcut                 | Context               | Action                              |
-| ------------------------ | --------------------- | ----------------------------------- |
-| **Ctrl+Alt+G** (default) | System-wide           | Toggle panel visibility (show/hide) |
-| **Left-click** thumbnail | Preview view          | Switch to the clicked window        |
-| **Right-click** panel    | Anywhere on the panel | Open navigation context menu        |
-| **Drag** title bar       | Panel title bar       | Move the panel to a new position    |
+| Shortcut                 | Context               | Action                                  |
+| ------------------------ | --------------------- | --------------------------------------- |
+| **Ctrl+Alt+G** (default) | System-wide           | Toggle panel visibility (show/hide)     |
+| **Ctrl+Alt+N** (default) | System-wide           | Switch to the next agent that needs you |
+| **Left-click** thumbnail | Preview view          | Switch to the clicked window            |
+| **Right-click** panel    | Anywhere on the panel | Open navigation context menu            |
+| **Esc**                  | Panel                 | Back to Preview, or leave full screen   |
+| **F11**                  | Panel                 | Toggle full screen                      |
+| **Drag** title bar       | Panel title bar       | Move the panel to a new position        |
 
 ---
 
@@ -436,7 +477,7 @@ If the combination is invalid or already used by another application, a red mess
 
 ### 9.1 config.json
 
-Stores all WinGlance settings: monitored apps, layout, thumbnail size, opacity, polling interval, hotkey, general options, coding agent detection, and LLM configuration, including the LLM prompt.
+Stores all WinGlance settings: monitored apps, layout, thumbnail size, opacity, polling interval, hotkeys, general options, coding agent detection and notifications, and LLM configuration, including the LLM prompt.
 
 - **Location**: next to `WinGlance.exe` by default.
 - **Fallback**: `%LOCALAPPDATA%\WinGlance\config.json` if the executable's folder is not writable (e.g., `Program Files` or a read-only drive).
@@ -446,7 +487,7 @@ Stores all WinGlance settings: monitored apps, layout, thumbnail size, opacity, 
 
 ### 9.2 winglance.log
 
-Records startup, warnings and errors: hotkey registration failures, LLM analysis errors, unreadable configuration, unexpected exceptions.
+Records startup, warnings and errors: hotkey registration failures, LLM analysis errors, agent notifications, unreadable configuration, unexpected exceptions.
 
 - **Location**: `%LOCALAPPDATA%\WinGlance\winglance.log`; the previous megabyte is kept in `winglance.old.log`.
 - Error dialogs show this path.
@@ -455,24 +496,28 @@ Records startup, warnings and errors: hotkey registration failures, LLM analysis
 
 ## 10. Default Settings Reference
 
-| Setting             | Default Value               |
-| ------------------- | --------------------------- |
-| Layout              | Fit to panel                |
-| Thumbnail width     | 200 px                      |
-| Thumbnail height    | 150 px                      |
-| Panel opacity       | 85%                         |
-| Polling interval    | 1000 ms                     |
-| Remember position   | On                          |
-| Close to tray       | On                          |
-| Auto-start          | Off                         |
-| Global hotkey       | Ctrl+Alt+G                  |
-| Coding agent badges | On                          |
-| Agent refresh       | 5000 ms                     |
-| LLM analysis        | Off                         |
-| LLM provider        | openai                      |
-| LLM endpoint        | `https://api.openai.com/v1` |
-| LLM model           | gpt-4o-mini                 |
-| Stale threshold     | 30 seconds                  |
+| Setting                  | Default Value               |
+| ------------------------ | --------------------------- |
+| Layout                   | Fit to panel                |
+| Thumbnail width          | 200 px                      |
+| Thumbnail height         | 150 px                      |
+| Panel opacity            | 85%                         |
+| Polling interval         | 1000 ms                     |
+| Remember position        | On                          |
+| Close to tray            | On                          |
+| Auto-start               | Off                         |
+| Blinking frame on switch | On                          |
+| Side click on switch     | On                          |
+| Show / hide hotkey       | Ctrl+Alt+G                  |
+| Next agent hotkey        | Ctrl+Alt+N                  |
+| Coding agent badges      | On                          |
+| Agent notifications      | On                          |
+| Agent refresh            | 5000 ms                     |
+| LLM analysis             | Off                         |
+| LLM provider             | openai                      |
+| LLM endpoint             | `https://api.openai.com/v1` |
+| LLM model                | gpt-4o-mini                 |
+| Stale threshold          | 30 seconds                  |
 
 ---
 
@@ -504,13 +549,13 @@ Records startup, warnings and errors: hotkey registration failures, LLM analysis
 
 > Windows has built-in focus-stealing prevention. WinGlance uses a workaround, but it may not work in all cases (e.g., full-screen games or elevated/administrator applications). If the target window is minimized, it should still be restored correctly.
 
-**Q: The global hotkey does not work.**
+**Q: A global hotkey does not work.**
 
 > Another application may have registered the same key combination: Settings then shows a red message under the hotkey field, and `winglance.log` records it. Choose a different combination and click **Save Configuration**. Also verify the format: modifiers separated by `+`, ending with the key (e.g., `Ctrl+Alt+G`).
 
 **Q: LLM analysis is enabled but no indicators appear.**
 
-> Open the **Prompt Editor**, check **Enable Debug Log** and click **Run**: each window's verdict, or the error returned by the provider, is listed. Also check the following:
+> Open the **Prompt Editor**, check **Enable Debug Log** and click **Run Analysis**: each window's verdict, or the error returned by the provider, is listed. Also check the following:
 >
 > - The provider, endpoint, API key, and model are correctly configured in Settings.
 > - The stale threshold has elapsed (wait at least 30 seconds without interacting with the monitored window).
@@ -525,6 +570,10 @@ Records startup, warnings and errors: hotkey registration failures, LLM analysis
 > - `claude agents --json` works in a terminal and lists the session (Claude Code v2.1.139 or later). WinGlance looks for `claude` on `PATH`, then in `%USERPROFILE%\.local\bin`.
 > - For VS Code, the window title shows the project folder (the default title does). Two windows on folders with the same name cannot be told apart.
 > - Background sessions started with `claude --bg` have no window, so they are not shown.
+
+**Q: I do not get agent notifications.**
+
+> Check that **Notify me when an agent finishes or needs me** is checked (Settings > Coding Agents, or the ⚙ Options panel) and that Windows' Do not disturb mode is off. No notification is shown for the window in front, nor for agents already waiting when WinGlance started.
 
 **Q: Can I run WinGlance from a USB drive?**
 

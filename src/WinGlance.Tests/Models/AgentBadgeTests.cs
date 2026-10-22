@@ -135,6 +135,32 @@ public class AgentBadgeTests
         Assert.Equal(expected, (Claude(status) with { BackgroundTasks = tasks }).EffectiveStatus);
     }
 
+    // ── Fields used by notifications ─────────────────────────────────────
+
+    [Fact]
+    public void FromSessions_ExposesTheMostUrgentSessionsAgentStatusAndProject()
+    {
+        var badge = AgentBadge.FromSessions([
+            Claude(AgentStatus.Idle, cwd: @"w:\00_DEV\Other"),
+            Claude(AgentStatus.Waiting, waitingFor: "permission prompt", cwd: @"w:\00_DEV\BookAmPlus\"),
+        ])!;
+
+        Assert.Equal("Claude", badge.AgentName);
+        Assert.Equal("permission prompt", badge.StatusText);
+        Assert.Equal("BookAmPlus", badge.Project);
+    }
+
+    [Theory]
+    [InlineData(@"w:\00_DEV\BookAmPlus", "BookAmPlus")]
+    [InlineData(@"z:\My Drive\00_DEV\WinGlance\", "WinGlance")]
+    [InlineData(@"C:\", null)]
+    [InlineData("", null)]
+    [InlineData(null, null)]
+    public void ProjectName_IsTheLastFolder(string? workingDirectory, string? expected)
+    {
+        Assert.Equal(expected, AgentBadge.ProjectName(workingDirectory));
+    }
+
     [Fact]
     public void AgentStatus_IsOrderedByUrgency()
     {

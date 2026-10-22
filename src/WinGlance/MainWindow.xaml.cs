@@ -18,6 +18,10 @@ public partial class MainWindow : Window
     private readonly MainViewModel _viewModel;
     private readonly TaskbarIcon _trayIcon;
     private readonly HotkeyService _hotkeyService = new();
+    private readonly HotkeyService _nextAgentHotkeyService = new(hotkeyId: 2);
+
+    // Window of the last agent notification: clicking the notification switches to it
+    private TrackedWindow? _lastNotifiedWindow;
     private readonly AttentionDetector _attentionDetector = new();
     private readonly WindowHighlighter _windowHighlighter = new();
     private readonly StereoClick _stereoClick = new();
@@ -67,6 +71,7 @@ public partial class MainWindow : Window
             ContextMenu = CreateTrayContextMenu(),
         };
         _trayIcon.TrayMouseDoubleClick += (_, _) => ShowPanel();
+        _trayIcon.TrayBalloonTipClicked += (_, _) => ActivateNotifiedWindow();
 
         Loaded += OnLoaded;
         Closing += OnClosing;
@@ -96,6 +101,19 @@ public partial class MainWindow : Window
         if (!hotkeyRegistered)
             Log.Warning($"Global hotkey '{_viewModel.Config.Hotkey}' could not be registered");
         _viewModel.SettingsViewModel.ReportHotkeyResult(hotkeyRegistered);
+
+        // "Next agent" hotkey: jumps to the next window whose agent needs the user
+        _nextAgentHotkeyService.Initialize(hwnd);
+        _nextAgentHotkeyService.HotkeyPressed += (_, _) => GoToNextAgent();
+        _viewModel.SettingsViewModel.ApplyNextAgentHotkey = RegisterNextAgentHotkey;
+        var nextAgentRegistered = RegisterNextAgentHotkey(_viewModel.Config.NextAgentHotkey);
+        if (!nextAgentRegistered)
+            Log.Warning($"Next agent hotkey '{_viewModel.Config.NextAgentHotkey}' could not be registered");
+        _viewModel.SettingsViewModel.ReportNextAgentHotkeyResult(nextAgentRegistered);
+
+        // Agent finished or waiting while the user is elsewhere: Windows notification
+        _viewModel.PreviewViewModel.AgentNeedsAttention += (window, transition) =>
+            Dispatcher.BeginInvoke(() => NotifyAgent(window, transition)); // raised on the polling thread
 
         // Attention detection (shell hook for flashing)
         _attentionDetector.Initialize(hwnd);
@@ -147,6 +165,7 @@ public partial class MainWindow : Window
         _windowHighlighter.Dispose();
         _stereoClick.Dispose();
         _hotkeyService.Dispose();
+        _nextAgentHotkeyService.Dispose();
         _hwndSource?.RemoveHook(WndProc);
         _trayIcon.Dispose();
     }
@@ -299,7 +318,13 @@ public partial class MainWindow : Window
 
     private void Border_MouseRightButtonUp(object sender, MouseButtonEventArgs e)
     {
-        var menu = new System.Windows.Controls.ContextMenu();
+        // Placed on the panel so that the menu takes the DPI of the panel's monitor: without
+        // a placement target, WPF scales the popup for the primary monitor
+        var menu = new System.Windows.Controls.ContextMenu
+        {
+            PlacementTarget = (UIElement)sender,
+            Placement = PlacementMode.MousePoint,
+        };
 
         var preview = new System.Windows.Controls.MenuItem { Header = "Preview" };
         preview.Click += (_, _) => SwitchToView(0);
@@ -367,6 +392,51 @@ public partial class MainWindow : Window
     private void MinimizeButton_Click(object sender, RoutedEventArgs e)
     {
         WindowState = WindowState.Minimized;
+    }
+
+    // ── Agents: next agent hotkey and notifications ───────────────
+
+    /// <summary>Registers the "next agent" hotkey; an empty string removes it.</summary>
+    private bool RegisterNextAgentHotkey(string hotkey)
+    {
+        if (!string.IsNullOrWhiteSpace(hotkey))
+            return _nextAgentHotkeyService.Register(hotkey);
+
+        _nextAgentHotkeyService.Unregister();
+        return true;
+    }
+
+    /// <summary>
+    /// Switches to the next window whose agent needs the user (waiting, then finished, then
+    /// idle), after the window currently in front; repeated presses cycle through them.
+    /// </summary>
+    private void GoToNextAgent()
+    {
+        var target = _viewModel.PreviewViewModel.FindNextAgentWindow(NativeMethods.GetForegroundWindow());
+        if (target is not null)
+            _viewModel.PreviewViewModel.Activate(target);
+    }
+
+    /// <summary>
+    /// Shows a Windows notification (through the tray icon) for an agent that finished or
+    /// waits, unless notifications are off or the user is already in that window.
+    /// </summary>
+    private void NotifyAgent(TrackedWindow window, AgentTransition transition)
+    {
+        if (!_viewModel.SettingsViewModel.AgentNotifications
+            || NativeMethods.GetForegroundWindow() == window.Hwnd)
+            return;
+
+        var (title, message) = AgentNotification.Describe(window, transition);
+        _lastNotifiedWindow = window;
+        _trayIcon.ShowBalloonTip(title, message, BalloonIcon.Info);
+        Log.Info($"Notified: {title}");
+    }
+
+    private void ActivateNotifiedWindow()
+    {
+        if (_lastNotifiedWindow is { } window && NativeMethods.IsWindow(window.Hwnd))
+            _viewModel.PreviewViewModel.Activate(window);
     }
 
     // ── Options panel ────────────────────────────────────────────

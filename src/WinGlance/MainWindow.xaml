@@ -158,7 +158,7 @@
                             BorderThickness="1"
                             CornerRadius="6"
                             Padding="12,10"
-                            Width="260">
+                            MinWidth="260">
                         <StackPanel>
                             <TextBlock Text="Options"
                                        Foreground="{DynamicResource HeaderText}"
@@ -192,6 +192,16 @@
                                       Margin="0,2" />
                             <CheckBox Content="Click from the window's screen side"
                                       IsChecked="{Binding ClickOnSwitch}"
+                                      Foreground="{DynamicResource PrimaryText}"
+                                      Margin="0,2" />
+
+                            <!-- Coding agents -->
+                            <TextBlock Text="Coding agents"
+                                       Foreground="{DynamicResource PrimaryText}"
+                                       FontSize="12"
+                                       Margin="0,10,0,2" />
+                            <CheckBox Content="Notify when an agent finishes or needs me"
+                                      IsChecked="{Binding AgentNotifications}"
                                       Foreground="{DynamicResource PrimaryText}"
                                       Margin="0,2" />
 

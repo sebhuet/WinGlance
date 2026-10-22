@@ -34,6 +34,9 @@ internal sealed class AppConfig
     /// </summary>
     public bool ClickOnSwitch { get; set; } = true;
     public string Hotkey { get; set; } = "Ctrl+Alt+G";
+
+    /// <summary>Global hotkey that switches to the next window whose agent needs the user.</summary>
+    public string NextAgentHotkey { get; set; } = "Ctrl+Alt+N";
     public LlmConfig Llm { get; set; } = new();
     public AgentDetectionConfig AgentDetection { get; set; } = new();
 }
@@ -45,6 +48,12 @@ internal sealed class AgentDetectionConfig
 {
     /// <summary>Shows Claude Code / OpenCode status on thumbnails.</summary>
     public bool Enabled { get; set; } = true;
+
+    /// <summary>
+    /// Shows a Windows notification when an agent finishes or starts waiting while its
+    /// window is not in front.
+    /// </summary>
+    public bool Notify { get; set; } = true;
 
     /// <summary>
     /// Delay between two agent discoveries. Each one runs <c>claude agents --json</c>

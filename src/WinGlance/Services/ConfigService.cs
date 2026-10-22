@@ -113,6 +113,7 @@ internal sealed class ConfigService
             : defaults.PanelOpacity;
         config.PollingIntervalMs = Math.Clamp(config.PollingIntervalMs, 500, 5000);
         config.Hotkey = string.IsNullOrWhiteSpace(config.Hotkey) ? defaults.Hotkey : config.Hotkey;
+        config.NextAgentHotkey ??= defaults.NextAgentHotkey; // empty means "no hotkey"
 
         config.Llm ??= new LlmConfig();
         config.Llm.Provider = string.IsNullOrWhiteSpace(config.Llm.Provider) ? defaults.Llm.Provider : config.Llm.Provider;

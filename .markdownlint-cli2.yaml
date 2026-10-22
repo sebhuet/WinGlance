@@ -7,6 +7,9 @@ config:
     siblings_only: true
   # GitHub issue and pull request templates start at level 2
   MD041: false
+  # Screenshots are taken at 200 % scaling: <img width> shows them at their real size
+  MD033:
+    allowed_elements: [img]
 
 ignores:
   - "node_modules/**"

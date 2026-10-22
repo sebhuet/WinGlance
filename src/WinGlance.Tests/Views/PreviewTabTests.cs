@@ -1,4 +1,3 @@
-using System.Runtime.ExceptionServices;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -6,6 +5,7 @@ using System.Windows.Media;
 using WinGlance.Models;
 using WinGlance.ViewModels;
 using WinGlance.Views;
+using static WinGlance.Tests.Views.ViewTestHelpers;
 
 namespace WinGlance.Tests.Views;
 
@@ -201,44 +201,7 @@ public class PreviewTabTests
         viewModel.Windows.Add(window);
 
         var view = new PreviewTab { DataContext = viewModel };
-        view.Measure(new Size(800, 600));
-        view.Arrange(new Rect(0, 0, 800, 600));
-        view.UpdateLayout();
+        Layout(view, 800, 600);
         return view;
-    }
-
-    private static IEnumerable<T> FindDescendants<T>(DependencyObject root) where T : DependencyObject
-    {
-        for (var i = 0; i < VisualTreeHelper.GetChildrenCount(root); i++)
-        {
-            var child = VisualTreeHelper.GetChild(root, i);
-            if (child is T match)
-                yield return match;
-            foreach (var descendant in FindDescendants<T>(child))
-                yield return descendant;
-        }
-    }
-
-    // WPF elements must be created on an STA thread; xUnit runs tests on MTA threads
-    private static void RunOnSta(Action action)
-    {
-        Exception? error = null;
-        var thread = new Thread(() =>
-        {
-            try
-            {
-                action();
-            }
-            catch (Exception ex)
-            {
-                error = ex;
-            }
-        });
-        thread.SetApartmentState(ApartmentState.STA);
-        thread.Start();
-        thread.Join();
-
-        if (error is not null)
-            ExceptionDispatchInfo.Capture(error).Throw();
     }
 }

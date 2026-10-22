@@ -286,9 +286,17 @@ internal sealed class PreviewViewModel : ViewModelBase, IDisposable
     /// </summary>
     private void ActivateWindow(object? parameter)
     {
-        if (parameter is not TrackedWindow window)
-            return;
+        if (parameter is TrackedWindow window)
+            Activate(window);
+    }
 
+    /// <summary>
+    /// Brings the window to the foreground, restoring it if minimized, then raises
+    /// <see cref="WindowActivated"/> (red frame, side click). Used by thumbnail clicks, the
+    /// "next agent" hotkey and notification clicks.
+    /// </summary>
+    public void Activate(TrackedWindow window)
+    {
         var hwnd = window.Hwnd;
 
         // Restore minimized windows
@@ -394,7 +402,12 @@ internal sealed class PreviewViewModel : ViewModelBase, IDisposable
     /// a waiting agent highlights the window whenever it is not focused, and an agent going from
     /// busy to idle keeps it highlighted until the user focuses the window.
     /// </summary>
-    internal static void ApplyAgentState(TrackedWindow window, AgentBadge? badge)
+    /// <returns>
+    /// The change worth telling the user about while they are elsewhere: a finished turn, or
+    /// an agent starting to wait. An agent first seen already waiting (e.g. at startup) is not
+    /// a change: notifying every waiting agent at launch would be noise.
+    /// </returns>
+    internal static AgentTransition ApplyAgentState(TrackedWindow window, AgentBadge? badge)
     {
         var previous = window.Agent?.Status;
         var current = badge?.Status;
@@ -407,7 +420,57 @@ internal sealed class PreviewViewModel : ViewModelBase, IDisposable
             AgentStatus.Idle => justFinished || window.NeedsAgentAttention,
             _ => false,
         };
+
+        if (window.IsActive)
+            return AgentTransition.None;
+        if (justFinished)
+            return AgentTransition.Finished;
+        if (current == AgentStatus.Waiting && previous is not null and not AgentStatus.Waiting)
+            return AgentTransition.NeedsInput;
+        return AgentTransition.None;
     }
+
+    /// <summary>
+    /// Raised after a scan for each window whose agent finished or started waiting while the
+    /// user was elsewhere. Raised on the polling thread.
+    /// </summary>
+    public event Action<TrackedWindow, AgentTransition>? AgentNeedsAttention;
+
+    /// <summary>
+    /// Picks the window to visit next among those whose agent needs the user: waiting agents
+    /// first, then turns finished but not seen yet, then idle agents; each group in panel order.
+    /// Starting after <paramref name="current"/> in that order, so repeated calls cycle through
+    /// them. Null when no agent needs the user.
+    /// </summary>
+    internal TrackedWindow? FindNextAgentWindow(IntPtr current)
+    {
+        List<TrackedWindow> candidates;
+        lock (_lock)
+        {
+            candidates = _windows
+                .Select((window, index) => (window, index, rank: AgentUrgencyRank(window)))
+                .Where(c => c.rank >= 0)
+                .OrderBy(c => c.rank)
+                .ThenBy(c => c.index)
+                .Select(c => c.window)
+                .ToList();
+        }
+
+        if (candidates.Count == 0)
+            return null;
+
+        var position = candidates.FindIndex(w => w.Hwnd == current);
+        return candidates[(position + 1) % candidates.Count];
+    }
+
+    /// <summary>0 waiting, 1 finished and unseen, 2 idle; -1 when the agent does not need the user.</summary>
+    private static int AgentUrgencyRank(TrackedWindow window) => window.Agent?.Status switch
+    {
+        AgentStatus.Waiting => 0,
+        AgentStatus.Idle when window.NeedsAgentAttention => 1,
+        AgentStatus.Idle => 2,
+        _ => -1,
+    };
 
     /// <summary>
     /// Diffs scanned windows against the current collection:
@@ -415,8 +478,11 @@ internal sealed class PreviewViewModel : ViewModelBase, IDisposable
     /// - Remove closed windows
     /// - Update properties of existing windows
     /// </summary>
-    private void MergeResults(List<TrackedWindow> scanned)
+    internal void MergeResults(List<TrackedWindow> scanned)
     {
+        // Raised once the lock is released: handlers may read the window list
+        var transitions = new List<(TrackedWindow Window, AgentTransition Transition)>();
+
         lock (_lock)
         {
             var scannedByHwnd = scanned.ToDictionary(w => w.Hwnd);
@@ -466,7 +532,9 @@ internal sealed class PreviewViewModel : ViewModelBase, IDisposable
                         existing.Icon = scannedWindow.Icon;
 
                     // After IsActive, which clears the "finished, not yet seen" highlight
-                    ApplyAgentState(existing, scannedWindow.Agent);
+                    var transition = ApplyAgentState(existing, scannedWindow.Agent);
+                    if (transition != AgentTransition.None)
+                        transitions.Add((existing, transition));
                 }
                 else
                 {
@@ -480,5 +548,8 @@ internal sealed class PreviewViewModel : ViewModelBase, IDisposable
 
         // Windows opened, closed or resized change the best "fit" size
         UpdateDisplaySize();
+
+        foreach (var (window, transition) in transitions)
+            AgentNeedsAttention?.Invoke(window, transition);
     }
 }
