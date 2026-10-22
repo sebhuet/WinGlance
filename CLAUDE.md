@@ -47,7 +47,7 @@ Respond in **French** when the user writes in French. Use English for code, comm
 - Solution: `src/WinGlance.slnx`
 - Build: `dotnet build src/WinGlance.slnx`
 - Test: `dotnet test src/WinGlance.slnx`
-- Publish: `dotnet publish src/WinGlance/WinGlance.csproj -c Release -r win-x64 --self-contained -p:PublishSingleFile=true`
+- Publish: `dotnet publish src/WinGlance/WinGlance.csproj -c Release -r win-x64 --self-contained -p:PublishSingleFile=true -o publish`
 - Build output is redirected to `$(TEMP)\WinGlance\` (see `src/Directory.Build.props`) to avoid Google Drive locking
 
 ## Lint

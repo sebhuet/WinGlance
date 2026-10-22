@@ -203,13 +203,13 @@ public class LlmAnalyzerTests
     }
 
     [Fact]
-    public void OpenAiBody_IsValidJson()
+    public async Task OpenAiBody_IsValidJson()
     {
         // Guard against hand-built JSON: the body must parse
         var (analyzer, handler) = Create("openai", _ => Json("""{"choices":[{"message":{"content":"idle"}}]}"""));
         using var screenshot = Screenshot();
 
-        analyzer.AnalyzeWithReasonAsync(screenshot, "quote \" title").GetAwaiter().GetResult();
+        await analyzer.AnalyzeWithReasonAsync(screenshot, "quote \" title");
 
         using var doc = JsonDocument.Parse(handler.Body!);
         Assert.Equal("test-model", doc.RootElement.GetProperty("model").GetString());

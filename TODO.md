@@ -1,13 +1,13 @@
 # WinGlance — Development Plan
 
-> WPF C# .NET 8+ application — Floating panel with live DWM window previews.
+> WPF C# .NET 10 application — Floating panel with live DWM window previews.
 > Full reference: [doc/SPECIFICATION.md](doc/SPECIFICATION.md)
 
 ---
 
 ## Phase 0 — Scaffolding & Infrastructure ✅
 
-- [x] **0.1** Create the solution `WinGlance.sln` and the project `WinGlance.csproj`
+- [x] **0.1** Create the solution `WinGlance.slnx` and the project `WinGlance.csproj`
 - [x] **0.2** Create the folder structure
 - [x] **0.3** Add the application manifest (`app.manifest`)
 - [x] **0.4** Configure `App.xaml` / `App.xaml.cs`
@@ -23,7 +23,7 @@
 - [x] **1.1** Create `MainWindow.xaml` — borderless, always-on-top window
 - [x] **1.2** Implement drag-move on the title bar
 - [x] **1.3** Implement window resizing (resize grip)
-- [x] **1.4** Add the `TabControl` with 3 tabs (Preview, Applications, Settings)
+- [x] **1.4** Add the `TabControl` with 3 tabs (Preview, Applications, Settings) — later replaced by a right-click menu
 - [x] **1.5** Create `MainViewModel.cs` — main orchestrator (MVVM)
 - [x] **1.6** Write and run unit tests (7 tests passing)
 
@@ -183,7 +183,7 @@
   - Opacity change via callback to MainWindow
   - Commands: `SaveCommand`, `EditPromptCommand`
   - `Save()` writes all settings (including LLM) to config file
-  - `EditPrompt()` creates default `prompt.txt` if missing, opens in default editor
+  - `EditPrompt()` opens the in-app Prompt Editor (initially opened `prompt.txt` in an external editor)
 - [x] **8.3** Hotkey text input (full keyboard recording deferred to Phase 10 HotkeyService)
 - [x] **8.4** Apply changes live: layout → PreviewViewModel, opacity → Window.Opacity callback, polling → PreviewViewModel, thumbnail size → PreviewViewModel
 - [x] **8.5** Implement `EditPrompt` — navigates to in-app Prompt Editor screen (view index 3)
@@ -380,6 +380,47 @@
 
 ---
 
+## Phase 19 — Bug Fixes from the Takeover Audit ✅
+
+An audit of the code against the specification (October 2026) found bugs in every area. All fixed, each with tests.
+
+- [x] **19.1** Native layer and enumeration
+  - `INPUT` lacked `MOUSEINPUT`: 32 bytes instead of 40 on x64, so `SendInput` failed and the focus workaround never ran
+  - `WM_GETICON` through `SendMessageTimeout` (a hung window blocked polling); icons extracted once; no `DestroyIcon` on borrowed handles
+  - Taskbar filtering rules: owned windows and DWM-cloaked windows (other virtual desktops, ghost UWP frames) skipped
+  - UWP apps resolved from the core window inside the ApplicationFrameHost frame
+- [x] **19.2** DWM thumbnails
+  - "Not Responding" / "Awaiting Action" moved out of the thumbnail area (DWM draws over WPF content)
+  - Idle dimming applied to the DWM image (`ThumbnailOpacity`); aspect ratio kept; clipped to the scroll viewport
+  - Thumbnail position follows every layout pass; `ThumbnailManager` thread-safe
+- [x] **19.3** Polling and threading
+  - First scan off the UI thread; no overlapping scans; LLM pass on a background thread, one at a time
+  - Scan failures logged instead of one error dialog per second; polling continues on other views
+- [x] **19.4** Lifecycle
+  - Second instance shows the running panel (no `ReleaseMutex` crash); startup failures no longer leave a zombie process
+  - Position saved on hide and session end, ignored when off-screen; opacity slider works after show/hide
+  - Application tray icon; hotkey re-registered on Save with a visible error, `MOD_NOREPEAT`, stricter parser
+- [x] **19.5** Configuration, Applications view, flashing
+  - Null sections and out-of-range values normalized; read-only fallback really tested; log file (`Services/Log.cs`)
+  - Monitored apps that are not running are kept; list scanned on open; display names editable
+  - Flash cleared on `HSHELL_REDRAW`; closed windows pruned; auto-start entry repaired when the exe moved
+- [x] **19.6** LLM pipeline
+  - Errors reported as errors (not "idle"), retried after one minute; provider switch updates endpoint and model
+  - Gemini key in a header; no `max_tokens`; captures at the real window size, minimized windows skipped, images scaled to 1568 px
+  - LLM enable/disable and prompt save applied live; API key encrypted with DPAPI, entered in a `PasswordBox`
+- [x] **19.7** Light theme applied: views use `DynamicResource` theme keys (tests guard against hardcoded colors)
+- [x] **19.8** Tests no longer write `HKCU\...\Run\WinGlance`
+- [x] **19.9** `dotnet test` passes (465 total)
+
+### Not done (specification gaps, not bugs)
+
+- Hotkey **Record** button; pulsating attention border; per-thumbnail app icon
+- Thumbnails scaling with the panel size; saved panel size
+- `IsStale` indicator; text-only fallback for models without vision
+- Single-file size (166 MB vs. 30–60 MB in NFR-1): trimming or compression not enabled
+
+---
+
 ## Phase Summary
 
 | Phase | Description                      | Depends on |
@@ -403,3 +444,4 @@
 | 16    | LLM-Assisted Analysis ✅         | 2, 3, 15   |
 | 17    | Polish & Final Touches ✅        | All        |
 | 18    | Coding Agent Detection ✅        | 3, 4, 15   |
+| 19    | Bug Fixes from the Audit ✅      | All        |

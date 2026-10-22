@@ -37,7 +37,7 @@ WinGlance is a **portable single-file application**. There is no installer.
 2. Place it anywhere on your computer — your Desktop, a dedicated folder, or even a USB drive.
 3. That's it. Double-click to run.
 
-**To uninstall**: delete `WinGlance.exe` and, optionally, the `config.json` and `prompt.txt` files located next to it (or in `%LOCALAPPDATA%\WinGlance\` if the executable was in a read-only location).
+**To uninstall**: delete `WinGlance.exe` and, optionally, the `config.json` file located next to it, and the `%LOCALAPPDATA%\WinGlance\` folder (log file, and the configuration if the executable was in a read-only location).
 
 ### 1.3 First Launch
 
@@ -72,16 +72,19 @@ WinGlance appears as a borderless, semi-transparent window that stays **always o
 
 ### 2.2 Navigation
 
-WinGlance has three views: **Preview**, **Applications**, and **Settings**.
+WinGlance has four views: **Preview**, **Applications**, **Settings**, and **Prompt Editor**.
 
 To switch between views, **right-click anywhere on the panel**. A context menu appears with the following options:
 
-| Menu Item        | Action                                |
-| ---------------- | ------------------------------------- |
-| **Preview**      | Show live window thumbnails (default) |
-| **Applications** | Choose which apps to monitor          |
-| **Settings**     | Configure WinGlance                   |
-| **Exit**         | Quit the application                  |
+| Menu Item         | Action                                         |
+| ----------------- | ---------------------------------------------- |
+| **Preview**       | Show live window thumbnails (default)          |
+| **Applications**  | Choose which apps to monitor                   |
+| **Settings**      | Configure WinGlance                            |
+| **Prompt Editor** | Edit the LLM prompt and watch the analysis log |
+| **Exit**          | Quit the application                           |
+
+Window tracking continues while another view is open, so indicators are up to date when you come back to Preview.
 
 ### 2.3 Title Bar Buttons
 
@@ -131,9 +134,11 @@ Three layout modes are available (configurable in Settings):
 
 Each thumbnail displays:
 
-- A **live preview** of the window content.
-- The **window title** below the thumbnail (truncated with "..." if too long).
+- A **live preview** of the window content, with the window's proportions kept (empty bands fill the rest).
+- Below it, the **window title** (truncated with "..." if too long), preceded by any status badges: coding agent, **Not Responding**, **Awaiting Action**. Badges sit below the preview because Windows draws live previews above everything else.
 - Hover over a thumbnail to see the **full window title** in a tooltip.
+
+Windows on another virtual desktop are not shown (their preview would be black); they appear when you switch to their desktop.
 
 ### 3.5 Switching Windows
 
@@ -146,14 +151,15 @@ Each thumbnail displays:
 
 Thumbnails display **color-coded borders** to communicate the state of each window. States are listed below in priority order (highest first):
 
-| Border Color | State          | Meaning                                                                                                   |
-| ------------ | -------------- | --------------------------------------------------------------------------------------------------------- |
-| **Red**      | Not Responding | The application has stopped responding. A red "Not Responding" banner also appears on the thumbnail.      |
-| **Orange**   | Flashing       | The window is requesting attention (e.g., a file transfer completed, a message was received).             |
-| **Orange**   | Agent          | A coding agent in the window waits for you, or finished while you were elsewhere (see Section 3.8).       |
-| **Yellow**   | Modal Dialog   | The window is blocked by a dialog box (e.g., "Save As", a confirmation prompt). Address the dialog first. |
-| **Blue**     | Active         | This is the currently focused window.                                                                     |
-| **Gray**     | Inactive       | Normal state — the window is running but not currently focused.                                           |
+| Border Color | State           | Meaning                                                                                                   |
+| ------------ | --------------- | --------------------------------------------------------------------------------------------------------- |
+| **Red**      | Not Responding  | The application has stopped responding. A red "Not Responding" badge also appears under the thumbnail.    |
+| **Orange**   | Flashing        | The window is requesting attention (e.g., a file transfer completed, a message was received).             |
+| **Orange**   | Agent           | A coding agent in the window waits for you, or finished while you were elsewhere (see Section 3.8).       |
+| **Orange**   | Awaiting Action | The AI analysis found that the window needs you (see Section 3.7).                                        |
+| **Yellow**   | Modal Dialog    | The window is blocked by a dialog box (e.g., "Save As", a confirmation prompt). Address the dialog first. |
+| **Blue**     | Active          | This is the currently focused window.                                                                     |
+| **Gray**     | Inactive        | Normal state — the window is running but not currently focused.                                           |
 
 All indicators update automatically and clear when the condition resolves.
 
@@ -161,10 +167,12 @@ All indicators update automatically and clear when the condition resolves.
 
 When LLM analysis is enabled (see [Section 6](#6-llm-assisted-analysis)), additional visual cues appear on thumbnails:
 
-| Indicator                              | Meaning                                                                                                           |
-| -------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
-| Orange **"Awaiting Action"** badge     | The AI detected that the window likely requires your attention (a dialog, error, prompt, or completed operation). |
-| **Dimmed thumbnail** (reduced opacity) | The AI classified the window as idle (no action needed).                                                          |
+| Indicator                                            | Meaning                                                                                                           |
+| ---------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| Orange **"Awaiting Action"** badge and orange border | The AI detected that the window likely requires your attention (a dialog, error, prompt, or completed operation). |
+| **Dimmed thumbnail** (reduced opacity)               | The AI classified the window as idle (no action needed).                                                          |
+
+When an analysis fails (wrong key, endpoint unreachable, timeout), no indicator is shown: the error appears in the Prompt Editor's debug log and in the log file, and the analysis is retried a minute later.
 
 ### 3.8 Coding Agent Indicators
 
@@ -198,20 +206,20 @@ Badges refresh every 5 seconds. Turn them off in **Settings > Coding Agents**.
 
 ### 4.1 Overview
 
-The Applications view lists all currently running applications that have visible windows. Use this view to choose which applications WinGlance should monitor.
+The Applications view lists all currently running applications that have visible windows. Use this view to choose which applications WinGlance should monitor. The list is scanned each time the view opens.
 
 ### 4.2 Application List
 
 Each entry in the list shows:
 
-| Column           | Description                                  |
-| ---------------- | -------------------------------------------- |
-| **Checkbox**     | Check to monitor, uncheck to stop monitoring |
-| **Display Name** | User-friendly application name               |
-| **Process**      | Executable process name (read-only)          |
-| **Windows**      | Number of visible windows for this app       |
+| Column           | Description                                                                |
+| ---------------- | -------------------------------------------------------------------------- |
+| **Checkbox**     | Check to monitor, uncheck to stop monitoring                               |
+| **Display Name** | Name shown as the group header in Preview; click to edit (e.g., `VS Code`) |
+| **Process**      | Executable process name (read-only)                                        |
+| **Windows**      | Number of visible windows for this app                                     |
 
-Applications already being monitored have their checkbox checked.
+Applications already being monitored have their checkbox checked. Monitored applications that are not running right now are listed too, with 0 windows, so that saving keeps them.
 
 ### 4.3 Adding and Removing Applications
 
@@ -222,7 +230,7 @@ Applications already being monitored have their checkbox checked.
 
 ### 4.4 Refreshing the List
 
-Click the **Refresh** button to re-scan currently running applications. This is useful if you launched a new application after opening the Applications view.
+The list is scanned when the view opens. Click the **Refresh** button to re-scan, for example after launching a new application while the view is open.
 
 ---
 
@@ -273,11 +281,11 @@ How frequently WinGlance scans for window changes (new windows opened, windows c
 A text field showing the current hotkey combination (default: `Ctrl+Alt+G`).
 
 - Type the desired key combination using the format: `Modifier+Modifier+Key`
-- **Supported modifiers**: `Ctrl`, `Alt`, `Shift`, `Win`
-- **Supported keys**: letters `A`–`Z`, digits `0`–`9`, function keys `F1`–`F24`
+- **Supported modifiers**: `Ctrl`, `Alt`, `Shift`, `Win`. At least one is required.
+- **Supported keys**: letters `A`–`Z`, digits `0`–`9`, function keys `F1`–`F24`, and named keys such as `Space` or `Home`
 - Examples: `Ctrl+Alt+G`, `Ctrl+Shift+F1`, `Win+Alt+W`
 
-The hotkey is applied after clicking **Save Configuration**.
+The hotkey is applied when you click **Save Configuration**. If it cannot be registered (invalid, or already used by another application), a red message appears under the field and the previous hotkey stays active.
 
 ### 5.7 Coding Agents
 
@@ -315,10 +323,12 @@ Here is how it works:
 
 1. Open the **Settings** view.
 2. Check **Enable LLM analysis**.
-3. Configure your preferred provider (see below).
-4. Click **Save Configuration**.
+3. Configure your preferred provider (see below). Choosing a provider fills in its default endpoint and model, unless you changed them.
+4. Click **Save Configuration**. Analysis starts (or stops) right away; no restart is needed.
 
 LLM analysis is **disabled by default**.
+
+The API key is hidden in the Settings view and stored encrypted in `config.json` (Windows DPAPI). Only your Windows account on this computer can decrypt it: if you copy `config.json` to another computer or user, enter the key again.
 
 ### 6.3 Provider: OpenAI
 
@@ -365,11 +375,14 @@ Controls how long a window must remain visually unchanged before triggering an L
 
 ### 6.7 Editing the Prompt
 
-Click **Edit Prompt File** in the LLM settings section to open `prompt.txt` in your default text editor. This file contains the instructions sent to the AI model, telling it how to classify windows.
+Open the **Prompt Editor** view: right-click the panel and select **Prompt Editor**, or click **Edit Prompt & Debug Log** in the LLM settings section. The text area contains the instructions sent to the AI model, telling it how to classify windows.
 
 You can customize the classification rules — for example, to add application-specific patterns or change what counts as "awaiting action".
 
-Changes take effect the next time an analysis is triggered (no restart needed).
+- **Save Prompt** stores the prompt in `config.json` and uses it from the next analysis on (no restart needed).
+- **Reset to Default** restores the built-in prompt.
+- **Enable Debug Log** lists each analysis: window title, verdict (`awaiting_action`, `idle` or `error`) and the model's reason or the error.
+- **Run** analyzes every monitored window now, to try a prompt without waiting for the stale threshold.
 
 ---
 
@@ -390,9 +403,9 @@ The hotkey works **system-wide**, regardless of which application currently has 
 2. Edit the **Global Hotkey** text field (e.g., type `Ctrl+Shift+W`).
 3. Click **Save Configuration**.
 
-The new hotkey takes effect immediately after saving (the old one is unregistered and the new one is registered).
+The new hotkey takes effect immediately after saving.
 
-If the chosen combination conflicts with another application's hotkey, the registration may silently fail. Try a different combination if the hotkey does not work.
+If the combination is invalid or already used by another application, a red message appears under the field and the previous hotkey stays active. Try a different combination.
 
 ---
 
@@ -411,20 +424,20 @@ If the chosen combination conflicts with another application's hotkey, the regis
 
 ### 9.1 config.json
 
-Stores all WinGlance settings: monitored apps, layout, thumbnail size, opacity, polling interval, hotkey, general options, and LLM configuration.
+Stores all WinGlance settings: monitored apps, layout, thumbnail size, opacity, polling interval, hotkey, general options, coding agent detection, and LLM configuration, including the LLM prompt.
 
 - **Location**: next to `WinGlance.exe` by default.
-- **Fallback**: `%LOCALAPPDATA%\WinGlance\config.json` if the executable's folder is read-only (e.g., on a network drive).
-- The file is **created automatically** the first time you save your configuration.
-- If the file is missing or corrupted, WinGlance starts with default settings.
+- **Fallback**: `%LOCALAPPDATA%\WinGlance\config.json` if the executable's folder is not writable (e.g., `Program Files` or a read-only drive).
+- The file is **created automatically** the first time you save your configuration, and the panel position is saved when you hide or exit WinGlance.
+- If the file is missing or corrupted, WinGlance starts with default settings. Missing sections and out-of-range values are replaced by their defaults.
+- The LLM API key is stored encrypted (`apiKeyProtected`). A plaintext `apiKey` typed in by hand is read, then encrypted at the next save.
 
-### 9.2 prompt.txt
+### 9.2 winglance.log
 
-Contains the system prompt sent to the AI model during LLM analysis.
+Records startup, warnings and errors: hotkey registration failures, LLM analysis errors, unreadable configuration, unexpected exceptions.
 
-- **Location**: next to `WinGlance.exe`.
-- Can be freely edited. Changes are picked up without restarting WinGlance.
-- If deleted, WinGlance uses a built-in fallback prompt.
+- **Location**: `%LOCALAPPDATA%\WinGlance\winglance.log`; the previous megabyte is kept in `winglance.old.log`.
+- Error dialogs show this path.
 
 ---
 
@@ -457,9 +470,9 @@ Contains the system prompt sent to the AI model during LLM analysis.
 
 > DWM is required for live thumbnails. This error typically appears in Remote Desktop sessions where DWM is disabled. Ensure your RDP session has desktop composition enabled, or run WinGlance on the local machine directly.
 
-**Q: I see "WinGlance is already running" when I try to launch it.**
+**Q: I launch WinGlance and nothing new appears.**
 
-> Only one instance of WinGlance can run at a time. Check your system tray for the existing instance and double-click its icon to show the panel.
+> Only one instance of WinGlance can run at a time. Launching it again brings up the panel of the instance already running.
 
 **Q: The panel disappeared and I cannot find it.**
 
@@ -467,11 +480,13 @@ Contains the system prompt sent to the AI model during LLM analysis.
 >
 > - Double-click the WinGlance icon in the system tray.
 > - Press the global hotkey (Ctrl+Alt+G by default).
-> - If the panel moved off-screen, delete `config.json` to reset the panel position to defaults.
+> - Launch `WinGlance.exe` again: it shows the running instance's panel.
+>
+> A saved position that is no longer on any screen (monitor disconnected) is ignored at startup: the panel opens centered.
 
 **Q: Thumbnails appear blank or black.**
 
-> This can happen if the source window is on a different virtual desktop or if the DWM session was reset. Try switching back to the application's desktop, or restart WinGlance.
+> This can happen if the DWM session was reset (e.g., after a Remote Desktop connection). Restart WinGlance. Windows on other virtual desktops are not shown until you switch to their desktop.
 
 **Q: Clicking a thumbnail does not bring the window to the foreground.**
 
@@ -479,11 +494,11 @@ Contains the system prompt sent to the AI model during LLM analysis.
 
 **Q: The global hotkey does not work.**
 
-> Another application may have registered the same key combination. Try changing the hotkey in Settings to a different combination. Also verify the format: modifiers separated by `+`, ending with the key (e.g., `Ctrl+Alt+G`).
+> Another application may have registered the same key combination: Settings then shows a red message under the hotkey field, and `winglance.log` records it. Choose a different combination and click **Save Configuration**. Also verify the format: modifiers separated by `+`, ending with the key (e.g., `Ctrl+Alt+G`).
 
 **Q: LLM analysis is enabled but no indicators appear.**
 
-> Check the following:
+> Open the **Prompt Editor**, check **Enable Debug Log** and click **Run**: each window's verdict, or the error returned by the provider, is listed. Also check the following:
 >
 > - The provider, endpoint, API key, and model are correctly configured in Settings.
 > - The stale threshold has elapsed (wait at least 30 seconds without interacting with the monitored window).
@@ -501,7 +516,7 @@ Contains the system prompt sent to the AI model during LLM analysis.
 
 **Q: Can I run WinGlance from a USB drive?**
 
-> Yes. WinGlance is fully portable. Place the executable on any drive and run it. Configuration is saved next to the executable. If the drive is read-only, configuration falls back to `%LOCALAPPDATA%\WinGlance\`.
+> Yes. WinGlance is fully portable. Place the executable on any drive and run it. Configuration is saved next to the executable. If the drive is read-only, configuration falls back to `%LOCALAPPDATA%\WinGlance\`. The LLM API key, encrypted for your Windows account, must be entered again on another computer. If **Start with Windows** was on and you moved the executable, the startup entry is updated the next time you launch it.
 
 **Q: How do I stop WinGlance from starting with Windows?**
 
