@@ -428,6 +428,10 @@ An audit of the code against the specification (October 2026) found bugs in ever
 - [x] **20.4** Idle Claude sessions with background commands shown as working ("N background tasks")
 - [x] **20.5** Tests: calculator maximality, offscreen rendering of the view without overflow
 - [x] **20.6** `Services/WindowHighlighter.cs`: red frame blinking around the window activated from a thumbnail (click-through overlay, prepared at startup); Settings option
+- [x] **20.7** Status row (badges + title) scaled with the thumbnail width (`StatusRowScale`, up to 2.5×), included in the fit calculation
+- [x] **20.8** Idle Claude badge in orange (the agent waits for the user)
+- [x] **20.9** Full screen button in the title bar (F11, Esc, title bar double-click); content pulled back from the maximized window's overhang
+- [x] **20.10** Options panel (⚙ in the title bar): transparency level, applied live, saved on close; link to the full Settings view
 
 ---
 

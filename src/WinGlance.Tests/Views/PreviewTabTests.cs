@@ -43,6 +43,7 @@ public class PreviewTabTests
             AgentStatus.Busy => Blue,
             AgentStatus.Waiting => Orange,
             AgentStatus.Running => Teal,
+            AgentStatus.Idle => Orange, // finished, waiting for the next prompt: needs the user
             _ => Gray,
         };
 
@@ -157,6 +158,32 @@ public class PreviewTabTests
             Assert.True(scroller.ExtentWidth <= scroller.ViewportWidth);
             // ...and the space is used: thumbnails are larger than the 200 px fixed default
             Assert.True(viewModel.DisplayThumbnailWidth > 200, $"thumbnails only {viewModel.DisplayThumbnailWidth} px wide");
+        });
+    }
+
+    [Fact]
+    public void FitLayout_LargeThumbnails_ScaleTheStatusRowText()
+    {
+        RunOnSta(() =>
+        {
+            var viewModel = new PreviewViewModel { Layout = PreviewViewModel.FitLayout };
+            viewModel.Windows.Add(new TrackedWindow((IntPtr)1, "Code", "VS Code") { AspectRatio = 1.84, Title = "Readme - Project" });
+
+            var view = new PreviewTab { DataContext = viewModel };
+            for (var pass = 0; pass < 3; pass++)
+            {
+                view.Measure(new Size(1600, 900));
+                view.Arrange(new Rect(0, 0, 1600, 900));
+                view.UpdateLayout();
+            }
+
+            var row = FindDescendants<DockPanel>(view).Single();
+            var scale = Assert.IsType<ScaleTransform>(row.LayoutTransform);
+            Assert.True(viewModel.StatusRowScale > 1.5);
+            Assert.Equal(viewModel.StatusRowScale, scale.ScaleX, precision: 6);
+            Assert.Equal(viewModel.StatusRowScale, scale.ScaleY, precision: 6);
+            // Scaled, the row spans exactly the thumbnail width
+            Assert.Equal(viewModel.DisplayThumbnailWidth, row.ActualWidth * scale.ScaleX, precision: 3);
         });
     }
 

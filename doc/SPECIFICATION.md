@@ -178,7 +178,7 @@ Shows, for each monitored window, whether a coding agent (**Claude Code** or **O
 
 #### Display
 
-- A badge next to the thumbnail title (outside the DWM thumbnail area, which covers WPF content): `Claude · working` (blue), `Claude · permission prompt` (orange), `Claude · idle` (gray), `OpenCode · running` (teal); `+N` when several sessions share a window; tooltip with each session's name and folder.
+- A badge next to the thumbnail title (outside the DWM thumbnail area, which covers WPF content): `Claude · working` (blue), `Claude · permission prompt` (orange), `Claude · idle` (orange: the agent waits for the next prompt), `OpenCode · running` (teal); `+N` when several sessions share a window; tooltip with each session's name and folder.
 - **Orange border** when an agent waits for the user, or when it finished a turn (busy → idle) while the window was not focused; the latter clears once the window is focused.
 - Settings: **Show Claude Code / OpenCode status on thumbnails** checkbox (default: on), applied live.
 

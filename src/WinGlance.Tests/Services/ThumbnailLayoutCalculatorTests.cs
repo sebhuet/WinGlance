@@ -14,7 +14,8 @@ public class ThumbnailLayoutCalculatorTests
     private static bool Fits(Size available, int[] groups, Size thumbnail)
     {
         var itemWidth = thumbnail.Width + Calc.ItemChromeWidth;
-        var itemHeight = thumbnail.Height + Calc.ItemChromeHeight;
+        var rowScale = Math.Clamp(thumbnail.Width / Calc.StatusRowBaseWidth, 1, Calc.MaxStatusRowScale);
+        var itemHeight = thumbnail.Height + Calc.ItemFrameHeight + (Calc.StatusRowHeight * rowScale);
         var perRow = (int)Math.Floor((available.Width - Calc.SafetyMargin) / itemWidth);
         if (perRow < 1)
             return false;
@@ -107,6 +108,30 @@ public class ThumbnailLayoutCalculatorTests
     public void Fit_EmptyArea_ReturnsNull()
     {
         Assert.Null(Calc.Fit(new Size(0, 0), [3], 1.6));
+    }
+
+    // ── Status row scale ─────────────────────────────────────────────────
+
+    [Theory]
+    [InlineData(120, 1)] // small thumbnails keep the base size
+    [InlineData(260, 1)]
+    [InlineData(520, 2)] // twice as wide, twice as large
+    [InlineData(2000, Calc.MaxStatusRowScale)]
+    [InlineData(double.NaN, 1)]
+    public void StatusRowScale_GrowsWithTheThumbnail(double width, double expected)
+    {
+        Assert.Equal(expected, Calc.StatusRowScale(width), precision: 6);
+    }
+
+    [Fact]
+    public void Fit_LargeThumbnails_LeaveRoomForTheLargerStatusRow()
+    {
+        // Full screen with a single window: the row is scaled, and must still fit below the image
+        var available = new Size(2560, 1392);
+        var size = Calc.Fit(available, [1], 1.84)!.Value;
+
+        Assert.True(Calc.StatusRowScale(size.Width) > 1);
+        Assert.True(Fits(available, [1], size));
     }
 
     // ── Typical aspect ratio ─────────────────────────────────────────────

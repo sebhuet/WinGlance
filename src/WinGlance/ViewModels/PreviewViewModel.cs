@@ -142,7 +142,14 @@ internal sealed class PreviewViewModel : ViewModelBase, IDisposable
     public double DisplayThumbnailWidth
     {
         get => _displayThumbnailWidth;
-        private set => SetProperty(ref _displayThumbnailWidth, value);
+        private set
+        {
+            if (SetProperty(ref _displayThumbnailWidth, value))
+            {
+                OnPropertyChanged(nameof(StatusRowScale));
+                OnPropertyChanged(nameof(StatusRowWidth));
+            }
+        }
     }
 
     /// <summary>Height at which thumbnails are drawn (see <see cref="DisplayThumbnailWidth"/>).</summary>
@@ -151,6 +158,17 @@ internal sealed class PreviewViewModel : ViewModelBase, IDisposable
         get => _displayThumbnailHeight;
         private set => SetProperty(ref _displayThumbnailHeight, value);
     }
+
+    /// <summary>
+    /// Scale applied to the badge/title row under each thumbnail: its text grows with the
+    /// thumbnail (see <see cref="ThumbnailLayoutCalculator.StatusRowScale"/>).
+    /// </summary>
+    public double StatusRowScale => ThumbnailLayoutCalculator.StatusRowScale(_displayThumbnailWidth);
+
+    /// <summary>
+    /// Width of the status row before scaling, so that once scaled it spans the thumbnail.
+    /// </summary>
+    public double StatusRowWidth => _displayThumbnailWidth / StatusRowScale;
 
     /// <summary>
     /// Size of the Preview area, reported by the view when it changes: the "fit" layout

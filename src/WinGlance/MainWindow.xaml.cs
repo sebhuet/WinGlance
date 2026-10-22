@@ -1,6 +1,7 @@
 using System.Drawing;
 using System.IO;
 using System.Windows;
+using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media.Animation;
@@ -68,6 +69,12 @@ public partial class MainWindow : Window
 
         Loaded += OnLoaded;
         Closing += OnClosing;
+        StateChanged += OnStateChanged;
+        KeyDown += OnKeyDown;
+
+        // Options panel: under the title bar, right-aligned with the panel, so it stays inside it
+        OptionsPopup.CustomPopupPlacementCallback = (popupSize, titleBarSize, _) =>
+            [new CustomPopupPlacement(new System.Windows.Point(titleBarSize.Width - popupSize.Width - 4, titleBarSize.Height), PopupPrimaryAxis.Horizontal)];
     }
 
     private void OnLoaded(object sender, RoutedEventArgs e)
@@ -97,6 +104,10 @@ public partial class MainWindow : Window
         _windowHighlighter.Prepare();
         _viewModel.PreviewViewModel.WindowActivated = target =>
         {
+            // A full-screen panel stays on top of the window just switched to: step aside
+            if (WindowState == WindowState.Maximized)
+                WindowState = WindowState.Normal;
+
             if (_viewModel.SettingsViewModel.HighlightOnSwitch)
                 _windowHighlighter.Flash(target);
         };
@@ -341,15 +352,95 @@ public partial class MainWindow : Window
 
     private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
-        if (e.ClickCount == 1)
-        {
+        if (e.ClickCount == 2)
+            ToggleFullScreen(); // as a double-click on a standard title bar
+        else if (e.ClickCount == 1 && WindowState == WindowState.Normal)
             DragMove();
-        }
     }
 
     private void MinimizeButton_Click(object sender, RoutedEventArgs e)
     {
         WindowState = WindowState.Minimized;
+    }
+
+    // ── Options panel ────────────────────────────────────────────
+
+    private void OptionsButton_Click(object sender, RoutedEventArgs e)
+    {
+        OptionsPopup.IsOpen = !OptionsPopup.IsOpen;
+    }
+
+    private void OptionsPopup_Closed(object? sender, EventArgs e)
+    {
+        // Applied live while open; kept once the panel closes
+        try
+        {
+            _viewModel.SettingsViewModel.SavePanelOpacity();
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            Log.Warning("Could not save the panel opacity", ex);
+        }
+    }
+
+    private void AllSettingsButton_Click(object sender, RoutedEventArgs e)
+    {
+        OptionsPopup.IsOpen = false;
+        SwitchToView(2);
+    }
+
+    // ── Full screen ──────────────────────────────────────────────
+
+    private void FullScreenButton_Click(object sender, RoutedEventArgs e) => ToggleFullScreen();
+
+    /// <summary>
+    /// Full screen is the maximized state: a borderless window then covers its whole monitor,
+    /// and in the "fit" layout the thumbnails grow to fill it.
+    /// </summary>
+    private void ToggleFullScreen()
+    {
+        WindowState = WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized;
+    }
+
+    private void OnStateChanged(object? sender, EventArgs e)
+    {
+        var isFullScreen = WindowState == WindowState.Maximized;
+        FullScreenButton.Content = isFullScreen ? "❐" : "□";
+        FullScreenButton.ToolTip = isFullScreen ? "Exit full screen (F11, Esc)" : "Full screen (F11)";
+
+        // A maximized resizable window keeps its invisible resize frame, which overhangs the
+        // monitor (7 px at 100 %): pull the content back onto the screen
+        RootBorder.Margin = isFullScreen ? GetMonitorOverhang() : new Thickness(0);
+
+        // Maximizing turns SizeToContent off: the fixed-size layouts must get it back
+        if (WindowState == WindowState.Normal)
+            ApplySizingMode();
+    }
+
+    /// <summary>
+    /// How far the window extends past its monitor on each side, in device-independent pixels.
+    /// </summary>
+    private Thickness GetMonitorOverhang()
+    {
+        var hwnd = new WindowInteropHelper(this).Handle;
+        if (!NativeMethods.GetWindowRect(hwnd, out var window) || !NativeMethods.TryGetMonitorBounds(hwnd, out var monitor))
+            return new Thickness(0);
+
+        var dpi = System.Windows.Media.VisualTreeHelper.GetDpi(this);
+        return new Thickness(
+            Math.Max(0, monitor.Left - window.Left) / dpi.DpiScaleX,
+            Math.Max(0, monitor.Top - window.Top) / dpi.DpiScaleY,
+            Math.Max(0, window.Right - monitor.Right) / dpi.DpiScaleX,
+            Math.Max(0, window.Bottom - monitor.Bottom) / dpi.DpiScaleY);
+    }
+
+    private void OnKeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.F11 || (e.Key == Key.Escape && WindowState == WindowState.Maximized))
+        {
+            ToggleFullScreen();
+            e.Handled = true;
+        }
     }
 
     private void CloseButton_Click(object sender, RoutedEventArgs e)

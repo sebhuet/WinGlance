@@ -338,6 +338,20 @@ public class PreviewViewModelTests
     }
 
     [Fact]
+    public void StatusRowScale_FollowsTheDisplayedThumbnailWidth()
+    {
+        using var vm = FitViewModel(1);
+        var changed = new List<string?>();
+        vm.PropertyChanged += (_, e) => changed.Add(e.PropertyName);
+
+        vm.SetViewportSize(new System.Windows.Size(1800, 1120));
+
+        Assert.Contains(nameof(PreviewViewModel.StatusRowScale), changed);
+        Assert.True(vm.StatusRowScale > 1);
+        Assert.Equal(vm.DisplayThumbnailWidth, vm.StatusRowWidth * vm.StatusRowScale, precision: 6);
+    }
+
+    [Fact]
     public void FitLayout_IgnoresTheConfiguredSize()
     {
         using var vm = FitViewModel(1);

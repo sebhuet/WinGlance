@@ -70,7 +70,8 @@
         </Style>
     </Window.Resources>
 
-    <Border Background="{DynamicResource WindowBackground}"
+    <Border x:Name="RootBorder"
+            Background="{DynamicResource WindowBackground}"
             BorderBrush="{DynamicResource WindowBorder}"
             BorderThickness="1"
             CornerRadius="6"
@@ -82,7 +83,8 @@
             </Grid.RowDefinitions>
 
             <!-- Custom Title Bar -->
-            <Grid Grid.Row="0"
+            <Grid x:Name="TitleBar"
+                  Grid.Row="0"
                   Background="{DynamicResource TitleBarBackground}"
                   MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
                 <Grid.ColumnDefinitions>
@@ -100,13 +102,80 @@
 
                 <StackPanel Grid.Column="1"
                             Orientation="Horizontal">
+                    <!-- Options panel: quick settings, applied and saved as they change -->
+                    <Button x:Name="OptionsButton"
+                            Content="&#x2699;"
+                            FontSize="15"
+                            Click="OptionsButton_Click"
+                            ToolTip="Options"
+                            AutomationProperties.Name="Options"
+                            Style="{StaticResource TitleBarButtonStyle}" />
                     <Button Content="&#x2014;"
                             Click="MinimizeButton_Click"
+                            ToolTip="Minimize"
+                            Style="{StaticResource TitleBarButtonStyle}" />
+                    <!-- Full screen toggle: glyph and tooltip follow the window state (code-behind) -->
+                    <Button x:Name="FullScreenButton"
+                            Content="&#x25A1;"
+                            FontSize="16"
+                            Click="FullScreenButton_Click"
+                            ToolTip="Full screen (F11)"
+                            AutomationProperties.Name="Full screen"
                             Style="{StaticResource TitleBarButtonStyle}" />
                     <Button Content="&#x2715;"
                             Click="CloseButton_Click"
                             Style="{StaticResource CloseButtonStyle}" />
                 </StackPanel>
+
+                <!-- A popup is a separate window: DWM thumbnails of the panel cannot cover it,
+                     and the panel's own opacity does not apply to it -->
+                <Popup x:Name="OptionsPopup"
+                       PlacementTarget="{Binding ElementName=TitleBar}"
+                       Placement="Custom"
+                       StaysOpen="False"
+                       AllowsTransparency="True"
+                       Closed="OptionsPopup_Closed">
+                    <Border DataContext="{Binding SettingsViewModel}"
+                            Background="{DynamicResource TitleBarBackground}"
+                            BorderBrush="{DynamicResource WindowBorder}"
+                            BorderThickness="1"
+                            CornerRadius="6"
+                            Padding="12,10"
+                            Width="260">
+                        <StackPanel>
+                            <TextBlock Text="Options"
+                                       Foreground="{DynamicResource HeaderText}"
+                                       FontSize="13"
+                                       FontWeight="SemiBold"
+                                       Margin="0,0,0,8" />
+
+                            <!-- Transparency -->
+                            <DockPanel Margin="0,0,0,2">
+                                <TextBlock DockPanel.Dock="Right"
+                                           Text="{Binding PanelTransparency, StringFormat='{}{0} %'}"
+                                           Foreground="{DynamicResource PrimaryText}"
+                                           FontSize="12" />
+                                <TextBlock Text="Transparency"
+                                           Foreground="{DynamicResource PrimaryText}"
+                                           FontSize="12" />
+                            </DockPanel>
+                            <Slider Minimum="0" Maximum="70"
+                                    Value="{Binding PanelTransparency}"
+                                    TickFrequency="5" IsSnapToTickEnabled="True"
+                                    AutomationProperties.Name="Transparency" />
+
+                            <Button Content="All settings…"
+                                    Click="AllSettingsButton_Click"
+                                    HorizontalAlignment="Right"
+                                    Margin="0,10,0,0"
+                                    Padding="10,3"
+                                    Background="{DynamicResource ButtonBackground}"
+                                    Foreground="{DynamicResource PrimaryText}"
+                                    BorderBrush="{DynamicResource InputBorder}"
+                                    Cursor="Hand" />
+                        </StackPanel>
+                    </Border>
+                </Popup>
             </Grid>
 
             <!-- Content area: views switched by SelectedTabIndex -->

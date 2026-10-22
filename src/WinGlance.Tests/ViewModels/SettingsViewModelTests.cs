@@ -263,6 +263,61 @@ public class SettingsViewModelTests : IDisposable
         Assert.Equal(1, notifications);
     }
 
+    // ── Transparency (Options panel) ─────────────────────────────────
+
+    [Theory]
+    [InlineData(0.85, 15)]
+    [InlineData(1.0, 0)]
+    [InlineData(0.3, 70)]
+    public void PanelTransparency_IsTheOpacityTheOtherWayRound(double opacity, int expected)
+    {
+        _config.PanelOpacity = opacity;
+
+        Assert.Equal(expected, CreateVm().PanelTransparency);
+    }
+
+    [Fact]
+    public void PanelTransparency_AppliesTheOpacityLive()
+    {
+        double? applied = null;
+        var vm = CreateVm(opacity => applied = opacity);
+        var raised = new List<string?>();
+        vm.PropertyChanged += (_, e) => raised.Add(e.PropertyName);
+
+        vm.PanelTransparency = 40;
+
+        Assert.Equal(0.6, applied!.Value, precision: 6);
+        Assert.Equal(0.6, vm.PanelOpacity, precision: 6);
+        Assert.Contains(nameof(SettingsViewModel.PanelTransparency), raised);
+    }
+
+    [Theory]
+    [InlineData(-10, 0)]
+    [InlineData(95, 70)] // never below 30 % opacity: the panel must stay visible
+    public void PanelTransparency_IsClamped(int requested, int expected)
+    {
+        var vm = CreateVm();
+
+        vm.PanelTransparency = requested;
+
+        Assert.Equal(expected, vm.PanelTransparency);
+    }
+
+    [Fact]
+    public void SavePanelOpacity_SavesTheOpacityAlone()
+    {
+        var vm = CreateVm();
+        vm.PanelTransparency = 25;
+        vm.Layout = "grid"; // pending in the Settings view, not saved by the Options panel
+
+        vm.SavePanelOpacity();
+
+        var saved = _configService.Load();
+        Assert.Equal(0.75, saved.PanelOpacity, precision: 6);
+        Assert.Equal("fit", saved.Layout);
+        Assert.Empty(_autoStartCalls); // the registry is not touched either
+    }
+
     // ── Highlight on switch ──────────────────────────────────────────
 
     [Fact]

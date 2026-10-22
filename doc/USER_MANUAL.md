@@ -88,7 +88,9 @@ Window tracking continues while another view is open, so indicators are up to da
 
 ### 2.3 Title Bar Buttons
 
+- **Options** (⚙): opens the Options panel, a quick settings panel under the title bar. Its first option is the panel's **Transparency** (0 % opaque to 70 %), applied as you move the slider and saved when the panel closes. **All settings…** opens the full Settings view.
 - **Minimize** (—): minimizes the panel to the Windows taskbar.
+- **Full screen** (□): the panel covers its whole screen; in the Fit to panel layout the thumbnails grow to fill it. Click again (❐), press **F11** or **Esc**, or double-click the title bar to go back. Clicking a thumbnail also leaves full screen, so that the window you switch to is not hidden behind the panel.
 - **Close** (×): behavior depends on your settings:
   - If **Close to system tray** is enabled (default): hides the panel to the system tray.
   - If disabled: exits the application entirely.
@@ -136,7 +138,7 @@ Four layout modes are available (configurable in Settings):
 Each thumbnail displays:
 
 - A **live preview** of the window content, with the window's proportions kept (empty bands fill the rest).
-- Below it, the **window title** (truncated with "..." if too long), preceded by any status badges: coding agent, **Not Responding**, **Awaiting Action**. Badges sit below the preview because Windows draws live previews above everything else.
+- Below it, the **window title** (truncated with "..." if too long), preceded by any status badges: coding agent, **Not Responding**, **Awaiting Action**. Badges sit below the preview because Windows draws live previews above everything else. This row grows with the thumbnail (up to 2.5 times), so its text stays readable on large thumbnails.
 - Hover over a thumbnail to see the **full window title** in a tooltip.
 
 Windows on another virtual desktop are not shown (their preview would be black); they appear when you switch to their desktop.
@@ -184,7 +186,7 @@ When **Claude Code** or **OpenCode** runs in a monitored window, a badge appears
 | ------------------------------------- | ---------------------------------------------------------------------------------------- |
 | Blue **Claude · working**             | Claude is working on a turn.                                                             |
 | Orange **Claude · permission prompt** | Claude is blocked on you: a permission prompt, a question, an open dialog.               |
-| Gray **Claude · idle**                | Claude finished its turn and waits for your next prompt.                                 |
+| Orange **Claude · idle**              | Claude finished its turn and waits for your next prompt: it needs you.                   |
 | Teal **OpenCode · running**           | OpenCode runs in this window. OpenCode does not report whether it is working or waiting. |
 | **+1**, **+2**… after the text        | Several agents run in the same window; the badge shows the most urgent one.              |
 

@@ -9,10 +9,17 @@ namespace WinGlance.Services;
 /// </summary>
 internal static class ThumbnailLayoutCalculator
 {
-    // Space around each thumbnail in PreviewTab.xaml: Border margin 4+4, border 2+2, padding 2+2,
-    // plus the 20 px badge/title row below the image. Keep in sync with the item template.
+    // Space around each thumbnail in PreviewTab.xaml: Border margin 4+4, border 2+2, padding 2+2.
+    // Keep in sync with the item template.
     internal const double ItemChromeWidth = 16;
-    internal const double ItemChromeHeight = 36;
+    internal const double ItemFrameHeight = 16;
+
+    // Badge/title row below the image, before scaling (see StatusRowScale)
+    internal const double StatusRowHeight = 20;
+
+    // The status row keeps its base size up to this thumbnail width, then grows with it
+    internal const double StatusRowBaseWidth = 260;
+    internal const double MaxStatusRowScale = 2.5;
 
     // Group header row (icon + app name), margins included
     internal const double GroupHeaderHeight = 26;
@@ -68,11 +75,25 @@ internal static class ThumbnailLayoutCalculator
         if (perRow < 1)
             return false;
 
-        var itemHeight = Math.Floor(thumbnailWidth / aspectRatio) + ItemChromeHeight;
+        var itemHeight = ItemHeight(thumbnailWidth, aspectRatio);
         var rows = groupSizes.Sum(n => (n + perRow - 1) / perRow);
         var height = (groupSizes.Count(n => n > 0) * GroupHeaderHeight) + (rows * itemHeight);
         return height <= available.Height - SafetyMargin;
     }
+
+    /// <summary>
+    /// Scale of the badge/title row under a thumbnail: 1 up to <see cref="StatusRowBaseWidth"/>,
+    /// then proportional to the thumbnail width, so that the text stays readable on large
+    /// thumbnails, up to <see cref="MaxStatusRowScale"/>.
+    /// </summary>
+    public static double StatusRowScale(double thumbnailWidth) =>
+        double.IsFinite(thumbnailWidth)
+            ? Math.Clamp(thumbnailWidth / StatusRowBaseWidth, 1, MaxStatusRowScale)
+            : 1;
+
+    /// <summary>Full height of one thumbnail item: image, frame and scaled status row.</summary>
+    internal static double ItemHeight(double thumbnailWidth, double aspectRatio) =>
+        Math.Floor(thumbnailWidth / aspectRatio) + ItemFrameHeight + (StatusRowHeight * StatusRowScale(thumbnailWidth));
 
     /// <summary>
     /// Cell aspect ratio for a set of windows: the median of their known ratios, so that the

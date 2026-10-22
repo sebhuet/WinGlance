@@ -126,8 +126,34 @@ internal sealed class SettingsViewModel : ViewModelBase
         set
         {
             if (SetProperty(ref _panelOpacity, value))
+            {
                 _onOpacityChanged?.Invoke(value);
+                OnPropertyChanged(nameof(PanelTransparency));
+            }
         }
+    }
+
+    /// <summary>
+    /// Transparency level in percent (0 = opaque, 70 = most transparent): the opacity seen
+    /// the other way round, as shown in the Options panel.
+    /// </summary>
+    public int PanelTransparency
+    {
+        get => (int)Math.Round((1 - _panelOpacity) * 100);
+        set => PanelOpacity = 1 - (Math.Clamp(value, 0, 70) / 100.0);
+    }
+
+    /// <summary>
+    /// Saves the panel opacity alone, without the other pending changes of the Settings view:
+    /// the Options panel applies its changes without a Save button.
+    /// </summary>
+    public void SavePanelOpacity()
+    {
+        if (_config.PanelOpacity == PanelOpacity)
+            return;
+
+        _config.PanelOpacity = PanelOpacity;
+        _configService.Save(_config);
     }
 
     // ── Polling interval ────────────────────────────────────────────────
