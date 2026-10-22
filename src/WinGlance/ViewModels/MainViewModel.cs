@@ -25,6 +25,9 @@ internal class MainViewModel : ViewModelBase
             MonitoredApps = config.MonitoredApps
                 .Select(a => new MonitoredApp(a.ProcessName, a.DisplayName))
                 .ToList(),
+            AgentMonitor = config.AgentDetection.Enabled
+                ? new AgentMonitor(config.AgentDetection.RefreshIntervalMs)
+                : null,
         };
 
         ApplicationsViewModel = new ApplicationsViewModel(

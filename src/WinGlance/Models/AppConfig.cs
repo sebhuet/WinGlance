@@ -20,6 +20,22 @@ internal sealed class AppConfig
     public bool CloseToTray { get; set; } = true;
     public string Hotkey { get; set; } = "Ctrl+Alt+G";
     public LlmConfig Llm { get; set; } = new();
+    public AgentDetectionConfig AgentDetection { get; set; } = new();
+}
+
+/// <summary>
+/// Coding agent detection configuration (FR-11).
+/// </summary>
+internal sealed class AgentDetectionConfig
+{
+    /// <summary>Shows Claude Code / OpenCode status on thumbnails.</summary>
+    public bool Enabled { get; set; } = true;
+
+    /// <summary>
+    /// Delay between two agent discoveries. Each one runs <c>claude agents --json</c>
+    /// (~0.2 s of CPU), hence a slower cadence than window polling.
+    /// </summary>
+    public int RefreshIntervalMs { get; set; } = 5000;
 }
 
 /// <summary>

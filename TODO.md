@@ -359,6 +359,27 @@
 
 ---
 
+## Phase 18 — Coding Agent Detection (FR-11) ✅
+
+- [x] **18.1** Native layer: Toolhelp32 process snapshot, PEB read of a process's current directory (x64)
+- [x] **18.2** Create `Services/ProcessTree.cs` — immutable snapshot, process lineage (cycle- and depth-guarded)
+- [x] **18.3** Create `Services/ClaudeAgentSource.cs`
+  - Runs `claude agents --json` (documented interface; `~/.claude` internals deliberately not read)
+  - Finds `claude.exe` / `claude.cmd` on PATH, then `%USERPROFILE%\.local\bin`; 5 s timeout
+- [x] **18.4** Create `Services/OpenCodeAgentSource.cs` — `opencode.exe` root processes, status "running"
+- [x] **18.5** Create `Services/AgentWindowMatcher.cs`
+  - Nearest window-owning ancestor; windows sharing one process (VS Code, Windows Terminal) told apart by working directory vs title
+- [x] **18.6** Create `Services/AgentMonitor.cs` — background discovery every 5 s, skipped while no `claude.exe` runs
+- [x] **18.7** `TrackedWindow.Agent` (`AgentBadge`) and `NeedsAgentAttention`; `PreviewViewModel.ApplyAgentState`
+  - Orange border when an agent waits, or finished a turn the user has not seen yet
+- [x] **18.8** Preview badge in the title row (fixed height, outside the DWM area); Settings checkbox, applied live
+- [x] **18.9** Write and run unit tests (122 tests)
+  - Parser, process tree, OpenCode roots, window matcher and title scoring, badge aggregation, attention transitions
+  - Native struct sizes and PEB read on the test process; offscreen rendering of the Preview badge
+  - `dotnet test` passes (345 total)
+
+---
+
 ## Phase Summary
 
 | Phase | Description                      | Depends on |
@@ -381,3 +402,4 @@
 | 15    | Window Attention Detection ✅    | 2, 3, 4    |
 | 16    | LLM-Assisted Analysis ✅         | 2, 3, 15   |
 | 17    | Polish & Final Touches ✅        | All        |
+| 18    | Coding Agent Detection ✅        | 3, 4, 15   |

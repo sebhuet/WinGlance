@@ -131,5 +131,51 @@ public class NativeMethodsTests
         Assert.Equal(0x0312, NativeMethods.WM_HOTKEY);
         Assert.Equal(0x8006, NativeMethods.HSHELL_FLASH);
         Assert.Equal(0x1000u, NativeMethods.PROCESS_QUERY_LIMITED_INFORMATION);
+        Assert.Equal(0x0010u, NativeMethods.PROCESS_VM_READ);
+        Assert.Equal(0x0002u, NativeMethods.TH32CS_SNAPPROCESS);
+        Assert.Equal(new IntPtr(-1), NativeMethods.INVALID_HANDLE_VALUE);
+    }
+
+    // ── Process tree and PEB reading (agent detection) ──────────────────
+
+    [Fact]
+    public void PROCESSENTRY32W_HasNativeX64Size()
+    {
+        Assert.True(Environment.Is64BitProcess, "WinGlance ships as win-x64");
+        // 9 fields with alignment padding (40 bytes) + 260 UTF-16 chars (520 bytes) + tail padding
+        Assert.Equal(568, Marshal.SizeOf<NativeMethods.PROCESSENTRY32W>());
+    }
+
+    [Fact]
+    public void PROCESS_BASIC_INFORMATION_HasNativeX64Size()
+    {
+        Assert.Equal(48, Marshal.SizeOf<NativeMethods.PROCESS_BASIC_INFORMATION>());
+    }
+
+    [Fact]
+    public void GetProcessEntries_ContainsCurrentProcess()
+    {
+        var entries = NativeMethods.GetProcessEntries();
+
+        var self = Assert.Single(entries, e => e.ProcessId == (uint)Environment.ProcessId);
+        Assert.EndsWith(".exe", self.ExeFile, StringComparison.OrdinalIgnoreCase);
+        Assert.NotEqual(0u, self.ParentProcessId);
+    }
+
+    [Fact]
+    public void TryGetProcessCurrentDirectory_CurrentProcess_MatchesEnvironment()
+    {
+        var directory = NativeMethods.TryGetProcessCurrentDirectory(Environment.ProcessId);
+
+        Assert.Equal(
+            Path.TrimEndingDirectorySeparator(Environment.CurrentDirectory),
+            directory,
+            ignoreCase: true);
+    }
+
+    [Fact]
+    public void TryGetProcessCurrentDirectory_UnknownProcess_ReturnsNull()
+    {
+        Assert.Null(NativeMethods.TryGetProcessCurrentDirectory(0x3FFFFFF0));
     }
 }

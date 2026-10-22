@@ -150,6 +150,7 @@ Thumbnails display **color-coded borders** to communicate the state of each wind
 | ------------ | -------------- | --------------------------------------------------------------------------------------------------------- |
 | **Red**      | Not Responding | The application has stopped responding. A red "Not Responding" banner also appears on the thumbnail.      |
 | **Orange**   | Flashing       | The window is requesting attention (e.g., a file transfer completed, a message was received).             |
+| **Orange**   | Agent          | A coding agent in the window waits for you, or finished while you were elsewhere (see Section 3.8).       |
 | **Yellow**   | Modal Dialog   | The window is blocked by a dialog box (e.g., "Save As", a confirmation prompt). Address the dialog first. |
 | **Blue**     | Active         | This is the currently focused window.                                                                     |
 | **Gray**     | Inactive       | Normal state — the window is running but not currently focused.                                           |
@@ -165,7 +166,27 @@ When LLM analysis is enabled (see [Section 6](#6-llm-assisted-analysis)), additi
 | Orange **"Awaiting Action"** badge     | The AI detected that the window likely requires your attention (a dialog, error, prompt, or completed operation). |
 | **Dimmed thumbnail** (reduced opacity) | The AI classified the window as idle (no action needed).                                                          |
 
-### 3.8 Dynamic Window Tracking
+### 3.8 Coding Agent Indicators
+
+When **Claude Code** or **OpenCode** runs in a monitored window, a badge appears next to the window title, under the thumbnail:
+
+| Badge                                 | Meaning                                                                                  |
+| ------------------------------------- | ---------------------------------------------------------------------------------------- |
+| Blue **Claude · working**             | Claude is working on a turn.                                                             |
+| Orange **Claude · permission prompt** | Claude is blocked on you: a permission prompt, a question, an open dialog.               |
+| Gray **Claude · idle**                | Claude finished its turn and waits for your next prompt.                                 |
+| Teal **OpenCode · running**           | OpenCode runs in this window. OpenCode does not report whether it is working or waiting. |
+| **+1**, **+2**… after the text        | Several agents run in the same window; the badge shows the most urgent one.              |
+
+Hover the badge to see each session's name and folder.
+
+The thumbnail border turns **orange** when an agent waits for you, and when an agent finishes a turn while you are in another window. The second case clears as soon as you switch to the window.
+
+It works with the Claude Code extension for VS Code, the `claude` command in a terminal, and agents started in the VS Code integrated terminal. In VS Code, WinGlance tells windows apart by the folder name in their title (`file - Folder - Visual Studio Code`). If two windows show the same folder name, their agents are not shown rather than shown on the wrong window.
+
+Badges refresh every 5 seconds. Turn them off in **Settings > Coding Agents**.
+
+### 3.9 Dynamic Window Tracking
 
 - When a new window opens for a monitored application, its thumbnail appears automatically (within approximately one second).
 - When a window is closed, its thumbnail is removed automatically.
@@ -258,11 +279,15 @@ A text field showing the current hotkey combination (default: `Ctrl+Alt+G`).
 
 The hotkey is applied after clicking **Save Configuration**.
 
-### 5.7 LLM Analysis Settings
+### 5.7 Coding Agents
+
+**Show Claude Code / OpenCode status on thumbnails** (default: on) shows the agent badges described in [Section 3.8](#38-coding-agent-indicators). The change applies immediately. The refresh interval (`agentDetection.refreshIntervalMs`, default 5000 ms) can be changed in `config.json`.
+
+### 5.8 LLM Analysis Settings
 
 See [Section 6](#6-llm-assisted-analysis) for a detailed explanation.
 
-### 5.8 Saving Settings
+### 5.9 Saving Settings
 
 Click **Save Configuration** to persist all settings to `config.json`.
 
@@ -405,22 +430,24 @@ Contains the system prompt sent to the AI model during LLM analysis.
 
 ## 10. Default Settings Reference
 
-| Setting           | Default Value             |
-| ----------------- | ------------------------- |
-| Layout            | Horizontal                |
-| Thumbnail width   | 200 px                    |
-| Thumbnail height  | 150 px                    |
-| Panel opacity     | 85%                       |
-| Polling interval  | 1000 ms                   |
-| Remember position | On                        |
-| Close to tray     | On                        |
-| Auto-start        | Off                       |
-| Global hotkey     | Ctrl+Alt+G                |
-| LLM analysis      | Off                       |
-| LLM provider      | openai                    |
-| LLM endpoint      | https://api.openai.com/v1 |
-| LLM model         | gpt-4o-mini               |
-| Stale threshold   | 30 seconds                |
+| Setting             | Default Value               |
+| ------------------- | --------------------------- |
+| Layout              | Horizontal                  |
+| Thumbnail width     | 200 px                      |
+| Thumbnail height    | 150 px                      |
+| Panel opacity       | 85%                         |
+| Polling interval    | 1000 ms                     |
+| Remember position   | On                          |
+| Close to tray       | On                          |
+| Auto-start          | Off                         |
+| Global hotkey       | Ctrl+Alt+G                  |
+| Coding agent badges | On                          |
+| Agent refresh       | 5000 ms                     |
+| LLM analysis        | Off                         |
+| LLM provider        | openai                      |
+| LLM endpoint        | `https://api.openai.com/v1` |
+| LLM model           | gpt-4o-mini                 |
+| Stale threshold     | 30 seconds                  |
 
 ---
 
@@ -462,6 +489,15 @@ Contains the system prompt sent to the AI model during LLM analysis.
 > - The stale threshold has elapsed (wait at least 30 seconds without interacting with the monitored window).
 > - Your API key is valid and the chosen model supports vision (image) input.
 > - For Ollama, ensure the Ollama service is running locally (`http://localhost:11434`).
+
+**Q: Claude Code runs in a window but no badge appears.**
+
+> Check the following:
+>
+> - **Settings > Coding Agents** is checked, and the window's application is monitored.
+> - `claude agents --json` works in a terminal and lists the session (Claude Code v2.1.139 or later). WinGlance looks for `claude` on `PATH`, then in `%USERPROFILE%\.local\bin`.
+> - For VS Code, the window title shows the project folder (the default title does). Two windows on folders with the same name cannot be told apart.
+> - Background sessions started with `claude --bg` have no window, so they are not shown.
 
 **Q: Can I run WinGlance from a USB drive?**
 

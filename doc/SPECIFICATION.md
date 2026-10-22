@@ -154,6 +154,29 @@ Extends FR-9 with intelligent window analysis via an external LLM.
 - **Debug log**: scrollable list displaying each LLM analysis result — window title, verdict (`awaiting_action` / `idle`), and the LLM's reasoning (second line of response)
 - Log is capped at 200 entries (oldest removed first) and can be cleared manually
 
+### FR-11: Coding Agent Detection
+
+Shows, for each monitored window, whether a coding agent (**Claude Code** or **OpenCode**) is running in it, and whether it is working or waiting for the user.
+
+#### Discovery
+
+- **Claude Code**: sessions are listed with `claude agents --json`, the interface documented for external tools ([agent view](https://code.claude.com/docs/en/agent-view)). Each live session gives its `pid`, `cwd`, `status` (`busy` / `waiting` / `idle`) and, when waiting, `waitingFor` (`permission prompt`, `input needed`, …). The files under `~/.claude` are not read: the documentation states they are not a stable interface.
+- **OpenCode**: no state interface exists, so instances are found from the process list (`opencode.exe`, helpers spawned by an instance excluded). Their working directory is read from the process (PEB). Status is reported as **running**, without busy/idle detail.
+- The `claude` executable is looked up on `PATH`, then in `%USERPROFILE%\.local\bin` (native installer). An npm install (`claude.cmd`) is supported.
+- Discovery runs in the background every `refreshIntervalMs` (default 5 s), not on every window poll: each `claude agents` call costs about 0.2 s of CPU. It is skipped while no `claude.exe` process runs.
+
+#### Window Association
+
+- Walk up the agent's process tree (Toolhelp32 snapshot) to the nearest process owning a monitored window.
+- If that process owns **several** windows (VS Code serves all its windows from one process; Windows Terminal likewise), match the agent's working directory against the window titles: full path in the title first, then the folder name as a title segment (`file - Folder - Visual Studio Code`), then parent folders with a lower score (agent started in a subfolder). A tie leaves the session unassigned rather than guessing.
+- Covers the Claude Code VS Code extension, the CLI in a terminal, and agents in the VS Code integrated terminal. Background sessions run by the Claude supervisor have no window and are not shown.
+
+#### Display
+
+- A badge next to the thumbnail title (outside the DWM thumbnail area, which covers WPF content): `Claude · working` (blue), `Claude · permission prompt` (orange), `Claude · idle` (gray), `OpenCode · running` (teal); `+N` when several sessions share a window; tooltip with each session's name and folder.
+- **Orange border** when an agent waits for the user, or when it finished a turn (busy → idle) while the window was not focused; the latter clears once the window is focused.
+- Settings: **Show Claude Code / OpenCode status on thumbnails** checkbox (default: on), applied live.
+
 ---
 
 ## Non-Functional Requirements
@@ -397,6 +420,10 @@ WinGlance/
     "apiKey": "",
     "model": "gpt-4o-mini",
     "staleThresholdSeconds": 30
+  },
+  "agentDetection": {
+    "enabled": true,
+    "refreshIntervalMs": 5000
   }
 }
 ```

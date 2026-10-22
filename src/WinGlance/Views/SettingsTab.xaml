@@ -126,6 +126,12 @@
                      BorderBrush="#FF555555" Padding="4,3"
                      Width="180" HorizontalAlignment="Left" />
 
+            <!-- ── Coding Agents ──────────────────────────── -->
+            <TextBlock Text="Coding Agents" Style="{StaticResource SectionHeader}" />
+            <CheckBox Content="Show Claude Code / OpenCode status on thumbnails"
+                      IsChecked="{Binding AgentDetectionEnabled}"
+                      Foreground="#FFCCCCCC" Margin="0,2" />
+
             <!-- ── LLM Analysis ───────────────────────────── -->
             <TextBlock Text="LLM Analysis" Style="{StaticResource SectionHeader}" />
             <CheckBox Content="Enable LLM analysis"

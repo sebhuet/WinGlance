@@ -12,6 +12,7 @@ When working with multiple windows of the same application (e.g., several VS Cod
 - **Multi-app grouping** — thumbnails grouped by application with icons and titles
 - **Window attention detection** — highlights windows that are flashing, not responding, or blocked by a modal dialog
 - **LLM-assisted analysis** — optional integration with OpenAI, Gemini, or Ollama to intelligently detect windows awaiting user action
+- **Coding agent badges** — shows whether Claude Code or OpenCode runs in each window, and whether it is working, idle, or waiting for you
 - **Global hotkey** — configurable shortcut (default: Ctrl+Alt+G) to show/hide the panel
 - **Dark/light theme** — auto-detects Windows system theme
 - **Per-monitor DPI** — works correctly on multi-monitor setups with different scaling
@@ -70,7 +71,7 @@ See [doc/SPECIFICATION.md](doc/SPECIFICATION.md) for the full config format.
 
 ## Project Structure
 
-```
+```text
 WinGlance/
 ├── src/
 │   ├── WinGlance/          # Main WPF application

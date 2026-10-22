@@ -14,6 +14,7 @@ internal sealed class SettingsViewModel : ViewModelBase
     private readonly AppConfig _config;
     private readonly PreviewViewModel _previewViewModel;
     private readonly Action<double>? _onOpacityChanged;
+    private readonly Action<bool> _applyAutoStart;
 
     private string _layout;
     private int _thumbnailWidth;
@@ -24,6 +25,7 @@ internal sealed class SettingsViewModel : ViewModelBase
     private bool _autoStart;
     private bool _closeToTray;
     private string _hotkey;
+    private bool _agentDetectionEnabled;
 
     // LLM settings
     private bool _llmEnabled;
@@ -33,16 +35,22 @@ internal sealed class SettingsViewModel : ViewModelBase
     private string _llmModel;
     private int _llmStaleThresholdSeconds;
 
+    /// <param name="applyAutoStart">
+    /// Writes the "Start with Windows" registry entry; defaults to <see cref="AutoStartService.SetAutoStart"/>.
+    /// Tests replace it so that they never touch the user's Run key.
+    /// </param>
     public SettingsViewModel(
         ConfigService configService,
         AppConfig config,
         PreviewViewModel previewViewModel,
-        Action<double>? onOpacityChanged = null)
+        Action<double>? onOpacityChanged = null,
+        Action<bool>? applyAutoStart = null)
     {
         _configService = configService;
         _config = config;
         _previewViewModel = previewViewModel;
         _onOpacityChanged = onOpacityChanged;
+        _applyAutoStart = applyAutoStart ?? AutoStartService.SetAutoStart;
 
         // Initialize from config
         _layout = config.Layout;
@@ -54,6 +62,7 @@ internal sealed class SettingsViewModel : ViewModelBase
         _autoStart = config.AutoStart;
         _closeToTray = config.CloseToTray;
         _hotkey = config.Hotkey;
+        _agentDetectionEnabled = config.AgentDetection.Enabled;
 
         _llmEnabled = config.Llm.Enabled;
         _llmProvider = config.Llm.Provider;
@@ -150,6 +159,26 @@ internal sealed class SettingsViewModel : ViewModelBase
         set => SetProperty(ref _hotkey, value);
     }
 
+    // ── Coding agents ──────────────────────────────────────────────────
+
+    /// <summary>
+    /// Shows Claude Code / OpenCode status on thumbnails. Applied live: turning it off
+    /// removes the monitor, and the next poll clears every badge.
+    /// </summary>
+    public bool AgentDetectionEnabled
+    {
+        get => _agentDetectionEnabled;
+        set
+        {
+            if (SetProperty(ref _agentDetectionEnabled, value))
+            {
+                _previewViewModel.AgentMonitor = value
+                    ? new AgentMonitor(_config.AgentDetection.RefreshIntervalMs)
+                    : null;
+            }
+        }
+    }
+
     // ── LLM settings ───────────────────────────────────────────────────
 
     public bool LlmEnabled
@@ -214,6 +243,7 @@ internal sealed class SettingsViewModel : ViewModelBase
         _config.AutoStart = AutoStart;
         _config.CloseToTray = CloseToTray;
         _config.Hotkey = Hotkey;
+        _config.AgentDetection.Enabled = AgentDetectionEnabled;
 
         _config.Llm.Enabled = LlmEnabled;
         _config.Llm.Provider = LlmProvider;
@@ -225,7 +255,7 @@ internal sealed class SettingsViewModel : ViewModelBase
         _configService.Save(_config);
 
         // Sync auto-start registry entry
-        Services.AutoStartService.SetAutoStart(AutoStart);
+        _applyAutoStart(AutoStart);
     }
 
     /// <summary>

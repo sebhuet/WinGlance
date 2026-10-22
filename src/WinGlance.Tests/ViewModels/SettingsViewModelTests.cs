@@ -24,13 +24,22 @@ public class SettingsViewModelTests : IDisposable
     public void Dispose()
     {
         _previewVm.Dispose();
-        try { Directory.Delete(_tempDir, recursive: true); }
-        catch { /* best-effort */ }
+        try
+        {
+            Directory.Delete(_tempDir, recursive: true);
+        }
+        catch
+        {
+            // best-effort
+        }
     }
+
+    // Auto-start values passed to the registry writer; recorded instead of written to HKCU\...\Run
+    private readonly List<bool> _autoStartCalls = [];
 
     private SettingsViewModel CreateVm(Action<double>? opacityCallback = null)
     {
-        return new SettingsViewModel(_configService, _config, _previewVm, opacityCallback);
+        return new SettingsViewModel(_configService, _config, _previewVm, opacityCallback, _autoStartCalls.Add);
     }
 
     // ── Defaults from config ─────────────────────────────────────────
@@ -172,9 +181,13 @@ public class SettingsViewModelTests : IDisposable
         vm.LlmModel = "llama3";
         vm.LlmStaleThresholdSeconds = 45;
 
+        vm.AgentDetectionEnabled = false;
+
         vm.Save();
 
+        Assert.Equal([true], _autoStartCalls); // applied through the injected writer, not the registry
         var loaded = _configService.Load();
+        Assert.False(loaded.AgentDetection.Enabled);
         Assert.Equal("grid", loaded.Layout);
         Assert.Equal(400, loaded.ThumbnailWidth);
         Assert.Equal(300, loaded.ThumbnailHeight);
@@ -206,5 +219,52 @@ public class SettingsViewModelTests : IDisposable
         var vm = CreateVm();
 
         Assert.NotNull(vm.EditPromptCommand);
+    }
+
+    // ── Coding agents ────────────────────────────────────────────────
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void Constructor_InitializesAgentDetectionFromConfig(bool enabled)
+    {
+        _config.AgentDetection.Enabled = enabled;
+
+        Assert.Equal(enabled, CreateVm().AgentDetectionEnabled);
+    }
+
+    [Fact]
+    public void AgentDetectionEnabled_TurnedOff_RemovesMonitorFromPreview()
+    {
+        _config.AgentDetection.Enabled = true;
+        var vm = CreateVm();
+        vm.AgentDetectionEnabled = false;
+        Assert.Null(_previewVm.AgentMonitor);
+    }
+
+    [Fact]
+    public void AgentDetectionEnabled_TurnedOn_GivesPreviewAMonitorWithConfiguredInterval()
+    {
+        _config.AgentDetection.Enabled = false;
+        _config.AgentDetection.RefreshIntervalMs = 7000;
+        var vm = CreateVm();
+
+        vm.AgentDetectionEnabled = true;
+
+        Assert.NotNull(_previewVm.AgentMonitor);
+        Assert.Equal(TimeSpan.FromSeconds(7), _previewVm.AgentMonitor.RefreshInterval);
+    }
+
+    [Fact]
+    public void AgentDetectionEnabled_RaisesPropertyChanged()
+    {
+        _config.AgentDetection.Enabled = false;
+        var vm = CreateVm();
+        var raised = false;
+        vm.PropertyChanged += (_, e) => raised |= e.PropertyName == nameof(SettingsViewModel.AgentDetectionEnabled);
+
+        vm.AgentDetectionEnabled = true;
+
+        Assert.True(raised);
     }
 }

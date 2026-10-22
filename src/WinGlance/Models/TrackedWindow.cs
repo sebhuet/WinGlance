@@ -17,6 +17,8 @@ public class TrackedWindow : ViewModels.ViewModelBase, IEquatable<TrackedWindow>
     private bool _isModalBlocked;
     private bool _isStale;
     private string? _llmVerdict;
+    private AgentBadge? _agent;
+    private bool _needsAgentAttention;
 
     /// <summary>
     /// Creates a new tracked window with immutable identity properties.
@@ -41,6 +43,9 @@ public class TrackedWindow : ViewModels.ViewModelBase, IEquatable<TrackedWindow>
 
     /// <summary>User-friendly display name (e.g., "VS Code").</summary>
     public string DisplayName { get; }
+
+    /// <summary>ID of the process owning the window; links agent processes to their window.</summary>
+    public uint ProcessId { get; init; }
 
     // ── Observable properties (updated each polling cycle) ─────────────
 
@@ -104,6 +109,24 @@ public class TrackedWindow : ViewModels.ViewModelBase, IEquatable<TrackedWindow>
     {
         get => _llmVerdict;
         set => SetProperty(ref _llmVerdict, value);
+    }
+
+    // ── Coding agents (FR-11) ──────────────────────────────────────────
+
+    /// <summary>Claude Code / OpenCode sessions hosted by this window, or null when there are none.</summary>
+    public AgentBadge? Agent
+    {
+        get => _agent;
+        set => SetProperty(ref _agent, value);
+    }
+
+    /// <summary>
+    /// True when an agent waits for the user, or finished a turn the user has not looked at yet.
+    /// </summary>
+    public bool NeedsAgentAttention
+    {
+        get => _needsAgentAttention;
+        set => SetProperty(ref _needsAgentAttention, value);
     }
 
     // ── Equality (by HWND) ──────────────────────────────────────────────

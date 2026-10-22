@@ -86,4 +86,25 @@ public class MainViewModelTests
         Assert.NotNull(vm.Config);
         Assert.NotNull(vm.ConfigService);
     }
+
+    [Fact]
+    public void Constructor_AgentDetectionEnabled_GivesPreviewAMonitor()
+    {
+        var config = new AppConfig { AgentDetection = { Enabled = true, RefreshIntervalMs = 3000 } };
+
+        var vm = CreateVm(config);
+
+        Assert.NotNull(vm.PreviewViewModel.AgentMonitor);
+        Assert.Equal(TimeSpan.FromSeconds(3), vm.PreviewViewModel.AgentMonitor.RefreshInterval);
+    }
+
+    [Fact]
+    public void Constructor_AgentDetectionDisabled_LeavesPreviewWithoutMonitor()
+    {
+        var config = new AppConfig { AgentDetection = { Enabled = false } };
+
+        var vm = CreateVm(config);
+
+        Assert.Null(vm.PreviewViewModel.AgentMonitor);
+    }
 }

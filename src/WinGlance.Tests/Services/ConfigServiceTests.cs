@@ -16,8 +16,14 @@ public class ConfigServiceTests : IDisposable
 
     public void Dispose()
     {
-        try { Directory.Delete(_tempDir, recursive: true); }
-        catch { /* cleanup best-effort */ }
+        try
+        {
+            Directory.Delete(_tempDir, recursive: true);
+        }
+        catch
+        {
+            // cleanup best-effort
+        }
     }
 
     [Fact]
@@ -135,5 +141,17 @@ public class ConfigServiceTests : IDisposable
         Assert.Equal("grid", config.Layout);
         Assert.Equal(200, config.ThumbnailWidth); // default
         Assert.Equal(150, config.ThumbnailHeight); // default
+    }
+
+    [Fact]
+    public void Load_ConfigWrittenBeforeAgentDetection_EnablesItByDefault()
+    {
+        var svc = new ConfigService(_tempDir);
+        File.WriteAllText(svc.ConfigPath, """{"layout":"grid","llm":{"enabled":false}}""");
+
+        var config = svc.Load();
+
+        Assert.True(config.AgentDetection.Enabled);
+        Assert.Equal(5000, config.AgentDetection.RefreshIntervalMs);
     }
 }

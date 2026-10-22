@@ -57,6 +57,30 @@ public class WindowStateToBorderBrushConverterTests
     }
 
     [Fact]
+    public void NeedsAgentAttention_ReturnsOrangeBrush()
+    {
+        var result = _converter.Convert([false, false, false, false, true], typeof(Brush), null!, CultureInfo.InvariantCulture);
+        var brush = Assert.IsType<SolidColorBrush>(result);
+        Assert.Equal(Color.FromRgb(255, 140, 0), brush.Color); // orange
+    }
+
+    [Fact]
+    public void NeedsAgentAttention_TakesPriorityOverModalAndActive()
+    {
+        var result = _converter.Convert([true, false, false, true, true], typeof(Brush), null!, CultureInfo.InvariantCulture);
+        var brush = Assert.IsType<SolidColorBrush>(result);
+        Assert.Equal(Color.FromRgb(255, 140, 0), brush.Color); // orange
+    }
+
+    [Fact]
+    public void IsHung_TakesPriorityOverAgentAttention()
+    {
+        var result = _converter.Convert([false, false, true, false, true], typeof(Brush), null!, CultureInfo.InvariantCulture);
+        var brush = Assert.IsType<SolidColorBrush>(result);
+        Assert.Equal(Color.FromRgb(255, 0, 0), brush.Color); // red
+    }
+
+    [Fact]
     public void EmptyValues_ReturnsInactiveBrush()
     {
         var result = _converter.Convert([], typeof(Brush), null!, CultureInfo.InvariantCulture);

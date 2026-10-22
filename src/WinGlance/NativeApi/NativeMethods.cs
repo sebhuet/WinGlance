@@ -34,6 +34,12 @@ internal static partial class NativeMethods
     public const int HSHELL_FLASH = 0x8006;
 
     public const uint PROCESS_QUERY_LIMITED_INFORMATION = 0x1000;
+    public const uint PROCESS_VM_READ = 0x0010;
+
+    public const uint TH32CS_SNAPPROCESS = 0x00000002;
+    public static readonly IntPtr INVALID_HANDLE_VALUE = new(-1);
+
+    public const int ProcessBasicInformation = 0;
 
     // SendInput constants
     public const uint INPUT_KEYBOARD = 1;
@@ -113,6 +119,36 @@ internal static partial class NativeMethods
         public uint Flags;
         public uint Time;
         public IntPtr ExtraInfo;
+    }
+
+    // ── Process structures ──────────────────────────────────────────────
+
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+    public struct PROCESSENTRY32W
+    {
+        public uint Size;
+        public uint Usage;
+        public uint ProcessId;
+        public IntPtr DefaultHeapId;
+        public uint ModuleId;
+        public uint Threads;
+        public uint ParentProcessId;
+        public int PriorityClassBase;
+        public uint Flags;
+
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 260)]
+        public string ExeFile;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct PROCESS_BASIC_INFORMATION
+    {
+        public IntPtr ExitStatus;
+        public IntPtr PebBaseAddress;
+        public IntPtr AffinityMask;
+        public IntPtr BasePriority;
+        public IntPtr UniqueProcessId;
+        public IntPtr InheritedFromUniqueProcessId;
     }
 
     // ── Delegates ─────────────────────────────────────────────────────
@@ -228,6 +264,26 @@ internal static partial class NativeMethods
     [DllImport("kernel32.dll", EntryPoint = "GetApplicationUserModelId", CharSet = CharSet.Unicode)]
     public static extern int GetApplicationUserModelId(IntPtr hProcess, ref uint applicationUserModelIdLength, char[] applicationUserModelId);
 
+    // ── Kernel32 / Ntdll (process tree, agent detection) ─────────────
+
+    [DllImport("kernel32.dll")]
+    public static extern IntPtr CreateToolhelp32Snapshot(uint dwFlags, uint th32ProcessID);
+
+    [DllImport("kernel32.dll", EntryPoint = "Process32FirstW", CharSet = CharSet.Unicode)]
+    public static extern bool Process32First(IntPtr hSnapshot, ref PROCESSENTRY32W lppe);
+
+    [DllImport("kernel32.dll", EntryPoint = "Process32NextW", CharSet = CharSet.Unicode)]
+    public static extern bool Process32Next(IntPtr hSnapshot, ref PROCESSENTRY32W lppe);
+
+    [DllImport("kernel32.dll")]
+    public static extern bool IsWow64Process(IntPtr hProcess, out bool wow64Process);
+
+    [DllImport("kernel32.dll")]
+    public static extern bool ReadProcessMemory(IntPtr hProcess, IntPtr lpBaseAddress, byte[] lpBuffer, nint nSize, out nint lpNumberOfBytesRead);
+
+    [DllImport("ntdll.dll")]
+    public static extern int NtQueryInformationProcess(IntPtr processHandle, int processInformationClass, ref PROCESS_BASIC_INFORMATION processInformation, int processInformationLength, out int returnLength);
+
     // ── Helpers ───────────────────────────────────────────────────────
 
     public static string GetWindowTitle(IntPtr hWnd)
@@ -251,5 +307,98 @@ internal static partial class NativeMethods
     {
         var exStyle = GetWindowLong(hWnd, GWL_EXSTYLE);
         return (exStyle & WS_EX_APPWINDOW) != 0;
+    }
+
+    /// <summary>
+    /// Lists every running process with its parent PID and executable name,
+    /// using a Toolhelp32 snapshot (a few milliseconds, no WMI).
+    /// </summary>
+    public static List<PROCESSENTRY32W> GetProcessEntries()
+    {
+        var entries = new List<PROCESSENTRY32W>();
+        var snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+        if (snapshot == INVALID_HANDLE_VALUE)
+            return entries;
+
+        try
+        {
+            var entry = new PROCESSENTRY32W { Size = (uint)Marshal.SizeOf<PROCESSENTRY32W>() };
+            if (!Process32First(snapshot, ref entry))
+                return entries;
+
+            do
+            {
+                entries.Add(entry);
+            }
+            while (Process32Next(snapshot, ref entry));
+
+            return entries;
+        }
+        finally
+        {
+            CloseHandle(snapshot);
+        }
+    }
+
+    /// <summary>
+    /// Reads the current directory of another process from its PEB.
+    /// Windows offers no public API for this; the offsets below are the stable x64 layout
+    /// (PEB.ProcessParameters at 0x20, RTL_USER_PROCESS_PARAMETERS.CurrentDirectory at 0x38).
+    /// Returns null for 32-bit targets, when WinGlance itself is not 64-bit, or when access is denied.
+    /// </summary>
+    public static string? TryGetProcessCurrentDirectory(int processId)
+    {
+        if (!Environment.Is64BitProcess)
+            return null;
+
+        var hProcess = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION | PROCESS_VM_READ, false, (uint)processId);
+        if (hProcess == IntPtr.Zero)
+            return null;
+
+        try
+        {
+            // A WOW64 process has a 32-bit PEB with different offsets
+            if (!IsWow64Process(hProcess, out var isWow64) || isWow64)
+                return null;
+
+            var info = new PROCESS_BASIC_INFORMATION();
+            if (NtQueryInformationProcess(hProcess, ProcessBasicInformation, ref info,
+                    Marshal.SizeOf<PROCESS_BASIC_INFORMATION>(), out _) != 0)
+                return null;
+
+            var parameters = ReadPointer(hProcess, info.PebBaseAddress + 0x20);
+            if (parameters == IntPtr.Zero)
+                return null;
+
+            // CurrentDirectory.DosPath is a UNICODE_STRING: Length (bytes) at +0, Buffer at +8
+            var unicodeString = new byte[16];
+            if (!ReadProcessMemory(hProcess, parameters + 0x38, unicodeString, unicodeString.Length, out var read)
+                || read != unicodeString.Length)
+                return null;
+
+            var length = BitConverter.ToUInt16(unicodeString, 0);
+            var buffer = (IntPtr)BitConverter.ToInt64(unicodeString, 8);
+            if (length == 0 || buffer == IntPtr.Zero)
+                return null;
+
+            var chars = new byte[length];
+            if (!ReadProcessMemory(hProcess, buffer, chars, length, out read) || read != length)
+                return null;
+
+            // The PEB stores the directory with a trailing separator ("C:\work\")
+            return System.IO.Path.TrimEndingDirectorySeparator(System.Text.Encoding.Unicode.GetString(chars));
+        }
+        finally
+        {
+            CloseHandle(hProcess);
+        }
+    }
+
+    private static IntPtr ReadPointer(IntPtr hProcess, IntPtr address)
+    {
+        var bytes = new byte[IntPtr.Size];
+        return ReadProcessMemory(hProcess, address, bytes, bytes.Length, out var read) && read == bytes.Length
+            ? (IntPtr)BitConverter.ToInt64(bytes, 0)
+            : IntPtr.Zero;
     }
 }

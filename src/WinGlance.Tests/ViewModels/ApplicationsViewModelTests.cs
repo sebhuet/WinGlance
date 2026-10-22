@@ -21,8 +21,14 @@ public class ApplicationsViewModelTests : IDisposable
 
     public void Dispose()
     {
-        try { Directory.Delete(_tempDir, recursive: true); }
-        catch { /* best-effort */ }
+        try
+        {
+            Directory.Delete(_tempDir, recursive: true);
+        }
+        catch
+        {
+            // best-effort
+        }
     }
 
     private ApplicationsViewModel CreateVm(Action<IReadOnlyList<MonitoredApp>>? callback = null)

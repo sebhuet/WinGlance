@@ -59,13 +59,14 @@
                             ToolTip="{Binding Title}"
                             Cursor="Hand"
                             Opacity="{Binding LlmVerdict, Converter={StaticResource LlmVerdictToOpacity}}">
-                        <!-- Multi-value border: IsActive, IsFlashing, IsHung, IsModalBlocked -->
+                        <!-- Multi-value border: IsActive, IsFlashing, IsHung, IsModalBlocked, NeedsAgentAttention -->
                         <Border.BorderBrush>
                             <MultiBinding Converter="{StaticResource StateBorderConverter}">
                                 <Binding Path="IsActive" />
                                 <Binding Path="IsFlashing" />
                                 <Binding Path="IsHung" />
                                 <Binding Path="IsModalBlocked" />
+                                <Binding Path="NeedsAgentAttention" />
                             </MultiBinding>
                         </Border.BorderBrush>
                         <Border.InputBindings>
@@ -82,13 +83,51 @@
                                     Width="{Binding DataContext.ThumbnailWidth, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                     Height="{Binding DataContext.ThumbnailHeight, RelativeSource={RelativeSource AncestorType=UserControl}}" />
 
-                                <!-- Window title -->
-                                <TextBlock Text="{Binding Title}"
-                                           Foreground="#FFAAAAAA"
-                                           FontSize="11"
-                                           Margin="4,2,4,2"
-                                           TextTrimming="CharacterEllipsis"
-                                           MaxWidth="{Binding DataContext.ThumbnailWidth, RelativeSource={RelativeSource AncestorType=UserControl}}" />
+                                <!-- Agent badge + window title. The badge sits below the thumbnail because
+                                     DWM draws thumbnails above WPF content, and the row height is fixed:
+                                     a badge appearing must not shift the thumbnails that follow. -->
+                                <DockPanel Height="20"
+                                           LastChildFill="True"
+                                           MaxWidth="{Binding DataContext.ThumbnailWidth, RelativeSource={RelativeSource AncestorType=UserControl}}">
+                                    <Border DockPanel.Dock="Left"
+                                            CornerRadius="3"
+                                            Margin="2,2,0,2"
+                                            Padding="5,0"
+                                            VerticalAlignment="Center"
+                                            ToolTip="{Binding Agent.Details}">
+                                        <Border.Style>
+                                            <Style TargetType="Border">
+                                                <Setter Property="Background" Value="#CC555555" />
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding Agent}" Value="{x:Null}">
+                                                        <Setter Property="Visibility" Value="Collapsed" />
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding Agent.Status}" Value="Busy">
+                                                        <Setter Property="Background" Value="#CC0078D7" />
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding Agent.Status}" Value="Waiting">
+                                                        <Setter Property="Background" Value="#CCFF8C00" />
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding Agent.Status}" Value="Running">
+                                                        <Setter Property="Background" Value="#CC00897B" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Border.Style>
+                                        <TextBlock Text="{Binding Agent.Text}"
+                                                   Foreground="White"
+                                                   FontSize="10"
+                                                   FontWeight="Bold" />
+                                    </Border>
+
+                                    <!-- Window title -->
+                                    <TextBlock Text="{Binding Title}"
+                                               Foreground="#FFAAAAAA"
+                                               FontSize="11"
+                                               Margin="4,2,4,2"
+                                               VerticalAlignment="Center"
+                                               TextTrimming="CharacterEllipsis" />
+                                </DockPanel>
                             </StackPanel>
 
                             <!-- Not Responding overlay -->

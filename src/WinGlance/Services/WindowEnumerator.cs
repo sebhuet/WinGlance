@@ -51,6 +51,7 @@ internal sealed class WindowEnumerator
 
             var window = new TrackedWindow(hWnd, app.ProcessName, app.DisplayName)
             {
+                ProcessId = pid,
                 Title = title,
                 IsActive = hWnd == foregroundHwnd,
                 Icon = ExtractIcon(hWnd),

@@ -74,6 +74,11 @@ internal sealed class PreviewViewModel : ViewModelBase, IDisposable
     public LlmService? LlmService { get; set; }
 
     /// <summary>
+    /// Optional coding agent monitor (Claude Code, OpenCode). Null disables agent badges.
+    /// </summary>
+    public AgentMonitor? AgentMonitor { get; set; }
+
+    /// <summary>
     /// Layout mode: "horizontal", "vertical", or "grid".
     /// </summary>
     public string Layout
@@ -211,7 +216,32 @@ internal sealed class PreviewViewModel : ViewModelBase, IDisposable
     private void Poll()
     {
         var scanned = _enumerator.GetWindows(MonitoredApps);
+
+        var badges = AgentMonitor?.GetBadges(scanned);
+        foreach (var window in scanned)
+            window.Agent = badges?.GetValueOrDefault(window.Hwnd);
+
         MergeResults(scanned);
+    }
+
+    /// <summary>
+    /// Applies a freshly scanned agent badge to a tracked window and updates its attention flag:
+    /// a waiting agent highlights the window whenever it is not focused, and an agent going from
+    /// busy to idle keeps it highlighted until the user focuses the window.
+    /// </summary>
+    internal static void ApplyAgentState(TrackedWindow window, AgentBadge? badge)
+    {
+        var previous = window.Agent?.Status;
+        var current = badge?.Status;
+        var justFinished = previous == AgentStatus.Busy && current == AgentStatus.Idle;
+
+        window.Agent = badge;
+        window.NeedsAgentAttention = !window.IsActive && current switch
+        {
+            AgentStatus.Waiting => true,
+            AgentStatus.Idle => justFinished || window.NeedsAgentAttention,
+            _ => false,
+        };
     }
 
     /// <summary>
@@ -264,9 +294,15 @@ internal sealed class PreviewViewModel : ViewModelBase, IDisposable
                     // Icon only updated if it was null
                     if (existing.Icon is null && scannedWindow.Icon is not null)
                         existing.Icon = scannedWindow.Icon;
+
+                    // After IsActive, which clears the "finished, not yet seen" highlight
+                    ApplyAgentState(existing, scannedWindow.Agent);
                 }
                 else
                 {
+                    // No previous state: only a waiting agent can need attention
+                    scannedWindow.NeedsAgentAttention = !scannedWindow.IsActive
+                        && scannedWindow.Agent?.Status == AgentStatus.Waiting;
                     _windows.Add(scannedWindow);
                 }
             }

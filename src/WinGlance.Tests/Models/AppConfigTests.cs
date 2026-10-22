@@ -23,6 +23,33 @@ public class AppConfigTests
         Assert.True(config.CloseToTray);
         Assert.Equal("Ctrl+Alt+G", config.Hotkey);
         Assert.NotNull(config.Llm);
+        Assert.NotNull(config.AgentDetection);
+    }
+
+    [Fact]
+    public void AgentDetectionConfig_Defaults_AreCorrect()
+    {
+        var agents = new AgentDetectionConfig();
+
+        Assert.True(agents.Enabled);
+        Assert.Equal(5000, agents.RefreshIntervalMs);
+    }
+
+    [Fact]
+    public void JsonRoundTrip_PreservesAgentDetection()
+    {
+        var options = new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
+        var original = new AppConfig
+        {
+            AgentDetection = new AgentDetectionConfig { Enabled = false, RefreshIntervalMs = 8000 },
+        };
+
+        var json = JsonSerializer.Serialize(original, options);
+        var restored = JsonSerializer.Deserialize<AppConfig>(json, options)!;
+
+        Assert.Contains("\"agentDetection\"", json);
+        Assert.False(restored.AgentDetection.Enabled);
+        Assert.Equal(8000, restored.AgentDetection.RefreshIntervalMs);
     }
 
     [Fact]

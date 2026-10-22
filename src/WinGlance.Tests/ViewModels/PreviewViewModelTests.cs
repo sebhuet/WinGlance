@@ -301,4 +301,123 @@ public class PreviewViewModelTests
         vm.Dispose();
         Assert.False(vm.IsPolling);
     }
+
+    // ── Coding agents (FR-11) ────────────────────────────────────────────
+
+    private static AgentBadge Badge(AgentStatus status) => new(status, status.ToString(), "");
+
+    private static TrackedWindow WindowWithAgent(AgentStatus? status, bool isActive = false) =>
+        new((IntPtr)1, "Code", "VS Code")
+        {
+            IsActive = isActive,
+            Agent = status is null ? null : Badge(status.Value),
+        };
+
+    [Fact]
+    public void AgentMonitor_DefaultsToNull()
+    {
+        using var vm = new PreviewViewModel();
+        Assert.Null(vm.AgentMonitor);
+    }
+
+    [Fact]
+    public void ApplyAgentState_SetsTheBadge()
+    {
+        var window = WindowWithAgent(null);
+        var badge = Badge(AgentStatus.Busy);
+
+        PreviewViewModel.ApplyAgentState(window, badge);
+
+        Assert.Same(badge, window.Agent);
+    }
+
+    [Theory]
+    [InlineData(AgentStatus.Waiting, false, true)]
+    [InlineData(AgentStatus.Waiting, true, false)] // the user is looking at it
+    [InlineData(AgentStatus.Busy, false, false)]
+    [InlineData(AgentStatus.Running, false, false)]
+    [InlineData(AgentStatus.Idle, false, false)] // idle from the start: nothing new to see
+    public void ApplyAgentState_FromNoAgent_FlagsOnlyAnUnfocusedWaitingAgent(
+        AgentStatus status, bool isActive, bool expected)
+    {
+        var window = WindowWithAgent(null, isActive);
+
+        PreviewViewModel.ApplyAgentState(window, Badge(status));
+
+        Assert.Equal(expected, window.NeedsAgentAttention);
+    }
+
+    [Fact]
+    public void ApplyAgentState_BusyToIdle_FlagsTheFinishedTurn()
+    {
+        var window = WindowWithAgent(AgentStatus.Busy);
+
+        PreviewViewModel.ApplyAgentState(window, Badge(AgentStatus.Idle));
+
+        Assert.True(window.NeedsAgentAttention);
+    }
+
+    [Fact]
+    public void ApplyAgentState_BusyToIdleWhileFocused_DoesNotFlag()
+    {
+        var window = WindowWithAgent(AgentStatus.Busy, isActive: true);
+
+        PreviewViewModel.ApplyAgentState(window, Badge(AgentStatus.Idle));
+
+        Assert.False(window.NeedsAgentAttention);
+    }
+
+    [Fact]
+    public void ApplyAgentState_FinishedTurn_StaysFlaggedUntilTheWindowIsFocused()
+    {
+        var window = WindowWithAgent(AgentStatus.Busy);
+        PreviewViewModel.ApplyAgentState(window, Badge(AgentStatus.Idle));
+
+        PreviewViewModel.ApplyAgentState(window, Badge(AgentStatus.Idle));
+        Assert.True(window.NeedsAgentAttention); // still unseen
+
+        window.IsActive = true;
+        PreviewViewModel.ApplyAgentState(window, Badge(AgentStatus.Idle));
+        Assert.False(window.NeedsAgentAttention); // seen
+
+        window.IsActive = false;
+        PreviewViewModel.ApplyAgentState(window, Badge(AgentStatus.Idle));
+        Assert.False(window.NeedsAgentAttention); // already seen, not flagged again
+    }
+
+    [Fact]
+    public void ApplyAgentState_NewTurn_ClearsTheFinishedFlag()
+    {
+        var window = WindowWithAgent(AgentStatus.Busy);
+        PreviewViewModel.ApplyAgentState(window, Badge(AgentStatus.Idle));
+
+        PreviewViewModel.ApplyAgentState(window, Badge(AgentStatus.Busy));
+
+        Assert.False(window.NeedsAgentAttention);
+    }
+
+    [Fact]
+    public void ApplyAgentState_AgentGone_ClearsBadgeAndFlag()
+    {
+        var window = WindowWithAgent(AgentStatus.Waiting);
+        window.NeedsAgentAttention = true;
+
+        PreviewViewModel.ApplyAgentState(window, null);
+
+        Assert.Null(window.Agent);
+        Assert.False(window.NeedsAgentAttention);
+    }
+
+    [Fact]
+    public void ApplyAgentState_WaitingAgain_FlagsAgainAfterFocusIsLost()
+    {
+        var window = WindowWithAgent(AgentStatus.Waiting, isActive: true);
+        PreviewViewModel.ApplyAgentState(window, Badge(AgentStatus.Waiting));
+        Assert.False(window.NeedsAgentAttention);
+
+        window.IsActive = false;
+        PreviewViewModel.ApplyAgentState(window, Badge(AgentStatus.Waiting));
+
+        Assert.True(window.NeedsAgentAttention);
+    }
 }
