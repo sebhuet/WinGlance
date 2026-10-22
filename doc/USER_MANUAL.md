@@ -2,9 +2,9 @@
 
 WinGlance is a portable, always-on-top floating panel for Windows 10 and Windows 11 that displays **live thumbnail previews** of your monitored application windows. It enables instant **one-click window switching**, making it ideal for power users who work with multiple instances of the same application (e.g., several VS Code editors, Chrome windows, or terminals), and shows at a glance which coding agent is working, done, or waiting for you.
 
-<img src="images/preview.png" alt="The WinGlance panel showing two groups of live window thumbnails, Windows PowerShell and Terminal, with colored borders and coding agent badges" width="1020">
+<img src="images/preview.png" alt="The WinGlance panel showing two groups of live window thumbnails, Windows PowerShell and Command Prompt, with colored borders and coding agent badges" width="1020">
 
-In this example, WinGlance monitors two applications. In the **Windows PowerShell** group, `db-backup` has a yellow border because a confirmation dialog blocks it, and `nightly-build` an orange one because it flashes for attention. In the **Terminal** group, `api-server` is the active window (blue) where Claude Code is working, `web-client` waits for a permission answer (red), Claude has finished in `docs-site`, and OpenCode runs in `infra`.
+In this example, WinGlance monitors two applications. In the **Windows PowerShell** group, Claude Code waits for a permission answer in `web-client` (red), has finished its turn in `docs-site` while you were elsewhere (orange), and is working in `api-server` (blue badge); OpenCode runs in `infra`. In the **Command Prompt** group, a confirmation dialog blocks `db-backup` (yellow) and `nightly-build` flashes for attention (orange).
 
 ---
 
@@ -197,7 +197,7 @@ When an analysis fails (wrong key, endpoint unreachable, timeout), no indicator 
 
 When **Claude Code** or **OpenCode** runs in a monitored window, a badge appears next to the window title, under the thumbnail:
 
-<img src="images/agent-badges.png" alt="Four terminal thumbnails with the badges Claude · working in blue, OpenCode · running in teal, Claude · idle in orange and Claude · permission prompt in red" width="1018">
+<img src="images/agent-badges.png" alt="Four console thumbnails with the badges OpenCode · running in teal, Claude · idle in orange, Claude · permission prompt in red with a red border, and Claude · working in blue" width="1010">
 
 | Badge                              | Meaning                                                                                  |
 | ---------------------------------- | ---------------------------------------------------------------------------------------- |

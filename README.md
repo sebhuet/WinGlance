@@ -2,7 +2,7 @@
 
 A floating panel that keeps **live thumbnails** of the windows you care about always in view, with **one-click switching** and a glance at which coding agent is working, done, or waiting for you.
 
-<img src="doc/images/preview.png" alt="The WinGlance panel showing two groups of live window thumbnails, Windows PowerShell and Terminal, with colored borders and coding agent badges" width="1020">
+<img src="doc/images/preview.png" alt="The WinGlance panel showing two groups of live window thumbnails, Windows PowerShell and Command Prompt, with colored borders and coding agent badges" width="1020">
 
 When working with multiple windows of the same application (e.g., several VS Code instances, each running a coding agent), the only way to see previews is by hovering over the taskbar icon — a transient popup that disappears immediately. WinGlance keeps those previews visible at all times, and tells you which window needs you.
 
@@ -24,7 +24,7 @@ When working with multiple windows of the same application (e.g., several VS Cod
 
 ## Coding Agent Badges
 
-<img src="doc/images/agent-badges.png" alt="Four terminal thumbnails with the badges Claude · working in blue, OpenCode · running in teal, Claude · idle in orange and Claude · permission prompt in red" width="1018">
+<img src="doc/images/agent-badges.png" alt="Four console thumbnails with the badges OpenCode · running in teal, Claude · idle in orange, Claude · permission prompt in red with a red border, and Claude · working in blue" width="1010">
 
 A badge under each thumbnail shows the agent running in the window: blue while Claude works, red when it waits for your answer (a permission prompt, a question), orange once it has finished its turn, teal for OpenCode. While you are in another window, the border turns red when an agent waits for you, and orange when it finishes. Sessions come from `claude agents --json` (Claude Code v2.1.139 or later); they are matched to VS Code windows and terminals alike.
 
