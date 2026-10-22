@@ -90,7 +90,7 @@ Window tracking continues while another view is open, so indicators are up to da
 
 ### 2.3 Title Bar Buttons
 
-- **Options** (⚙): opens the Options panel, a quick settings panel under the title bar. Its first option is the panel's **Transparency** (0 % opaque to 70 %), applied as you move the slider and saved when the panel closes. **All settings…** opens the full Settings view.
+- **Options** (⚙): opens the Options panel, a quick settings panel under the title bar. Its first option is the panel's **Transparency** (0 % opaque to 70 %), applied as you move the slider; it also switches the red frame and the side click played when you switch to a window. Changes are saved when the panel closes. **All settings…** opens the full Settings view.
 - **Minimize** (—): minimizes the panel to the Windows taskbar.
 - **Full screen** (□): the panel covers its whole screen; in the Fit to panel layout the thumbnails grow to fill it. Click again (❐), press **F11** or **Esc**, or double-click the title bar to go back. Clicking a thumbnail also leaves full screen, so that the window you switch to is not hidden behind the panel.
 - **Close** (×): behavior depends on your settings:
@@ -152,6 +152,7 @@ Windows on another virtual desktop are not shown (their preview would be black);
 - If the window is minimized, it is automatically restored first.
 - WinGlance uses a workaround to reliably bring the window to the foreground, even when Windows would normally prevent focus stealing.
 - A **red frame blinks three times** around the window, on whichever screen it is, so your eye finds it at once. The frame lets mouse clicks through. Turn it off in **Settings > General**.
+- A short, quiet **click** (a dry "tic", not a beep) tells you which screen the window is on: heard on the left for the leftmost screen, on the right for the rightmost one, in the center for a middle screen (with two screens: left and right; with one: center). Screens are ordered from left to right as Windows arranges them. Turn it off in **Settings > General** or in the **⚙ Options** panel.
 
 ### 3.6 Window State Indicators
 

@@ -181,6 +181,20 @@
                                     TickFrequency="5" IsSnapToTickEnabled="True"
                                     AutomationProperties.Name="Transparency" />
 
+                            <!-- After a thumbnail click -->
+                            <TextBlock Text="When switching to a window"
+                                       Foreground="{DynamicResource PrimaryText}"
+                                       FontSize="12"
+                                       Margin="0,10,0,2" />
+                            <CheckBox Content="Blinking red frame"
+                                      IsChecked="{Binding HighlightOnSwitch}"
+                                      Foreground="{DynamicResource PrimaryText}"
+                                      Margin="0,2" />
+                            <CheckBox Content="Click from the window's screen side"
+                                      IsChecked="{Binding ClickOnSwitch}"
+                                      Foreground="{DynamicResource PrimaryText}"
+                                      Margin="0,2" />
+
                             <Button Content="All settings…"
                                     Click="AllSettingsButton_Click"
                                     HorizontalAlignment="Right"

@@ -20,6 +20,7 @@ When working with multiple windows of the same application (e.g., VS Code), the 
 - Clicking on a thumbnail must immediately **bring the corresponding window to the foreground** and give it focus
 - If the window is minimized, it must be restored before receiving focus
 - The activated window is then outlined by a **red frame blinking three times** (about one second) over its visible bounds (DWM extended frame bounds), on its own monitor: a click-through, non-activating topmost overlay, created off-screen at startup so that the first flash is immediate. Setting: `highlightOnSwitch` (default: on)
+- A short stereo **click** is played from the side of the window's monitor: monitors are ordered by the horizontal position of their center and spread from hard left (-1) to hard right (+1), so with three monitors the click is left, center or right. The click (25 ms, 2 kHz sine damped with a 2.5 ms time constant: a dry "tic", discreet in an open office) is generated in memory as a WAV file with constant-power panning. Setting: `clickOnSwitch` (default: on)
 
 ### FR-3: Dynamic Window Tracking
 
