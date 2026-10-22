@@ -25,6 +25,7 @@ internal sealed class SettingsViewModel : ViewModelBase
     private bool _autoStart;
     private bool _closeToTray;
     private bool _highlightOnSwitch;
+    private bool _beepOnSwitch;
     private string _hotkey;
     private string _hotkeyStatus = string.Empty;
     private bool _agentDetectionEnabled;
@@ -64,6 +65,7 @@ internal sealed class SettingsViewModel : ViewModelBase
         _autoStart = config.AutoStart;
         _closeToTray = config.CloseToTray;
         _highlightOnSwitch = config.HighlightOnSwitch;
+        _beepOnSwitch = config.BeepOnSwitch;
         _hotkey = config.Hotkey;
         _agentDetectionEnabled = config.AgentDetection.Enabled;
 
@@ -144,15 +146,20 @@ internal sealed class SettingsViewModel : ViewModelBase
     }
 
     /// <summary>
-    /// Saves the panel opacity alone, without the other pending changes of the Settings view:
-    /// the Options panel applies its changes without a Save button.
+    /// Saves the settings of the Options panel alone (transparency, switch frame, switch beep),
+    /// without the other pending changes of the Settings view: the Options panel applies its
+    /// changes without a Save button.
     /// </summary>
-    public void SavePanelOpacity()
+    public void SaveQuickOptions()
     {
-        if (_config.PanelOpacity == PanelOpacity)
+        if (_config.PanelOpacity == PanelOpacity
+            && _config.HighlightOnSwitch == HighlightOnSwitch
+            && _config.BeepOnSwitch == BeepOnSwitch)
             return;
 
         _config.PanelOpacity = PanelOpacity;
+        _config.HighlightOnSwitch = HighlightOnSwitch;
+        _config.BeepOnSwitch = BeepOnSwitch;
         _configService.Save(_config);
     }
 
@@ -196,6 +203,16 @@ internal sealed class SettingsViewModel : ViewModelBase
     {
         get => _highlightOnSwitch;
         set => SetProperty(ref _highlightOnSwitch, value);
+    }
+
+    /// <summary>
+    /// Beeps on the side of the monitor the window switched to is on (left, center, right).
+    /// Read live by MainWindow at each switch.
+    /// </summary>
+    public bool BeepOnSwitch
+    {
+        get => _beepOnSwitch;
+        set => SetProperty(ref _beepOnSwitch, value);
     }
 
     public string Hotkey
@@ -331,6 +348,7 @@ internal sealed class SettingsViewModel : ViewModelBase
         _config.AutoStart = AutoStart;
         _config.CloseToTray = CloseToTray;
         _config.HighlightOnSwitch = HighlightOnSwitch;
+        _config.BeepOnSwitch = BeepOnSwitch;
         _config.Hotkey = Hotkey;
         _config.AgentDetection.Enabled = AgentDetectionEnabled;
 

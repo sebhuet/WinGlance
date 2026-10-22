@@ -20,6 +20,7 @@ public partial class MainWindow : Window
     private readonly HotkeyService _hotkeyService = new();
     private readonly AttentionDetector _attentionDetector = new();
     private readonly WindowHighlighter _windowHighlighter = new();
+    private readonly StereoBeep _stereoBeep = new();
     private readonly uint _showPanelMessage = NativeMethods.RegisterWindowMessage(App.ShowPanelMessageName);
     private HwndSource? _hwndSource;
     private bool _isExiting;
@@ -110,6 +111,10 @@ public partial class MainWindow : Window
 
             if (_viewModel.SettingsViewModel.HighlightOnSwitch)
                 _windowHighlighter.Flash(target);
+
+            // Heard from the side of the window's monitor: left, center or right
+            if (_viewModel.SettingsViewModel.BeepOnSwitch)
+                _stereoBeep.Play(ScreenSide.PanOfWindow(target));
         };
 
         // Allow settings to navigate to prompt editor
@@ -140,6 +145,7 @@ public partial class MainWindow : Window
         _viewModel.PreviewViewModel.Dispose();
         _attentionDetector.Dispose();
         _windowHighlighter.Dispose();
+        _stereoBeep.Dispose();
         _hotkeyService.Dispose();
         _hwndSource?.RemoveHook(WndProc);
         _trayIcon.Dispose();
@@ -375,11 +381,11 @@ public partial class MainWindow : Window
         // Applied live while open; kept once the panel closes
         try
         {
-            _viewModel.SettingsViewModel.SavePanelOpacity();
+            _viewModel.SettingsViewModel.SaveQuickOptions();
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            Log.Warning("Could not save the panel opacity", ex);
+            Log.Warning("Could not save the Options panel settings", ex);
         }
     }
 

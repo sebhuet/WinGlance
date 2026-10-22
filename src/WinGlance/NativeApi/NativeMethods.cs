@@ -205,6 +205,8 @@ internal static partial class NativeMethods
 
     public delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);
 
+    public delegate bool MonitorEnumProc(IntPtr hMonitor, IntPtr hdcMonitor, ref RECT lprcMonitor, IntPtr dwData);
+
     // ── User32 ────────────────────────────────────────────────────────
 
     [DllImport("user32.dll")]
@@ -277,6 +279,9 @@ internal static partial class NativeMethods
 
     [DllImport("user32.dll", EntryPoint = "GetMonitorInfoW")]
     public static extern bool GetMonitorInfo(IntPtr hMonitor, ref MONITORINFO lpmi);
+
+    [DllImport("user32.dll")]
+    public static extern bool EnumDisplayMonitors(IntPtr hdc, IntPtr lprcClip, MonitorEnumProc lpfnEnum, IntPtr dwData);
 
     [DllImport("user32.dll")]
     public static extern bool DestroyIcon(IntPtr hIcon);
@@ -537,6 +542,18 @@ internal static partial class NativeMethods
             return true;
 
         return GetWindowRect(hWnd, out bounds) && bounds.Right > bounds.Left && bounds.Bottom > bounds.Top;
+    }
+
+    /// <summary>Bounds of every monitor, in physical pixels.</summary>
+    public static List<RECT> GetMonitorBounds()
+    {
+        var monitors = new List<RECT>();
+        EnumDisplayMonitors(IntPtr.Zero, IntPtr.Zero, (IntPtr _, IntPtr _, ref RECT bounds, IntPtr _) =>
+        {
+            monitors.Add(bounds);
+            return true;
+        }, IntPtr.Zero);
+        return monitors;
     }
 
     /// <summary>Bounds of the monitor showing (most of) the window, in physical pixels.</summary>

@@ -304,18 +304,35 @@ public class SettingsViewModelTests : IDisposable
     }
 
     [Fact]
-    public void SavePanelOpacity_SavesTheOpacityAlone()
+    public void SaveQuickOptions_SavesTheOptionsPanelSettingsAlone()
     {
         var vm = CreateVm();
         vm.PanelTransparency = 25;
         vm.Layout = "grid"; // pending in the Settings view, not saved by the Options panel
 
-        vm.SavePanelOpacity();
+        vm.HighlightOnSwitch = false;
+        vm.BeepOnSwitch = false;
+        vm.SaveQuickOptions();
 
         var saved = _configService.Load();
         Assert.Equal(0.75, saved.PanelOpacity, precision: 6);
+        Assert.False(saved.HighlightOnSwitch);
+        Assert.False(saved.BeepOnSwitch);
         Assert.Equal("fit", saved.Layout);
         Assert.Empty(_autoStartCalls); // the registry is not touched either
+    }
+
+    [Fact]
+    public void BeepOnSwitch_IsReadFromConfig_AndSaved()
+    {
+        _config.BeepOnSwitch = true;
+        var vm = CreateVm();
+        Assert.True(vm.BeepOnSwitch);
+
+        vm.BeepOnSwitch = false;
+        vm.Save();
+
+        Assert.False(_configService.Load().BeepOnSwitch);
     }
 
     // ── Highlight on switch ──────────────────────────────────────────
