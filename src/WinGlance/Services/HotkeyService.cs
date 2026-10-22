@@ -8,9 +8,12 @@ namespace WinGlance.Services;
 /// Registers and manages a global hotkey using the Win32 RegisterHotKey API.
 /// Hooks into the window message loop via <see cref="HwndSource"/> to receive WM_HOTKEY.
 /// </summary>
-internal sealed class HotkeyService : IDisposable
+/// <param name="hotkeyId">
+/// Identifier of the hotkey on its window: each hotkey of a window needs its own.
+/// </param>
+internal sealed class HotkeyService(int hotkeyId = 1) : IDisposable
 {
-    private const int HotkeyId = 0x0001;
+    private readonly int _hotkeyId = hotkeyId;
 
     private IntPtr _hwnd;
     private HwndSource? _hwndSource;
@@ -49,7 +52,7 @@ internal sealed class HotkeyService : IDisposable
         Unregister();
 
         // MOD_NOREPEAT: holding the keys down must not toggle the panel over and over
-        if (NativeMethods.RegisterHotKey(_hwnd, HotkeyId, modifiers | NativeMethods.MOD_NOREPEAT, vk))
+        if (NativeMethods.RegisterHotKey(_hwnd, _hotkeyId, modifiers | NativeMethods.MOD_NOREPEAT, vk))
         {
             (_modifiers, _virtualKey, _isRegistered) = (modifiers, vk, true);
             return true;
@@ -58,7 +61,7 @@ internal sealed class HotkeyService : IDisposable
         if (hadPrevious)
         {
             _isRegistered = NativeMethods.RegisterHotKey(
-                _hwnd, HotkeyId, previousModifiers | NativeMethods.MOD_NOREPEAT, previousKey);
+                _hwnd, _hotkeyId, previousModifiers | NativeMethods.MOD_NOREPEAT, previousKey);
             (_modifiers, _virtualKey) = (previousModifiers, previousKey);
         }
 
@@ -72,7 +75,7 @@ internal sealed class HotkeyService : IDisposable
     {
         if (_isRegistered)
         {
-            NativeMethods.UnregisterHotKey(_hwnd, HotkeyId);
+            NativeMethods.UnregisterHotKey(_hwnd, _hotkeyId);
             _isRegistered = false;
         }
     }
@@ -85,7 +88,7 @@ internal sealed class HotkeyService : IDisposable
 
     private IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
     {
-        if (msg == NativeMethods.WM_HOTKEY && wParam.ToInt32() == HotkeyId)
+        if (msg == NativeMethods.WM_HOTKEY && wParam.ToInt32() == _hotkeyId)
         {
             HotkeyPressed?.Invoke(this, EventArgs.Empty);
             handled = true;

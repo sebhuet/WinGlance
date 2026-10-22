@@ -183,6 +183,11 @@ Shows, for each monitored window, whether a coding agent (**Claude Code** or **O
 - **Orange border** when an agent waits for the user, or when it finished a turn (busy → idle) while the window was not focused; the latter clears once the window is focused.
 - Settings: **Show Claude Code / OpenCode status on thumbnails** checkbox (default: on), applied live.
 
+#### Notifications and next agent
+
+- When a window's agent goes from busy to idle (finished) or starts waiting (needs input) while the window is not in front, a Windows notification is shown through the tray icon (balloon tip, displayed as a toast). Clicking it activates the window. An agent first seen already waiting (startup) is not notified. Setting: `agentDetection.notify` (default: on).
+- A second global hotkey, `nextAgentHotkey` (default `Ctrl+Alt+N`, empty for none), activates the next window whose agent needs the user: waiting first, then finished but not seen, then idle; within a group in panel order, starting after the window in front, so repeated presses cycle.
+
 ---
 
 ## Non-Functional Requirements

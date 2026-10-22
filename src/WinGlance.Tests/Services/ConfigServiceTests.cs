@@ -193,6 +193,18 @@ public class ConfigServiceTests : IDisposable
         Assert.Equal(("Code", "Code"), (app.ProcessName, app.DisplayName));
     }
 
+    [Theory]
+    [InlineData("""{"nextAgentHotkey":""}""", "")] // explicitly none
+    [InlineData("""{"nextAgentHotkey":null}""", "Ctrl+Alt+N")]
+    [InlineData("""{}""", "Ctrl+Alt+N")]
+    public void Load_NextAgentHotkey_EmptyMeansNone_MissingMeansDefault(string json, string expected)
+    {
+        var svc = new ConfigService(_tempDir);
+        File.WriteAllText(svc.ConfigPath, json);
+
+        Assert.Equal(expected, svc.Load().NextAgentHotkey);
+    }
+
     [Fact]
     public void Load_UnknownLayout_FallsBackToTheDefault()
     {

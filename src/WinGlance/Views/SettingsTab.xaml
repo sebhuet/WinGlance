@@ -142,7 +142,8 @@
                       Foreground="{DynamicResource PrimaryText}" Margin="0,2" />
 
             <!-- ── Hotkey ─────────────────────────────────── -->
-            <TextBlock Text="Global Hotkey" Style="{StaticResource SectionHeader}" />
+            <TextBlock Text="Global Hotkeys" Style="{StaticResource SectionHeader}" />
+            <TextBlock Text="Show / hide the panel" Style="{StaticResource Label}" Margin="0,0,0,2" />
             <TextBox Text="{Binding Hotkey, UpdateSourceTrigger=PropertyChanged}"
                      Background="{DynamicResource InputBackground}" Foreground="{DynamicResource PrimaryText}"
                      BorderBrush="{DynamicResource InputBorder}" Padding="4,3"
@@ -163,10 +164,34 @@
                 </TextBlock.Style>
             </TextBlock>
 
+            <TextBlock Text="Go to the next agent that needs you (empty: none)" Style="{StaticResource Label}" Margin="0,8,0,2" />
+            <TextBox Text="{Binding NextAgentHotkey, UpdateSourceTrigger=PropertyChanged}"
+                     Background="{DynamicResource InputBackground}" Foreground="{DynamicResource PrimaryText}"
+                     BorderBrush="{DynamicResource InputBorder}" Padding="4,3"
+                     Width="180" HorizontalAlignment="Left" />
+            <TextBlock Text="{Binding NextAgentHotkeyStatus}"
+                       Foreground="{DynamicResource ErrorText}"
+                       FontSize="11"
+                       TextWrapping="Wrap"
+                       Margin="0,4,0,0">
+                <TextBlock.Style>
+                    <Style TargetType="TextBlock">
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding NextAgentHotkeyStatus}" Value="">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </TextBlock.Style>
+            </TextBlock>
+
             <!-- ── Coding Agents ──────────────────────────── -->
             <TextBlock Text="Coding Agents" Style="{StaticResource SectionHeader}" />
             <CheckBox Content="Show Claude Code / OpenCode status on thumbnails"
                       IsChecked="{Binding AgentDetectionEnabled}"
+                      Foreground="{DynamicResource PrimaryText}" Margin="0,2" />
+            <CheckBox Content="Notify me when an agent finishes or needs me"
+                      IsChecked="{Binding AgentNotifications}"
                       Foreground="{DynamicResource PrimaryText}" Margin="0,2" />
 
             <!-- ── LLM Analysis ───────────────────────────── -->

@@ -510,6 +510,95 @@ public class PreviewViewModelTests
         Assert.False(window.NeedsAgentAttention);
     }
 
+    // ── Agent transitions (notifications) ────────────────────────────────
+
+    [Theory]
+    [InlineData(AgentStatus.Busy, AgentStatus.Idle, false, AgentTransition.Finished)]
+    [InlineData(AgentStatus.Busy, AgentStatus.Idle, true, AgentTransition.None)] // the user is looking
+    [InlineData(AgentStatus.Busy, AgentStatus.Waiting, false, AgentTransition.NeedsInput)]
+    [InlineData(AgentStatus.Idle, AgentStatus.Waiting, false, AgentTransition.NeedsInput)]
+    [InlineData(AgentStatus.Waiting, AgentStatus.Waiting, false, AgentTransition.None)] // already told
+    [InlineData(AgentStatus.Idle, AgentStatus.Idle, false, AgentTransition.None)]
+    [InlineData(AgentStatus.Idle, AgentStatus.Busy, false, AgentTransition.None)]
+    [InlineData(null, AgentStatus.Waiting, false, AgentTransition.None)] // first seen (startup): no burst
+    public void ApplyAgentState_ReportsTheTransitionToNotify(
+        AgentStatus? previous, AgentStatus current, bool isActive, AgentTransition expected)
+    {
+        var window = WindowWithAgent(previous, isActive);
+
+        Assert.Equal(expected, PreviewViewModel.ApplyAgentState(window, Badge(current)));
+    }
+
+    [Fact]
+    public void MergeResults_RaisesAgentNeedsAttention_ForTransitionsOnly()
+    {
+        using var vm = new PreviewViewModel();
+        var raised = new List<(IntPtr, AgentTransition)>();
+        vm.AgentNeedsAttention += (window, transition) => raised.Add((window.Hwnd, transition));
+        TrackedWindow Scan(int hwnd, AgentStatus status) =>
+            new((IntPtr)hwnd, "Code", "VS Code") { Agent = Badge(status) };
+
+        vm.MergeResults([Scan(1, AgentStatus.Busy), Scan(2, AgentStatus.Idle)]); // first scan: no event
+        vm.MergeResults([Scan(1, AgentStatus.Idle), Scan(2, AgentStatus.Waiting)]);
+        vm.MergeResults([Scan(1, AgentStatus.Idle), Scan(2, AgentStatus.Waiting)]); // nothing new
+
+        Assert.Equal([((IntPtr)1, AgentTransition.Finished), ((IntPtr)2, AgentTransition.NeedsInput)], raised);
+    }
+
+    // ── Next agent ───────────────────────────────────────────────────────
+
+    private static PreviewViewModel WithAgents(params (int Hwnd, AgentStatus? Status, bool Unseen)[] windows)
+    {
+        var vm = new PreviewViewModel();
+        foreach (var (hwnd, status, unseen) in windows)
+        {
+            vm.Windows.Add(new TrackedWindow((IntPtr)hwnd, "Code", "VS Code")
+            {
+                Agent = status is null ? null : Badge(status.Value),
+                NeedsAgentAttention = unseen,
+            });
+        }
+        return vm;
+    }
+
+    [Fact]
+    public void FindNextAgentWindow_GoesToWaitingAgentsFirst_ThenFinished_ThenIdle()
+    {
+        using var vm = WithAgents(
+            (1, AgentStatus.Idle, false),
+            (2, AgentStatus.Busy, false),
+            (3, AgentStatus.Idle, true), // finished, not seen
+            (4, null, false),
+            (5, AgentStatus.Waiting, true));
+
+        var visited = new List<IntPtr>();
+        var current = IntPtr.Zero; // no tracked window in front
+        for (var i = 0; i < 4; i++)
+        {
+            current = vm.FindNextAgentWindow(current)!.Hwnd;
+            visited.Add(current);
+        }
+
+        // Busy and agent-less windows are skipped; the cycle starts over
+        Assert.Equal([(IntPtr)5, 3, 1, 5], visited);
+    }
+
+    [Fact]
+    public void FindNextAgentWindow_NoAgentNeedsTheUser_ReturnsNull()
+    {
+        using var vm = WithAgents((1, AgentStatus.Busy, false), (2, null, false));
+
+        Assert.Null(vm.FindNextAgentWindow(IntPtr.Zero));
+    }
+
+    [Fact]
+    public void FindNextAgentWindow_SingleCandidate_IsReturnedEvenWhenInFront()
+    {
+        using var vm = WithAgents((1, AgentStatus.Waiting, false));
+
+        Assert.Equal((IntPtr)1, vm.FindNextAgentWindow((IntPtr)1)!.Hwnd);
+    }
+
     [Fact]
     public void ApplyAgentState_WaitingAgain_FlagsAgainAfterFocusIsLost()
     {

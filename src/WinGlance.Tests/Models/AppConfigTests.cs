@@ -25,6 +25,8 @@ public class AppConfigTests
         Assert.NotNull(config.Llm);
         Assert.NotNull(config.AgentDetection);
         Assert.True(config.HighlightOnSwitch);
+        Assert.Equal("Ctrl+Alt+N", config.NextAgentHotkey);
+        Assert.True(config.AgentDetection.Notify);
         Assert.Equal((900, 560), (config.PanelWidth, config.PanelHeight));
     }
 

@@ -203,6 +203,10 @@ It works with the Claude Code extension for VS Code, the `claude` command in a t
 
 Badges refresh every 5 seconds. Turn them off in **Settings > Coding Agents**.
 
+**Notifications.** When an agent finishes its turn or starts waiting for you (permission prompt, question) while its window is not in front, WinGlance shows a Windows notification, e.g. "Claude finished · BookAmPlus" or "Claude needs you · BookAmPlus" with the reason. Click it to switch to the window. Agents already waiting when WinGlance starts are not notified. Turn notifications off in **Settings > Coding Agents** or in the **⚙ Options** panel; Windows' Do not disturb mode also silences them.
+
+**Next agent hotkey.** Press **Ctrl+Alt+N** (configurable in **Settings > Global Hotkeys**) from anywhere to switch to the next window whose agent needs you: agents waiting for an answer first, then turns you have not seen yet, then idle agents. Press it again to go on to the next one; working agents are skipped.
+
 ### 3.9 Dynamic Window Tracking
 
 - When a new window opens for a monitored application, its thumbnail appears automatically (within approximately one second).
@@ -423,12 +427,13 @@ If the combination is invalid or already used by another application, a red mess
 
 ## 8. Keyboard Shortcuts Reference
 
-| Shortcut                 | Context               | Action                              |
-| ------------------------ | --------------------- | ----------------------------------- |
-| **Ctrl+Alt+G** (default) | System-wide           | Toggle panel visibility (show/hide) |
-| **Left-click** thumbnail | Preview view          | Switch to the clicked window        |
-| **Right-click** panel    | Anywhere on the panel | Open navigation context menu        |
-| **Drag** title bar       | Panel title bar       | Move the panel to a new position    |
+| Shortcut                 | Context               | Action                                  |
+| ------------------------ | --------------------- | --------------------------------------- |
+| **Ctrl+Alt+G** (default) | System-wide           | Toggle panel visibility (show/hide)     |
+| **Ctrl+Alt+N** (default) | System-wide           | Switch to the next agent that needs you |
+| **Left-click** thumbnail | Preview view          | Switch to the clicked window            |
+| **Right-click** panel    | Anywhere on the panel | Open navigation context menu            |
+| **Drag** title bar       | Panel title bar       | Move the panel to a new position        |
 
 ---
 

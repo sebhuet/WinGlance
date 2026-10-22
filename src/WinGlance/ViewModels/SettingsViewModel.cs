@@ -28,7 +28,10 @@ internal sealed class SettingsViewModel : ViewModelBase
     private bool _clickOnSwitch;
     private string _hotkey;
     private string _hotkeyStatus = string.Empty;
+    private string _nextAgentHotkey;
+    private string _nextAgentHotkeyStatus = string.Empty;
     private bool _agentDetectionEnabled;
+    private bool _agentNotifications;
 
     // LLM settings
     private bool _llmEnabled;
@@ -67,7 +70,9 @@ internal sealed class SettingsViewModel : ViewModelBase
         _highlightOnSwitch = config.HighlightOnSwitch;
         _clickOnSwitch = config.ClickOnSwitch;
         _hotkey = config.Hotkey;
+        _nextAgentHotkey = config.NextAgentHotkey;
         _agentDetectionEnabled = config.AgentDetection.Enabled;
+        _agentNotifications = config.AgentDetection.Notify;
 
         _llmEnabled = config.Llm.Enabled;
         _llmProvider = config.Llm.Provider;
@@ -146,20 +151,22 @@ internal sealed class SettingsViewModel : ViewModelBase
     }
 
     /// <summary>
-    /// Saves the settings of the Options panel alone (transparency, switch frame, switch click),
-    /// without the other pending changes of the Settings view: the Options panel applies its
-    /// changes without a Save button.
+    /// Saves the settings of the Options panel alone (transparency, switch frame, switch click,
+    /// agent notifications), without the other pending changes of the Settings view: the
+    /// Options panel applies its changes without a Save button.
     /// </summary>
     public void SaveQuickOptions()
     {
         if (_config.PanelOpacity == PanelOpacity
             && _config.HighlightOnSwitch == HighlightOnSwitch
-            && _config.ClickOnSwitch == ClickOnSwitch)
+            && _config.ClickOnSwitch == ClickOnSwitch
+            && _config.AgentDetection.Notify == AgentNotifications)
             return;
 
         _config.PanelOpacity = PanelOpacity;
         _config.HighlightOnSwitch = HighlightOnSwitch;
         _config.ClickOnSwitch = ClickOnSwitch;
+        _config.AgentDetection.Notify = AgentNotifications;
         _configService.Save(_config);
     }
 
@@ -235,14 +242,49 @@ internal sealed class SettingsViewModel : ViewModelBase
     public Func<string, bool>? ApplyHotkey { get; set; }
 
     /// <summary>Updates <see cref="HotkeyStatus"/> after a registration attempt.</summary>
-    internal void ReportHotkeyResult(bool registered)
+    internal void ReportHotkeyResult(bool registered) => HotkeyStatus = DescribeRegistration(registered);
+
+    /// <summary>
+    /// Hotkey that switches to the next window whose agent needs the user; empty for none.
+    /// </summary>
+    public string NextAgentHotkey
     {
-        HotkeyStatus = registered
-            ? string.Empty
-            : "Not registered: use Modifier+Key (e.g. Ctrl+Alt+G). The combination may be used by another application.";
+        get => _nextAgentHotkey;
+        set => SetProperty(ref _nextAgentHotkey, value);
     }
 
+    /// <summary>Error shown under the "next agent" hotkey field; empty while it is registered.</summary>
+    public string NextAgentHotkeyStatus
+    {
+        get => _nextAgentHotkeyStatus;
+        private set => SetProperty(ref _nextAgentHotkeyStatus, value);
+    }
+
+    /// <summary>
+    /// Registers the "next agent" hotkey; returns false if it is invalid or taken. An empty
+    /// string removes it. Set by MainWindow.
+    /// </summary>
+    public Func<string, bool>? ApplyNextAgentHotkey { get; set; }
+
+    /// <summary>Updates <see cref="NextAgentHotkeyStatus"/> after a registration attempt.</summary>
+    internal void ReportNextAgentHotkeyResult(bool registered) =>
+        NextAgentHotkeyStatus = DescribeRegistration(registered);
+
+    private static string DescribeRegistration(bool registered) => registered
+        ? string.Empty
+        : "Not registered: use Modifier+Key (e.g. Ctrl+Alt+G). The combination may be used by another application.";
+
     // ── Coding agents ──────────────────────────────────────────────────
+
+    /// <summary>
+    /// Shows a Windows notification when an agent finishes or starts waiting while its window
+    /// is not in front. Read live by MainWindow.
+    /// </summary>
+    public bool AgentNotifications
+    {
+        get => _agentNotifications;
+        set => SetProperty(ref _agentNotifications, value);
+    }
 
     /// <summary>
     /// Shows Claude Code / OpenCode status on thumbnails. Applied live: turning it off
@@ -350,7 +392,9 @@ internal sealed class SettingsViewModel : ViewModelBase
         _config.HighlightOnSwitch = HighlightOnSwitch;
         _config.ClickOnSwitch = ClickOnSwitch;
         _config.Hotkey = Hotkey;
+        _config.NextAgentHotkey = NextAgentHotkey.Trim();
         _config.AgentDetection.Enabled = AgentDetectionEnabled;
+        _config.AgentDetection.Notify = AgentNotifications;
 
         var llm = _config.Llm;
         var llmChanged = (llm.Enabled, llm.Provider, llm.Endpoint, llm.ApiKey, llm.Model, llm.StaleThresholdSeconds)
@@ -371,6 +415,8 @@ internal sealed class SettingsViewModel : ViewModelBase
         // The hotkey applies immediately, not at next launch
         if (ApplyHotkey is { } applyHotkey)
             ReportHotkeyResult(applyHotkey(Hotkey));
+        if (ApplyNextAgentHotkey is { } applyNextAgentHotkey)
+            ReportNextAgentHotkeyResult(applyNextAgentHotkey(NextAgentHotkey.Trim()));
 
         if (llmChanged)
             LlmSettingsChanged?.Invoke();
