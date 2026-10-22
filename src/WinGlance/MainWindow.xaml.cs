@@ -13,6 +13,7 @@ using WinGlance.ViewModels;
 
 namespace WinGlance;
 
+/// <summary>Floating panel: hosts the Preview, Applications, Settings and Prompt Editor views, the tray icon, the global hotkeys and the window switching.</summary>
 public partial class MainWindow : Window
 {
     private readonly MainViewModel _viewModel;
@@ -29,6 +30,11 @@ public partial class MainWindow : Window
     private HwndSource? _hwndSource;
     private bool _isExiting;
 
+    /// <summary>
+    /// Builds the panel from the saved configuration: restores the saved position when its title bar is still reachable on the current monitors, applies the saved size and opacity, and starts the services.
+    /// </summary>
+    /// <param name="configService">Persists the configuration when settings change or the panel is hidden.</param>
+    /// <param name="config">The loaded configuration, shared with the ViewModels.</param>
     internal MainWindow(ConfigService configService, AppConfig config)
     {
         InitializeComponent();
@@ -204,6 +210,7 @@ public partial class MainWindow : Window
 
     // ── Panel visibility ─────────────────────────────────────────────
 
+    /// <summary>Hides the panel when it is visible, shows it otherwise (tray click, hotkey, second instance).</summary>
     internal void TogglePanel()
     {
         if (IsVisible)

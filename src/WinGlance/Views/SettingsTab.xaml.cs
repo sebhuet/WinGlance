@@ -4,6 +4,7 @@ using WinGlance.ViewModels;
 
 namespace WinGlance.Views;
 
+/// <summary>Settings view: layout, thumbnail size, opacity, polling, general options, hotkeys, coding agents and LLM analysis.</summary>
 public partial class SettingsTab : UserControl
 {
     public SettingsTab()

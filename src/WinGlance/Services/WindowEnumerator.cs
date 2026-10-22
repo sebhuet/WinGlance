@@ -317,6 +317,9 @@ internal sealed class WindowEnumerator
 /// </summary>
 internal sealed class DiscoveredApp(string processName, int windowCount)
 {
+    /// <summary>Process name of the application.</summary>
     public string ProcessName { get; } = processName;
+
+    /// <summary>Number of visible windows found for the application.</summary>
     public int WindowCount { get; set; } = windowCount;
 }

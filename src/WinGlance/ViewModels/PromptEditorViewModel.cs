@@ -17,6 +17,7 @@ internal sealed class PromptEditorViewModel : ViewModelBase
     private bool _isDebugEnabled;
     private bool _isRunning;
 
+    /// <summary>Initializes the editor from the saved prompt and debug flag.</summary>
     public PromptEditorViewModel(ConfigService configService, AppConfig config)
     {
         _configService = configService;
@@ -66,9 +67,16 @@ internal sealed class PromptEditorViewModel : ViewModelBase
     /// </summary>
     public Func<Task>? RunAnalysisFunc { get; set; }
 
+    /// <summary>Saves the prompt and the debug flag.</summary>
     public ICommand SaveCommand { get; }
+
+    /// <summary>Puts the default prompt back in the editor, without saving it.</summary>
     public ICommand ResetToDefaultCommand { get; }
+
+    /// <summary>Clears the debug log.</summary>
     public ICommand ClearLogCommand { get; }
+
+    /// <summary>Runs an analysis of all tracked windows now; disabled while one is running.</summary>
     public ICommand RunAnalysisCommand { get; }
 
     /// <summary>
@@ -114,6 +122,7 @@ internal sealed class PromptEditorViewModel : ViewModelBase
     /// </summary>
     public Action<string>? PromptSaved { get; set; }
 
+    /// <summary>Writes the prompt and debug flag to the config file, then hands the prompt to <see cref="PromptSaved"/>.</summary>
     internal void Save()
     {
         _config.Llm.Prompt = PromptText;
@@ -127,6 +136,7 @@ internal sealed class PromptEditorViewModel : ViewModelBase
         PromptText = LlmConfig.DefaultPrompt;
     }
 
+    /// <summary>Runs a forced analysis through <see cref="RunAnalysisFunc"/> and shows the outcome in the debug log. Turns the debug log on first.</summary>
     internal async Task RunAnalysis()
     {
         // Auto-enable debug log so the user sees results, including the message below:

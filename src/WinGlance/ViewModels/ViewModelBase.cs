@@ -9,6 +9,7 @@ namespace WinGlance.ViewModels;
 /// </summary>
 public abstract class ViewModelBase : INotifyPropertyChanged
 {
+    /// <summary>Raised when a property value changes.</summary>
     public event PropertyChangedEventHandler? PropertyChanged;
 
     /// <summary>
@@ -25,6 +26,7 @@ public abstract class ViewModelBase : INotifyPropertyChanged
         return true;
     }
 
+    /// <summary>Raises <see cref="PropertyChanged"/> for a property; the caller's name by default.</summary>
     protected void OnPropertyChanged([CallerMemberName] string? propertyName = null)
     {
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));

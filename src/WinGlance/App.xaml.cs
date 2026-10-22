@@ -6,6 +6,7 @@ using WinGlance.Services;
 
 namespace WinGlance;
 
+/// <summary>Application entry point: enforces a single instance, installs the global error handlers and opens the main window.</summary>
 public partial class App : Application
 {
     /// <summary>

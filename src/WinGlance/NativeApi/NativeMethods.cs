@@ -2,6 +2,10 @@ using System.Runtime.InteropServices;
 
 namespace WinGlance.NativeApi;
 
+/// <summary>
+/// P/Invoke declarations and small helpers over the Win32 API. The <c>extern</c> signatures mirror the
+/// Win32 functions of the same name, so Microsoft's documentation applies to them.
+/// </summary>
 internal static partial class NativeMethods
 {
     // ── Constants ──────────────────────────────────────────────────────
@@ -66,6 +70,7 @@ internal static partial class NativeMethods
 
     // ── Structures ────────────────────────────────────────────────────
 
+    /// <summary>Win32 RECT: a rectangle given by its edges in pixels; window bounds and DWM thumbnail rectangles.</summary>
     [StructLayout(LayoutKind.Sequential)]
     public struct RECT
     {
@@ -75,6 +80,7 @@ internal static partial class NativeMethods
         public int Bottom;
     }
 
+    /// <summary>Win32 POINT: a position in pixels; used inside <see cref="WINDOWPLACEMENT"/>.</summary>
     [StructLayout(LayoutKind.Sequential)]
     public struct POINT
     {
@@ -82,6 +88,7 @@ internal static partial class NativeMethods
         public int Y;
     }
 
+    /// <summary>Win32 SIZE: a size in pixels; the source size returned by <c>DwmQueryThumbnailSourceSize</c>.</summary>
     [StructLayout(LayoutKind.Sequential)]
     public struct SIZE
     {
@@ -89,6 +96,7 @@ internal static partial class NativeMethods
         public int Height;
     }
 
+    /// <summary>Win32 WINDOWPLACEMENT: show state and normal position of a window, read with <c>GetWindowPlacement</c>.</summary>
     [StructLayout(LayoutKind.Sequential)]
     public struct WINDOWPLACEMENT
     {
@@ -100,6 +108,7 @@ internal static partial class NativeMethods
         public RECT NormalPosition;
     }
 
+    /// <summary>Win32 DWM_THUMBNAIL_PROPERTIES: destination, source, opacity and visibility of a live thumbnail; <c>Flags</c> (DWM_TNP_*) selects the fields DWM applies.</summary>
     [StructLayout(LayoutKind.Sequential)]
     public struct DWM_THUMBNAIL_PROPERTIES
     {
@@ -113,6 +122,7 @@ internal static partial class NativeMethods
 
     // ── SendInput structures ────────────────────────────────────────────
 
+    /// <summary>Win32 INPUT: one synthetic input event for <c>SendInput</c> (WinGlance sends an Alt key press before taking the foreground).</summary>
     [StructLayout(LayoutKind.Sequential)]
     public struct INPUT
     {
@@ -124,6 +134,7 @@ internal static partial class NativeMethods
 
     // MOUSEINPUT is declared only to give the union its native size: SendInput rejects
     // calls whose cbSize differs from sizeof(INPUT) (40 bytes on x64, 28 on x86).
+    /// <summary>Union of the INPUT payloads: a mouse or a keyboard event.</summary>
     [StructLayout(LayoutKind.Explicit)]
     public struct InputUnion
     {
@@ -134,6 +145,7 @@ internal static partial class NativeMethods
         public KEYBDINPUT Keyboard;
     }
 
+    /// <summary>Win32 MOUSEINPUT: declared only to size <see cref="InputUnion"/>.</summary>
     [StructLayout(LayoutKind.Sequential)]
     public struct MOUSEINPUT
     {
@@ -145,6 +157,7 @@ internal static partial class NativeMethods
         public IntPtr ExtraInfo;
     }
 
+    /// <summary>Win32 KEYBDINPUT: a keyboard event for <c>SendInput</c>.</summary>
     [StructLayout(LayoutKind.Sequential)]
     public struct KEYBDINPUT
     {
@@ -157,6 +170,7 @@ internal static partial class NativeMethods
 
     // ── Process structures ──────────────────────────────────────────────
 
+    /// <summary>Win32 PROCESSENTRY32W: one process of a Toolhelp32 snapshot (PID, parent PID, executable name).</summary>
     [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
     public struct PROCESSENTRY32W
     {
@@ -174,6 +188,7 @@ internal static partial class NativeMethods
         public string ExeFile;
     }
 
+    /// <summary>Win32 PROCESS_BASIC_INFORMATION: filled by <c>NtQueryInformationProcess</c>; WinGlance uses its PEB address to read a process's command line.</summary>
     [StructLayout(LayoutKind.Sequential)]
     public struct PROCESS_BASIC_INFORMATION
     {
@@ -185,6 +200,7 @@ internal static partial class NativeMethods
         public IntPtr InheritedFromUniqueProcessId;
     }
 
+    /// <summary>Win32 MONITORINFO: bounds and work area of a monitor; <c>Size</c> must be set before the call.</summary>
     [StructLayout(LayoutKind.Sequential)]
     public struct MONITORINFO
     {
@@ -194,6 +210,7 @@ internal static partial class NativeMethods
         public uint Flags;
     }
 
+    /// <summary>Win32 DATA_BLOB: a byte buffer passed to and returned by the DPAPI functions <c>CryptProtectData</c> and <c>CryptUnprotectData</c>.</summary>
     [StructLayout(LayoutKind.Sequential)]
     public struct DATA_BLOB
     {
@@ -203,8 +220,10 @@ internal static partial class NativeMethods
 
     // ── Delegates ─────────────────────────────────────────────────────
 
+    /// <summary>Callback of <c>EnumWindows</c> and <c>EnumChildWindows</c>; returns true to continue the enumeration.</summary>
     public delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);
 
+    /// <summary>Callback of <c>EnumDisplayMonitors</c>; returns true to continue the enumeration.</summary>
     public delegate bool MonitorEnumProc(IntPtr hMonitor, IntPtr hdcMonitor, ref RECT lprcMonitor, IntPtr dwData);
 
     // ── User32 ────────────────────────────────────────────────────────
@@ -390,6 +409,7 @@ internal static partial class NativeMethods
 
     // ── Helpers ───────────────────────────────────────────────────────
 
+    /// <summary>Returns the title of a window, or an empty string when it has none.</summary>
     public static string GetWindowTitle(IntPtr hWnd)
     {
         var length = GetWindowTextLength(hWnd);
@@ -401,12 +421,14 @@ internal static partial class NativeMethods
         return new string(buffer, 0, length);
     }
 
+    /// <summary>True if the window has the WS_EX_TOOLWINDOW style.</summary>
     public static bool IsToolWindow(IntPtr hWnd)
     {
         var exStyle = GetWindowLong(hWnd, GWL_EXSTYLE);
         return (exStyle & WS_EX_TOOLWINDOW) != 0;
     }
 
+    /// <summary>True if the window has the WS_EX_APPWINDOW style.</summary>
     public static bool IsAppWindow(IntPtr hWnd)
     {
         var exStyle = GetWindowLong(hWnd, GWL_EXSTYLE);

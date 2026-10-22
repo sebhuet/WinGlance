@@ -20,6 +20,7 @@ internal sealed class ConfigService
 
     private readonly string _configPath;
 
+    /// <summary>Creates the service on the real config file: next to the executable when that folder is writable, otherwise under <c>%LOCALAPPDATA%\WinGlance</c>.</summary>
     public ConfigService()
     {
         _configPath = ResolveConfigPath(

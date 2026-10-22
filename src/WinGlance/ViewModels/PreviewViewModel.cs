@@ -36,6 +36,10 @@ internal sealed class PreviewViewModel : ViewModelBase, IDisposable
     private double _displayThumbnailHeight = 150;
     private System.Windows.Size _viewportSize = System.Windows.Size.Empty;
 
+    /// <summary>
+    /// Creates the preview with its window list grouped by application and a stopped polling
+    /// timer; <see cref="Start"/> begins the scans.
+    /// </summary>
     public PreviewViewModel()
     {
         BindingOperations.EnableCollectionSynchronization(Windows, _lock);

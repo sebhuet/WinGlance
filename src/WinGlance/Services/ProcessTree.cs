@@ -19,6 +19,7 @@ internal sealed class ProcessTree
     private readonly Dictionary<int, ProcessInfo> _byId = [];
     private readonly Dictionary<int, List<ProcessInfo>> _childrenById = [];
 
+    /// <summary>Indexes the processes by ID and by parent ID. When an ID appears twice, the last entry wins.</summary>
     public ProcessTree(IEnumerable<ProcessInfo> processes)
     {
         foreach (var process in processes)

@@ -27,6 +27,7 @@ internal sealed class AgentMonitor
     {
     }
 
+    /// <summary>Creates a monitor on a given Claude agent source; the public constructor looks for the claude CLI on PATH.</summary>
     internal AgentMonitor(int refreshIntervalMs, ClaudeAgentSource claude)
     {
         _claude = claude;

@@ -16,6 +16,7 @@ namespace WinGlance.Services;
 /// </summary>
 internal sealed record LlmResult(string? Verdict, string? Reason, string? Error)
 {
+    /// <summary>Creates a result that carries only an error message.</summary>
     public static LlmResult Failure(string error) => new(null, null, error);
 }
 
@@ -34,6 +35,7 @@ internal sealed class LlmAnalyzer : IDisposable
     private readonly LlmConfig _config;
     private readonly string _systemPrompt;
 
+    /// <summary>Creates an analyzer that sends its requests through one HTTP client (30 s timeout) shared by all instances.</summary>
     public LlmAnalyzer(LlmConfig config, string systemPrompt)
         : this(config, systemPrompt, s_sharedClient)
     {

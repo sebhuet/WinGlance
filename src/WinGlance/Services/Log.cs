@@ -23,10 +23,13 @@ internal static class Log
         s_filePath = Path.Combine(directory, "winglance.log");
     }
 
+    /// <summary>Logs an informational message.</summary>
     public static void Info(string message) => Write("INFO", message, null);
 
+    /// <summary>Logs a warning, with the exception that caused it when there is one.</summary>
     public static void Warning(string message, Exception? exception = null) => Write("WARN", message, exception);
 
+    /// <summary>Logs an error, with the exception that caused it when there is one.</summary>
     public static void Error(string message, Exception? exception = null) => Write("ERROR", message, exception);
 
     private static void Write(string level, string message, Exception? exception)

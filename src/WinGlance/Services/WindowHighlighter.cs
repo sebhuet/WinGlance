@@ -15,6 +15,8 @@ namespace WinGlance.Services;
 internal sealed class WindowHighlighter : IDisposable
 {
     internal const int Blinks = 3;
+
+    /// <summary>Time between two on/off steps of the frame.</summary>
     internal static readonly TimeSpan BlinkInterval = TimeSpan.FromMilliseconds(180);
 
     private const double FrameThickness = 6;
@@ -27,6 +29,7 @@ internal sealed class WindowHighlighter : IDisposable
     private IntPtr _target;
     private int _step;
 
+    /// <summary>Creates the highlighter; no window is created until one is outlined.</summary>
     public WindowHighlighter()
     {
         _timer = new DispatcherTimer { Interval = BlinkInterval };

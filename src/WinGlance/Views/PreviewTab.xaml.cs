@@ -4,6 +4,7 @@ using WinGlance.ViewModels;
 
 namespace WinGlance.Views;
 
+/// <summary>Preview view: the live thumbnails of the monitored windows.</summary>
 public partial class PreviewTab : UserControl
 {
     public PreviewTab()

@@ -10,7 +10,10 @@ namespace WinGlance.Converters;
 /// </summary>
 internal sealed class BoolToBorderBrushConverter : IValueConverter
 {
+    /// <summary>Brush returned for <c>true</c>.</summary>
     public Brush ActiveBrush { get; set; } = new SolidColorBrush(Color.FromRgb(0, 120, 215)); // Windows blue
+
+    /// <summary>Brush returned for <c>false</c> or any other value.</summary>
     public Brush InactiveBrush { get; set; } = new SolidColorBrush(Color.FromRgb(68, 68, 68));
 
     public object Convert(object value, Type targetType, object parameter, CultureInfo culture)

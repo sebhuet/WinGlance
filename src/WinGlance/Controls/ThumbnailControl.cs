@@ -29,11 +29,13 @@ internal sealed class ThumbnailControl : FrameworkElement
 
     // ── Dependency properties ───────────────────────────────────────────
 
+    /// <summary>Handle of the window whose thumbnail is drawn; changing it registers a new thumbnail.</summary>
     public static readonly DependencyProperty SourceHwndProperty =
         DependencyProperty.Register(
             nameof(SourceHwnd), typeof(IntPtr), typeof(ThumbnailControl),
             new PropertyMetadata(IntPtr.Zero, OnSourceHwndChanged));
 
+    /// <summary>Service that registers the DWM thumbnails; the control draws nothing until it is set.</summary>
     public static readonly DependencyProperty ThumbnailManagerProperty =
         DependencyProperty.Register(
             nameof(ThumbnailManager), typeof(ThumbnailManager), typeof(ThumbnailControl),
@@ -48,18 +50,21 @@ internal sealed class ThumbnailControl : FrameworkElement
             nameof(ThumbnailOpacity), typeof(double), typeof(ThumbnailControl),
             new PropertyMetadata(1.0, OnThumbnailOpacityChanged));
 
+    /// <summary>Window shown by the thumbnail (<see cref="SourceHwndProperty"/>).</summary>
     public IntPtr SourceHwnd
     {
         get => (IntPtr)GetValue(SourceHwndProperty);
         set => SetValue(SourceHwndProperty, value);
     }
 
+    /// <summary>Service used to register the thumbnail (<see cref="ThumbnailManagerProperty"/>).</summary>
     public ThumbnailManager? ThumbnailManager
     {
         get => (ThumbnailManager?)GetValue(ThumbnailManagerProperty);
         set => SetValue(ThumbnailManagerProperty, value);
     }
 
+    /// <summary>Opacity of the DWM thumbnail, 0-1 (<see cref="ThumbnailOpacityProperty"/>).</summary>
     public double ThumbnailOpacity
     {
         get => (double)GetValue(ThumbnailOpacityProperty);
@@ -68,6 +73,7 @@ internal sealed class ThumbnailControl : FrameworkElement
 
     // ── Lifecycle ───────────────────────────────────────────────────────
 
+    /// <summary>Hooks the load, size and visibility events that register, move and hide the thumbnail.</summary>
     public ThumbnailControl()
     {
         Loaded += OnLoaded;

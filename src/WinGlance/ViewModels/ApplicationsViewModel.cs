@@ -118,6 +118,7 @@ internal sealed class AppEntry : ViewModelBase
     private bool _isMonitored;
     private string _displayName;
 
+    /// <summary>Creates an unmonitored entry whose display name is the process name.</summary>
     public AppEntry(string processName)
     {
         ProcessName = processName;

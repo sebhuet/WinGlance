@@ -87,6 +87,7 @@ internal sealed class SettingsViewModel : ViewModelBase
 
     // ── Layout ──────────────────────────────────────────────────────────
 
+    /// <summary>Layout name ("fit", "horizontal", "vertical" or "grid"). Applied live to the preview; persisted by <see cref="Save"/>.</summary>
     public string Layout
     {
         get => _layout;
@@ -105,6 +106,7 @@ internal sealed class SettingsViewModel : ViewModelBase
 
     // ── Thumbnail size ──────────────────────────────────────────────────
 
+    /// <summary>Thumbnail width in pixels (100-500). Applied live to the preview; persisted by <see cref="Save"/>.</summary>
     public int ThumbnailWidth
     {
         get => _thumbnailWidth;
@@ -115,6 +117,7 @@ internal sealed class SettingsViewModel : ViewModelBase
         }
     }
 
+    /// <summary>Thumbnail height in pixels (75-400). Applied live to the preview; persisted by <see cref="Save"/>.</summary>
     public int ThumbnailHeight
     {
         get => _thumbnailHeight;
@@ -127,6 +130,7 @@ internal sealed class SettingsViewModel : ViewModelBase
 
     // ── Panel opacity ───────────────────────────────────────────────────
 
+    /// <summary>Panel opacity (0.3-1.0). Applied live through the opacity callback; persisted by <see cref="Save"/>.</summary>
     public double PanelOpacity
     {
         get => _panelOpacity;
@@ -172,6 +176,7 @@ internal sealed class SettingsViewModel : ViewModelBase
 
     // ── Polling interval ────────────────────────────────────────────────
 
+    /// <summary>Delay between two window scans in milliseconds (500-5000). Applied live to the preview; persisted by <see cref="Save"/>.</summary>
     public int PollingIntervalMs
     {
         get => _pollingIntervalMs;
@@ -184,18 +189,21 @@ internal sealed class SettingsViewModel : ViewModelBase
 
     // ── General settings ────────────────────────────────────────────────
 
+    /// <summary>Reopens the panel at its saved position. Takes effect once saved.</summary>
     public bool RememberPosition
     {
         get => _rememberPosition;
         set => SetProperty(ref _rememberPosition, value);
     }
 
+    /// <summary>Starts WinGlance with Windows. Written to the registry by <see cref="Save"/>.</summary>
     public bool AutoStart
     {
         get => _autoStart;
         set => SetProperty(ref _autoStart, value);
     }
 
+    /// <summary>Hides the panel in the tray when it is closed. Takes effect once saved.</summary>
     public bool CloseToTray
     {
         get => _closeToTray;
@@ -222,6 +230,7 @@ internal sealed class SettingsViewModel : ViewModelBase
         set => SetProperty(ref _clickOnSwitch, value);
     }
 
+    /// <summary>Global show/hide hotkey, e.g. Ctrl+Alt+G. Registered by <see cref="Save"/>.</summary>
     public string Hotkey
     {
         get => _hotkey;
@@ -306,6 +315,7 @@ internal sealed class SettingsViewModel : ViewModelBase
 
     // ── LLM settings ───────────────────────────────────────────────────
 
+    /// <summary>Turns the LLM analysis on. Takes effect on <see cref="Save"/>, through <see cref="LlmSettingsChanged"/>.</summary>
     public bool LlmEnabled
     {
         get => _llmEnabled;
@@ -334,24 +344,28 @@ internal sealed class SettingsViewModel : ViewModelBase
         }
     }
 
+    /// <summary>Base URL of the LLM provider API. Takes effect on <see cref="Save"/>.</summary>
     public string LlmEndpoint
     {
         get => _llmEndpoint;
         set => SetProperty(ref _llmEndpoint, value);
     }
 
+    /// <summary>API key of the LLM provider, stored encrypted in config.json. Takes effect on <see cref="Save"/>.</summary>
     public string LlmApiKey
     {
         get => _llmApiKey;
         set => SetProperty(ref _llmApiKey, value);
     }
 
+    /// <summary>Model name sent to the LLM provider. Takes effect on <see cref="Save"/>.</summary>
     public string LlmModel
     {
         get => _llmModel;
         set => SetProperty(ref _llmModel, value);
     }
 
+    /// <summary>Seconds a window must stay unchanged before it is analyzed (10-120). Takes effect on <see cref="Save"/>.</summary>
     public int LlmStaleThresholdSeconds
     {
         get => _llmStaleThresholdSeconds;
@@ -373,7 +387,10 @@ internal sealed class SettingsViewModel : ViewModelBase
 
     // ── Commands ────────────────────────────────────────────────────────
 
+    /// <summary>Saves all the settings (see <see cref="Save"/>).</summary>
     public ICommand SaveCommand { get; }
+
+    /// <summary>Opens the Prompt Editor screen.</summary>
     public ICommand EditPromptCommand { get; }
 
     /// <summary>
