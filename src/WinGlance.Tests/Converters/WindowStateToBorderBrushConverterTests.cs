@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Windows.Media;
 using WinGlance.Converters;
+using WinGlance.Models;
 
 namespace WinGlance.Tests.Converters;
 
@@ -81,6 +82,41 @@ public class WindowStateToBorderBrushConverterTests
         var result = _converter.Convert([false, false, false, false, false, verdict!], typeof(Brush), null!, CultureInfo.InvariantCulture);
         var brush = Assert.IsType<SolidColorBrush>(result);
         Assert.Equal(Color.FromRgb(r, g, b), brush.Color);
+    }
+
+    [Theory]
+    [InlineData(AgentStatus.Waiting, 232, 17, 35)] // red: blocked on a permission prompt or a question
+    [InlineData(AgentStatus.Idle, 255, 140, 0)] // orange: turn finished while the window was not in front
+    public void NeedsAgentAttention_AgentStatus_RedOnlyWhenWaiting(AgentStatus status, byte r, byte g, byte b)
+    {
+        var result = _converter.Convert([false, false, false, false, true, null!, status], typeof(Brush), null!, CultureInfo.InvariantCulture);
+        var brush = Assert.IsType<SolidColorBrush>(result);
+        Assert.Equal(Color.FromRgb(r, g, b), brush.Color);
+    }
+
+    [Fact]
+    public void AgentWaiting_TakesPriorityOverFlashing()
+    {
+        var result = _converter.Convert([false, true, false, false, true, null!, AgentStatus.Waiting], typeof(Brush), null!, CultureInfo.InvariantCulture);
+        var brush = Assert.IsType<SolidColorBrush>(result);
+        Assert.Equal(Color.FromRgb(232, 17, 35), brush.Color);
+    }
+
+    [Fact]
+    public void AgentWaiting_WindowInFront_KeepsTheActiveBrush()
+    {
+        // NeedsAgentAttention is false for the window in front: the answer is asked where you look
+        var result = _converter.Convert([true, false, false, false, false, null!, AgentStatus.Waiting], typeof(Brush), null!, CultureInfo.InvariantCulture);
+        var brush = Assert.IsType<SolidColorBrush>(result);
+        Assert.Equal(Color.FromRgb(0, 120, 215), brush.Color); // blue
+    }
+
+    [Fact]
+    public void IsHung_TakesPriorityOverAgentWaiting()
+    {
+        var result = _converter.Convert([false, false, true, false, true, null!, AgentStatus.Waiting], typeof(Brush), null!, CultureInfo.InvariantCulture);
+        var brush = Assert.IsType<SolidColorBrush>(result);
+        Assert.Equal(Color.FromRgb(255, 0, 0), brush.Color);
     }
 
     [Fact]

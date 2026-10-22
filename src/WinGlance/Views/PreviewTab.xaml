@@ -71,7 +71,7 @@
                             ToolTip="{Binding Title}"
                             Cursor="Hand"
                             Opacity="{Binding LlmVerdict, Converter={StaticResource LlmVerdictToOpacity}}">
-                        <!-- Multi-value border: IsActive, IsFlashing, IsHung, IsModalBlocked, NeedsAgentAttention, LlmVerdict -->
+                        <!-- Multi-value border: IsActive, IsFlashing, IsHung, IsModalBlocked, NeedsAgentAttention, LlmVerdict, agent status -->
                         <Border.BorderBrush>
                             <MultiBinding Converter="{StaticResource StateBorderConverter}">
                                 <Binding Path="IsActive" />
@@ -80,6 +80,7 @@
                                 <Binding Path="IsModalBlocked" />
                                 <Binding Path="NeedsAgentAttention" />
                                 <Binding Path="LlmVerdict" />
+                                <Binding Path="Agent.Status" />
                             </MultiBinding>
                         </Border.BorderBrush>
                         <Border.InputBindings>
@@ -125,8 +126,9 @@
                                                 <DataTrigger Binding="{Binding Agent.Status}" Value="Busy">
                                                     <Setter Property="Background" Value="#CC0078D7" />
                                                 </DataTrigger>
+                                                <!-- Waiting: blocked on a permission prompt or a question, it goes no further without you -->
                                                 <DataTrigger Binding="{Binding Agent.Status}" Value="Waiting">
-                                                    <Setter Property="Background" Value="#CCFF8C00" />
+                                                    <Setter Property="Background" Value="#CCE81123" />
                                                 </DataTrigger>
                                                 <!-- Idle: the agent finished and waits for the next prompt, it needs you too -->
                                                 <DataTrigger Binding="{Binding Agent.Status}" Value="Idle">

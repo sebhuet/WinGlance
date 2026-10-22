@@ -24,9 +24,9 @@ When working with multiple windows of the same application (e.g., several VS Cod
 
 ## Coding Agent Badges
 
-<img src="doc/images/agent-badges.png" alt="Four terminal thumbnails with the badges Claude · working in blue, OpenCode · running in teal, Claude · idle in orange and Claude · permission prompt in orange" width="1018">
+<img src="doc/images/agent-badges.png" alt="Four terminal thumbnails with the badges Claude · working in blue, OpenCode · running in teal, Claude · idle in orange and Claude · permission prompt in red" width="1018">
 
-A badge under each thumbnail shows the agent running in the window: blue while Claude works, orange when it is idle or waits for your answer, teal for OpenCode. The border turns orange when an agent waits for you, or finished while you were in another window. Sessions come from `claude agents --json` (Claude Code v2.1.139 or later); they are matched to VS Code windows and terminals alike.
+A badge under each thumbnail shows the agent running in the window: blue while Claude works, red when it waits for your answer (a permission prompt, a question), orange once it has finished its turn, teal for OpenCode. While you are in another window, the border turns red when an agent waits for you, and orange when it finishes. Sessions come from `claude agents --json` (Claude Code v2.1.139 or later); they are matched to VS Code windows and terminals alike.
 
 ## Requirements
 

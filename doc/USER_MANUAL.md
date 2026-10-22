@@ -4,7 +4,7 @@ WinGlance is a portable, always-on-top floating panel for Windows 10 and Windows
 
 <img src="images/preview.png" alt="The WinGlance panel showing two groups of live window thumbnails, Windows PowerShell and Terminal, with colored borders and coding agent badges" width="1020">
 
-In this example, WinGlance monitors two applications. In the **Windows PowerShell** group, `db-backup` has a yellow border because a confirmation dialog blocks it, and `nightly-build` an orange one because it flashes for attention. In the **Terminal** group, `api-server` is the active window (blue) where Claude Code is working, `web-client` waits for a permission answer (orange), Claude has finished in `docs-site`, and OpenCode runs in `infra`.
+In this example, WinGlance monitors two applications. In the **Windows PowerShell** group, `db-backup` has a yellow border because a confirmation dialog blocks it, and `nightly-build` an orange one because it flashes for attention. In the **Terminal** group, `api-server` is the active window (blue) where Claude Code is working, `web-client` waits for a permission answer (red), Claude has finished in `docs-site`, and OpenCode runs in `infra`.
 
 ---
 
@@ -172,8 +172,9 @@ Thumbnails display **color-coded borders** to communicate the state of each wind
 | Border Color | State           | Meaning                                                                                                   |
 | ------------ | --------------- | --------------------------------------------------------------------------------------------------------- |
 | **Red**      | Not Responding  | The application has stopped responding. A red "Not Responding" badge also appears under the thumbnail.    |
+| **Red**      | Agent waiting   | A coding agent in the window waits for your answer: a permission prompt or a question (see Section 3.8).  |
 | **Orange**   | Flashing        | The window is requesting attention (e.g., a file transfer completed, a message was received).             |
-| **Orange**   | Agent           | A coding agent in the window waits for you, or finished while you were elsewhere (see Section 3.8).       |
+| **Orange**   | Agent finished  | A coding agent finished its turn while you were in another window (see Section 3.8).                      |
 | **Orange**   | Awaiting Action | The AI analysis found that the window needs you (see Section 3.7).                                        |
 | **Yellow**   | Modal Dialog    | The window is blocked by a dialog box (e.g., "Save As", a confirmation prompt). Address the dialog first. |
 | **Blue**     | Active          | This is the currently focused window.                                                                     |
@@ -196,21 +197,21 @@ When an analysis fails (wrong key, endpoint unreachable, timeout), no indicator 
 
 When **Claude Code** or **OpenCode** runs in a monitored window, a badge appears next to the window title, under the thumbnail:
 
-<img src="images/agent-badges.png" alt="Four terminal thumbnails with the badges Claude · working in blue, OpenCode · running in teal, Claude · idle in orange and Claude · permission prompt in orange" width="1018">
+<img src="images/agent-badges.png" alt="Four terminal thumbnails with the badges Claude · working in blue, OpenCode · running in teal, Claude · idle in orange and Claude · permission prompt in red" width="1018">
 
-| Badge                                 | Meaning                                                                                  |
-| ------------------------------------- | ---------------------------------------------------------------------------------------- |
-| Blue **Claude · working**             | Claude is working on a turn.                                                             |
-| Orange **Claude · permission prompt** | Claude is blocked on you: a permission prompt, a question, an open dialog.               |
-| Orange **Claude · idle**              | Claude finished its turn and waits for your next prompt: it needs you.                   |
-| Teal **OpenCode · running**           | OpenCode runs in this window. OpenCode does not report whether it is working or waiting. |
-| **+1**, **+2**… after the text        | Several agents run in the same window; the badge shows the most urgent one.              |
+| Badge                              | Meaning                                                                                  |
+| ---------------------------------- | ---------------------------------------------------------------------------------------- |
+| Blue **Claude · working**          | Claude is working on a turn.                                                             |
+| Red **Claude · permission prompt** | Claude is blocked on you: a permission prompt, a question, an open dialog.               |
+| Orange **Claude · idle**           | Claude finished its turn and waits for your next prompt: it needs you.                   |
+| Teal **OpenCode · running**        | OpenCode runs in this window. OpenCode does not report whether it is working or waiting. |
+| **+1**, **+2**… after the text     | Several agents run in the same window; the badge shows the most urgent one.              |
 
 Hover the badge to see each session's name and folder.
 
-A blue **Claude · 2 background tasks** badge means that Claude finished its turn but commands it started in the background (a server, a browser automation, a long build) are still running. Claude itself reports such a session as idle; WinGlance counts the commands its tools still run. When they all end, the badge turns gray and the border orange until you look at the window. Background sub-agents that run no command are not detected.
+A blue **Claude · 2 background tasks** badge means that Claude finished its turn but commands it started in the background (a server, a browser automation, a long build) are still running. Claude itself reports such a session as idle; WinGlance counts the commands its tools still run. When they all end, the badge turns orange, and so does the border until you look at the window. Background sub-agents that run no command are not detected.
 
-The thumbnail border turns **orange** when an agent waits for you, and when an agent finishes a turn while you are in another window. The second case clears as soon as you switch to the window.
+While you are in another window, the thumbnail border turns **red** when an agent waits for your answer, and **orange** when an agent finishes a turn. The orange border clears as soon as you switch to the window; the red one comes back when you leave the window while the agent still waits.
 
 It works with the Claude Code extension for VS Code, the `claude` command in a terminal, and agents started in the VS Code integrated terminal. In VS Code, WinGlance tells windows apart by the folder name in their title (`file - Folder - Visual Studio Code`). If two windows show the same folder name, their agents are not shown rather than shown on the wrong window.
 

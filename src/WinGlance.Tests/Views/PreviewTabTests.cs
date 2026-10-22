@@ -17,6 +17,7 @@ public class PreviewTabTests
 {
     private static readonly Color Blue = Color.FromArgb(0xCC, 0x00, 0x78, 0xD7);
     private static readonly Color Orange = Color.FromArgb(0xCC, 0xFF, 0x8C, 0x00);
+    private static readonly Color Red = Color.FromArgb(0xCC, 0xE8, 0x11, 0x23);
     private static readonly Color Teal = Color.FromArgb(0xCC, 0x00, 0x89, 0x7B);
     private static readonly Color Gray = Color.FromArgb(0xCC, 0x55, 0x55, 0x55);
 
@@ -41,7 +42,7 @@ public class PreviewTabTests
         var expected = status switch
         {
             AgentStatus.Busy => Blue,
-            AgentStatus.Waiting => Orange,
+            AgentStatus.Waiting => Red, // blocked on a permission prompt or a question
             AgentStatus.Running => Teal,
             AgentStatus.Idle => Orange, // finished, waiting for the next prompt: needs the user
             _ => Gray,
@@ -124,6 +125,24 @@ public class PreviewTabTests
             var frame = FindDescendants<Border>(view).Single(b => b.Cursor == Cursors.Hand);
 
             Assert.Equal(Color.FromRgb(255, 140, 0), Assert.IsType<SolidColorBrush>(frame.BorderBrush).Color);
+        });
+    }
+
+    [Fact]
+    public void ThumbnailBorder_AgentWaitingForAnAnswer_IsRed()
+    {
+        RunOnSta(() =>
+        {
+            var window = new TrackedWindow((IntPtr)1, "Code", "VS Code")
+            {
+                NeedsAgentAttention = true,
+                Agent = new AgentBadge(AgentStatus.Waiting, "Claude · permission prompt", "details"),
+            };
+
+            var view = Render(window);
+            var frame = FindDescendants<Border>(view).Single(b => b.Cursor == Cursors.Hand);
+
+            Assert.Equal(Color.FromRgb(232, 17, 35), Assert.IsType<SolidColorBrush>(frame.BorderBrush).Color);
         });
     }
 
