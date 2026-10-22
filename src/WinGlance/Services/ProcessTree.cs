@@ -17,12 +17,24 @@ internal sealed class ProcessTree
     private const int MaxDepth = 32;
 
     private readonly Dictionary<int, ProcessInfo> _byId = [];
+    private readonly Dictionary<int, List<ProcessInfo>> _childrenById = [];
 
     public ProcessTree(IEnumerable<ProcessInfo> processes)
     {
         foreach (var process in processes)
             _byId[process.ProcessId] = process;
+
+        foreach (var process in _byId.Values)
+        {
+            if (!_childrenById.TryGetValue(process.ParentProcessId, out var children))
+                _childrenById[process.ParentProcessId] = children = [];
+            children.Add(process);
+        }
     }
+
+    /// <summary>Direct children of a process (empty if none or unknown).</summary>
+    public IReadOnlyList<ProcessInfo> GetChildren(int processId) =>
+        _childrenById.TryGetValue(processId, out var children) ? children : [];
 
     /// <summary>All processes in the snapshot.</summary>
     public IEnumerable<ProcessInfo> Processes => _byId.Values;

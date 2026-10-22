@@ -76,7 +76,10 @@ internal sealed class AgentMonitor
             if (_claude.IsScriptShim
                 || tree.Processes.Any(p => p.ExeName.Equals("claude.exe", StringComparison.OrdinalIgnoreCase)))
             {
-                sessions.AddRange(_claude.GetSessions());
+                // "idle" only means the turn ended: count the commands still running in the background
+                sessions.AddRange(_claude.GetSessions().Select(session => session.Status == AgentStatus.Idle
+                    ? session with { BackgroundTasks = ClaudeToolShells.CountRunning(tree, session.ProcessId) }
+                    : session));
             }
 
             sessions.AddRange(_openCode.GetSessions(tree));

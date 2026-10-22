@@ -89,6 +89,52 @@ public class AgentBadgeTests
         Assert.Equal(first, second);
     }
 
+    // ── Background commands of an idle session ───────────────────────────
+
+    [Theory]
+    [InlineData(1, "Claude · 1 background task")]
+    [InlineData(3, "Claude · 3 background tasks")]
+    public void FromSessions_IdleWithBackgroundTasks_ShowsWorkInProgress(int tasks, string expectedText)
+    {
+        // Claude says "idle" once its turn ends, even while its background commands run
+        var badge = AgentBadge.FromSessions([Claude(AgentStatus.Idle) with { BackgroundTasks = tasks }])!;
+
+        Assert.Equal(AgentStatus.Busy, badge.Status);
+        Assert.Equal(expectedText, badge.Text);
+    }
+
+    [Fact]
+    public void FromSessions_BackgroundTasks_OutrankAPlainIdleSession()
+    {
+        var badge = AgentBadge.FromSessions([
+            Claude(AgentStatus.Idle),
+            Claude(AgentStatus.Idle) with { BackgroundTasks = 2 },
+        ])!;
+
+        Assert.Equal("Claude · 2 background tasks +1", badge.Text);
+    }
+
+    [Fact]
+    public void FromSessions_WaitingStillOutranksBackgroundTasks()
+    {
+        var badge = AgentBadge.FromSessions([
+            Claude(AgentStatus.Idle) with { BackgroundTasks = 2 },
+            Claude(AgentStatus.Waiting, waitingFor: "permission prompt"),
+        ])!;
+
+        Assert.Equal(AgentStatus.Waiting, badge.Status);
+    }
+
+    [Theory]
+    [InlineData(AgentStatus.Idle, 0, AgentStatus.Idle)]
+    [InlineData(AgentStatus.Idle, 2, AgentStatus.Busy)]
+    [InlineData(AgentStatus.Waiting, 2, AgentStatus.Waiting)]
+    [InlineData(AgentStatus.Busy, 0, AgentStatus.Busy)]
+    public void EffectiveStatus_TurnsIdleIntoBusyOnlyWithBackgroundTasks(AgentStatus status, int tasks, AgentStatus expected)
+    {
+        Assert.Equal(expected, (Claude(status) with { BackgroundTasks = tasks }).EffectiveStatus);
+    }
+
     [Fact]
     public void AgentStatus_IsOrderedByUrgency()
     {

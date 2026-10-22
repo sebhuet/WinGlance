@@ -405,11 +405,30 @@ internal static partial class NativeMethods
 
     /// <summary>
     /// Reads the current directory of another process from its PEB.
-    /// Windows offers no public API for this; the offsets below are the stable x64 layout
-    /// (PEB.ProcessParameters at 0x20, RTL_USER_PROCESS_PARAMETERS.CurrentDirectory at 0x38).
     /// Returns null for 32-bit targets, when WinGlance itself is not 64-bit, or when access is denied.
     /// </summary>
-    public static string? TryGetProcessCurrentDirectory(int processId)
+    public static string? TryGetProcessCurrentDirectory(int processId) =>
+        TryReadProcessParametersString(processId, ProcessParametersCurrentDirectoryOffset) is { } directory
+            // The PEB stores the directory with a trailing separator ("C:\work\")
+            ? System.IO.Path.TrimEndingDirectorySeparator(directory)
+            : null;
+
+    /// <summary>
+    /// Reads the command line of another process from its PEB.
+    /// Returns null for 32-bit targets, when WinGlance itself is not 64-bit, or when access is denied.
+    /// </summary>
+    public static string? TryGetProcessCommandLine(int processId) =>
+        TryReadProcessParametersString(processId, ProcessParametersCommandLineOffset);
+
+    // Stable x64 layout of RTL_USER_PROCESS_PARAMETERS: UNICODE_STRING fields
+    private const int ProcessParametersCurrentDirectoryOffset = 0x38;
+    private const int ProcessParametersCommandLineOffset = 0x70;
+
+    /// <summary>
+    /// Reads a UNICODE_STRING field of another process's RTL_USER_PROCESS_PARAMETERS.
+    /// Windows offers no public API for this; PEB.ProcessParameters sits at 0x20 on x64.
+    /// </summary>
+    private static string? TryReadProcessParametersString(int processId, int fieldOffset)
     {
         if (!Environment.Is64BitProcess)
             return null;
@@ -433,9 +452,9 @@ internal static partial class NativeMethods
             if (parameters == IntPtr.Zero)
                 return null;
 
-            // CurrentDirectory.DosPath is a UNICODE_STRING: Length (bytes) at +0, Buffer at +8
+            // UNICODE_STRING: Length (bytes) at +0, Buffer at +8
             var unicodeString = new byte[16];
-            if (!ReadProcessMemory(hProcess, parameters + 0x38, unicodeString, unicodeString.Length, out var read)
+            if (!ReadProcessMemory(hProcess, parameters + fieldOffset, unicodeString, unicodeString.Length, out var read)
                 || read != unicodeString.Length)
                 return null;
 
@@ -448,8 +467,7 @@ internal static partial class NativeMethods
             if (!ReadProcessMemory(hProcess, buffer, chars, length, out read) || read != length)
                 return null;
 
-            // The PEB stores the directory with a trailing separator ("C:\work\")
-            return System.IO.Path.TrimEndingDirectorySeparator(System.Text.Encoding.Unicode.GetString(chars));
+            return System.Text.Encoding.Unicode.GetString(chars);
         }
         finally
         {

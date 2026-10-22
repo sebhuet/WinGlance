@@ -188,6 +188,8 @@ When **Claude Code** or **OpenCode** runs in a monitored window, a badge appears
 
 Hover the badge to see each session's name and folder.
 
+A blue **Claude · 2 background tasks** badge means that Claude finished its turn but commands it started in the background (a server, a browser automation, a long build) are still running. Claude itself reports such a session as idle; WinGlance counts the commands its tools still run. When they all end, the badge turns gray and the border orange until you look at the window. Background sub-agents that run no command are not detected.
+
 The thumbnail border turns **orange** when an agent waits for you, and when an agent finishes a turn while you are in another window. The second case clears as soon as you switch to the window.
 
 It works with the Claude Code extension for VS Code, the `claude` command in a terminal, and agents started in the VS Code integrated terminal. In VS Code, WinGlance tells windows apart by the folder name in their title (`file - Folder - Visual Studio Code`). If two windows show the same folder name, their agents are not shown rather than shown on the wrong window.

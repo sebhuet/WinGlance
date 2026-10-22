@@ -37,10 +37,22 @@ public enum AgentStatus
 /// <param name="Status">Live state of the session.</param>
 /// <param name="WaitingFor">What a waiting session needs, e.g. "permission prompt" (Claude only).</param>
 /// <param name="Name">Session display name (Claude only).</param>
+/// <param name="BackgroundTasks">
+/// Commands the session's tools still run after its turn ended (Claude only, counted while idle).
+/// </param>
 internal sealed record AgentSession(
     AgentKind Kind,
     int ProcessId,
     string? WorkingDirectory,
     AgentStatus Status,
     string? WaitingFor = null,
-    string? Name = null);
+    string? Name = null,
+    int BackgroundTasks = 0)
+{
+    /// <summary>
+    /// Status as shown to the user: an idle session whose background commands still run is
+    /// not idle from the user's point of view, it is working.
+    /// </summary>
+    public AgentStatus EffectiveStatus =>
+        Status == AgentStatus.Idle && BackgroundTasks > 0 ? AgentStatus.Busy : Status;
+}

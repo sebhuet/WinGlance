@@ -18,7 +18,7 @@ public sealed record AgentBadge(AgentStatus Status, string Text, string Details)
             return null;
 
         // Most urgent first; OrderByDescending is stable, so ties keep discovery order
-        var ordered = sessions.OrderByDescending(s => s.Status).ToList();
+        var ordered = sessions.OrderByDescending(s => s.EffectiveStatus).ToList();
         var top = ordered[0];
 
         var text = $"{KindLabel(top.Kind)} · {StatusLabel(top)}";
@@ -26,15 +26,17 @@ public sealed record AgentBadge(AgentStatus Status, string Text, string Details)
             text += $" +{ordered.Count - 1}";
 
         var details = string.Join(Environment.NewLine, ordered.Select(DescribeSession));
-        return new AgentBadge(top.Status, text, details);
+        return new AgentBadge(top.EffectiveStatus, text, details);
     }
 
     /// <summary>Human-readable status, using Claude's own reason for a waiting session.</summary>
-    internal static string StatusLabel(AgentSession session) => session.Status switch
+    internal static string StatusLabel(AgentSession session) => session switch
     {
-        AgentStatus.Waiting => string.IsNullOrWhiteSpace(session.WaitingFor) ? "needs input" : session.WaitingFor,
-        AgentStatus.Busy => "working",
-        AgentStatus.Idle => "idle",
+        { Status: AgentStatus.Waiting } => string.IsNullOrWhiteSpace(session.WaitingFor) ? "needs input" : session.WaitingFor,
+        { Status: AgentStatus.Busy } => "working",
+        { Status: AgentStatus.Idle, BackgroundTasks: 1 } => "1 background task",
+        { Status: AgentStatus.Idle, BackgroundTasks: > 1 } => $"{session.BackgroundTasks} background tasks",
+        { Status: AgentStatus.Idle } => "idle",
         _ => "running",
     };
 

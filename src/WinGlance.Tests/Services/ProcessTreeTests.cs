@@ -52,6 +52,16 @@ public class ProcessTreeTests
     }
 
     [Fact]
+    public void GetChildren_ReturnsDirectChildrenOnly()
+    {
+        var tree = new ProcessTree([P(1, 0), P(10, 1), P(11, 1), P(20, 10)]);
+
+        Assert.Equal([10, 11], tree.GetChildren(1).Select(p => p.ProcessId).Order());
+        Assert.Empty(tree.GetChildren(20));
+        Assert.Empty(tree.GetChildren(999));
+    }
+
+    [Fact]
     public void Processes_ExposesEverySnapshotEntry()
     {
         var tree = new ProcessTree([P(1, 0, "a.exe"), P(2, 1, "b.exe")]);

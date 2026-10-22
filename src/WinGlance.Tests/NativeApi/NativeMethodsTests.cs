@@ -174,6 +174,21 @@ public class NativeMethodsTests
     }
 
     [Fact]
+    public void TryGetProcessCommandLine_CurrentProcess_NamesTheTestHost()
+    {
+        var commandLine = NativeMethods.TryGetProcessCommandLine(Environment.ProcessId);
+
+        Assert.NotNull(commandLine);
+        Assert.Contains("testhost", commandLine, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void TryGetProcessCommandLine_UnknownProcess_ReturnsNull()
+    {
+        Assert.Null(NativeMethods.TryGetProcessCommandLine(0x3FFFFFF0));
+    }
+
+    [Fact]
     public void TryGetProcessCurrentDirectory_UnknownProcess_ReturnsNull()
     {
         Assert.Null(NativeMethods.TryGetProcessCurrentDirectory(0x3FFFFFF0));
