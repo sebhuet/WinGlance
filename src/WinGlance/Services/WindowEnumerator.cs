@@ -14,15 +14,23 @@ namespace WinGlance.Services;
 /// </summary>
 internal sealed class WindowEnumerator
 {
+    // A hung window must not stall the polling thread on WM_GETICON
+    private const uint IconTimeoutMs = 100;
+
     /// <summary>
     /// Enumerates all visible windows belonging to the specified monitored applications.
     /// </summary>
-    public List<TrackedWindow> GetWindows(IEnumerable<MonitoredApp> monitoredApps)
+    /// <param name="monitoredApps">Applications to look for; duplicate process names are ignored.</param>
+    /// <param name="needsIcon">
+    /// Tells whether a window still needs its icon extracted; null extracts every icon.
+    /// Lets the caller skip windows whose icon it already has.
+    /// </param>
+    public List<TrackedWindow> GetWindows(IEnumerable<MonitoredApp> monitoredApps, Func<IntPtr, bool>? needsIcon = null)
     {
-        var appLookup = monitoredApps.ToDictionary(
-            a => a.ProcessName,
-            a => a,
-            StringComparer.OrdinalIgnoreCase);
+        // A hand-edited config can list the same process twice; the first entry wins
+        var appLookup = new Dictionary<string, MonitoredApp>(StringComparer.OrdinalIgnoreCase);
+        foreach (var app in monitoredApps)
+            appLookup.TryAdd(app.ProcessName, app);
 
         var foregroundHwnd = NativeMethods.GetForegroundWindow();
         var results = new List<TrackedWindow>();
@@ -37,10 +45,7 @@ internal sealed class WindowEnumerator
             if (processName is null)
                 return true;
 
-            // Resolve UWP apps hosted by ApplicationFrameHost.exe
-            var resolvedName = string.Equals(processName, "ApplicationFrameHost", StringComparison.OrdinalIgnoreCase)
-                ? ResolveUwpAppName(pid) ?? processName
-                : processName;
+            var resolvedName = ResolveAppName(hWnd, pid, processName);
 
             if (!appLookup.TryGetValue(resolvedName, out var app))
                 return true; // not a monitored app
@@ -54,7 +59,7 @@ internal sealed class WindowEnumerator
                 ProcessId = pid,
                 Title = title,
                 IsActive = hWnd == foregroundHwnd,
-                Icon = ExtractIcon(hWnd),
+                Icon = needsIcon is null || needsIcon(hWnd) ? ExtractIcon(hWnd) : null,
                 IsHung = NativeMethods.IsHungAppWindow(hWnd),
                 IsModalBlocked = !NativeMethods.IsWindowEnabled(hWnd),
             };
@@ -84,9 +89,7 @@ internal sealed class WindowEnumerator
             if (processName is null)
                 return true;
 
-            var resolvedName = string.Equals(processName, "ApplicationFrameHost", StringComparison.OrdinalIgnoreCase)
-                ? ResolveUwpAppName(pid) ?? processName
-                : processName;
+            var resolvedName = ResolveAppName(hWnd, pid, processName);
 
             if (apps.TryGetValue(resolvedName, out var existing))
             {
@@ -106,23 +109,29 @@ internal sealed class WindowEnumerator
     // ── Filtering ───────────────────────────────────────────────────────
 
     /// <summary>
-    /// Determines if a window should appear in enumeration results.
-    /// Filters out invisible windows, tool windows (unless WS_EX_APPWINDOW), and untitled windows.
+    /// Determines if a window should appear in enumeration results, following the taskbar's rules:
+    /// visible, titled, not a tool window, not owned by another window (dialogs), unless it has
+    /// WS_EX_APPWINDOW; and not cloaked by DWM (other virtual desktop, ghost UWP frame).
     /// </summary>
     internal static bool IsEligibleWindow(IntPtr hWnd)
     {
         if (!NativeMethods.IsWindowVisible(hWnd))
             return false;
 
-        // Skip tool windows unless they also have WS_EX_APPWINDOW
-        if (NativeMethods.IsToolWindow(hWnd) && !NativeMethods.IsAppWindow(hWnd))
-            return false;
-
         // Skip windows with no title
         if (NativeMethods.GetWindowTextLength(hWnd) == 0)
             return false;
 
-        return true;
+        if (!NativeMethods.IsAppWindow(hWnd))
+        {
+            // Tool windows and owned windows (dialogs, popups) have no taskbar button
+            if (NativeMethods.IsToolWindow(hWnd))
+                return false;
+            if (NativeMethods.GetWindow(hWnd, NativeMethods.GW_OWNER) != IntPtr.Zero)
+                return false;
+        }
+
+        return !NativeMethods.IsCloaked(hWnd);
     }
 
     // ── Process resolution ──────────────────────────────────────────────
@@ -132,7 +141,7 @@ internal sealed class WindowEnumerator
     {
         try
         {
-            var process = Process.GetProcessById((int)pid);
+            using var process = Process.GetProcessById((int)pid);
             return process.ProcessName;
         }
         catch
@@ -142,8 +151,42 @@ internal sealed class WindowEnumerator
     }
 
     /// <summary>
-    /// Resolves the real app name for a UWP process via GetApplicationUserModelId.
-    /// UWP windows run under ApplicationFrameHost.exe; this extracts the actual package name.
+    /// Returns the application name of a window: its process name, except for UWP windows,
+    /// whose frame belongs to ApplicationFrameHost.exe and is resolved to the hosted app.
+    /// </summary>
+    private static string ResolveAppName(IntPtr hWnd, uint pid, string processName)
+    {
+        if (!string.Equals(processName, "ApplicationFrameHost", StringComparison.OrdinalIgnoreCase))
+            return processName;
+
+        var appPid = FindHostedAppProcessId(hWnd, pid);
+        return appPid == 0
+            ? processName // suspended app: its core window has left the frame
+            : ResolveUwpAppName(appPid) ?? GetProcessName(appPid) ?? processName;
+    }
+
+    /// <summary>
+    /// Finds the process of the UWP app hosted in an ApplicationFrameHost frame: the frame's
+    /// child core window belongs to the app process, not to the frame host. Returns 0 if none.
+    /// </summary>
+    private static uint FindHostedAppProcessId(IntPtr frameHwnd, uint framePid)
+    {
+        uint appPid = 0;
+        NativeMethods.EnumChildWindows(frameHwnd, (child, _) =>
+        {
+            NativeMethods.GetWindowThreadProcessId(child, out var childPid);
+            if (childPid == framePid)
+                return true; // frame's own child, keep looking
+
+            appPid = childPid;
+            return false; // found, stop
+        }, IntPtr.Zero);
+
+        return appPid;
+    }
+
+    /// <summary>
+    /// Resolves the app name of a packaged (UWP) process via GetApplicationUserModelId.
     /// </summary>
     private static string? ResolveUwpAppName(uint pid)
     {
@@ -203,6 +246,7 @@ internal sealed class WindowEnumerator
     /// </summary>
     internal static ImageSource? ExtractIcon(IntPtr hWnd)
     {
+        // The handle belongs to the window or its class: it is copied, never destroyed here
         var hIcon = GetWindowIcon(hWnd);
         if (hIcon == IntPtr.Zero)
             return null;
@@ -220,10 +264,6 @@ internal sealed class WindowEnumerator
         {
             return null;
         }
-        finally
-        {
-            NativeMethods.DestroyIcon(hIcon);
-        }
     }
 
     /// <summary>
@@ -232,33 +272,28 @@ internal sealed class WindowEnumerator
     /// </summary>
     private static IntPtr GetWindowIcon(IntPtr hWnd)
     {
-        // Try WM_GETICON with ICON_SMALL first
-        var hIcon = NativeMethods.SendMessage(hWnd, NativeMethods.WM_GETICON,
-            (IntPtr)NativeMethods.ICON_SMALL2, IntPtr.Zero);
-
-        if (hIcon != IntPtr.Zero)
-            return hIcon;
-
-        hIcon = NativeMethods.SendMessage(hWnd, NativeMethods.WM_GETICON,
-            (IntPtr)NativeMethods.ICON_SMALL, IntPtr.Zero);
-
-        if (hIcon != IntPtr.Zero)
-            return hIcon;
-
-        // Try WM_GETICON with ICON_BIG
-        hIcon = NativeMethods.SendMessage(hWnd, NativeMethods.WM_GETICON,
-            (IntPtr)NativeMethods.ICON_BIG, IntPtr.Zero);
-
-        if (hIcon != IntPtr.Zero)
-            return hIcon;
+        foreach (var iconType in new[] { NativeMethods.ICON_SMALL2, NativeMethods.ICON_SMALL, NativeMethods.ICON_BIG })
+        {
+            var windowIcon = QueryIcon(hWnd, iconType);
+            if (windowIcon != IntPtr.Zero)
+                return windowIcon;
+        }
 
         // Fallback to class icon
-        hIcon = NativeMethods.GetClassLongPtr(hWnd, NativeMethods.GCL_HICONSM);
-        if (hIcon != IntPtr.Zero)
-            return hIcon;
+        var classIcon = NativeMethods.GetClassLongPtr(hWnd, NativeMethods.GCL_HICONSM);
+        return classIcon != IntPtr.Zero
+            ? classIcon
+            : NativeMethods.GetClassLongPtr(hWnd, NativeMethods.GCL_HICON);
+    }
 
-        hIcon = NativeMethods.GetClassLongPtr(hWnd, NativeMethods.GCL_HICON);
-        return hIcon;
+    /// <summary>
+    /// Sends WM_GETICON with a timeout: a plain SendMessage to a hung window never returns.
+    /// </summary>
+    private static IntPtr QueryIcon(IntPtr hWnd, int iconType)
+    {
+        var ok = NativeMethods.SendMessageTimeout(hWnd, NativeMethods.WM_GETICON, iconType, IntPtr.Zero,
+            NativeMethods.SMTO_ABORTIFHUNG, IconTimeoutMs, out var hIcon);
+        return ok == IntPtr.Zero ? IntPtr.Zero : hIcon;
     }
 }
 

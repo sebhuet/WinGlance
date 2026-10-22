@@ -215,7 +215,14 @@ internal sealed class PreviewViewModel : ViewModelBase, IDisposable
 
     private void Poll()
     {
-        var scanned = _enumerator.GetWindows(MonitoredApps);
+        // Icons are only extracted for windows that do not have one yet
+        HashSet<IntPtr> windowsWithIcon;
+        lock (_lock)
+        {
+            windowsWithIcon = _windows.Where(w => w.Icon is not null).Select(w => w.Hwnd).ToHashSet();
+        }
+
+        var scanned = _enumerator.GetWindows(MonitoredApps, hwnd => !windowsWithIcon.Contains(hwnd));
 
         var badges = AgentMonitor?.GetBadges(scanned);
         foreach (var window in scanned)

@@ -178,4 +178,67 @@ public class NativeMethodsTests
     {
         Assert.Null(NativeMethods.TryGetProcessCurrentDirectory(0x3FFFFFF0));
     }
+
+    // ── SendInput ────────────────────────────────────────────────────────
+
+    [Fact]
+    public void INPUT_HasNativeX64Size()
+    {
+        // SendInput fails with ERROR_INVALID_PARAMETER unless cbSize == sizeof(INPUT)
+        Assert.Equal(40, NativeMethods.INPUT.Size);
+    }
+
+    [Fact]
+    public void SendInput_AltKeyUp_IsAccepted()
+    {
+        // A lone key-up is harmless and proves the struct size is accepted
+        var input = new NativeMethods.INPUT
+        {
+            Type = NativeMethods.INPUT_KEYBOARD,
+            Union = new NativeMethods.InputUnion
+            {
+                Keyboard = new NativeMethods.KEYBDINPUT
+                {
+                    VirtualKey = NativeMethods.VK_MENU,
+                    Flags = NativeMethods.KEYEVENTF_KEYUP,
+                },
+            },
+        };
+
+        Assert.Equal(1u, NativeMethods.SendInput(1, [input], NativeMethods.INPUT.Size));
+    }
+
+    // ── Window state helpers ─────────────────────────────────────────────
+
+    [Fact]
+    public void IsCloaked_InvalidHandle_ReturnsFalse()
+    {
+        Assert.False(NativeMethods.IsCloaked(IntPtr.Zero));
+    }
+
+    [Fact]
+    public void IsWindow_InvalidHandle_ReturnsFalse()
+    {
+        Assert.False(NativeMethods.IsWindow(IntPtr.Zero));
+    }
+
+    // ── DPAPI ────────────────────────────────────────────────────────────
+
+    [Fact]
+    public void ProtectForCurrentUser_RoundTrips_AndHidesThePlaintext()
+    {
+        var secret = System.Text.Encoding.UTF8.GetBytes("sk-secret-key");
+
+        var protectedBytes = NativeMethods.ProtectForCurrentUser(secret);
+
+        Assert.NotNull(protectedBytes);
+        Assert.NotEqual(secret, protectedBytes);
+        Assert.Equal(secret, NativeMethods.UnprotectForCurrentUser(protectedBytes));
+    }
+
+    [Fact]
+    public void UnprotectForCurrentUser_CorruptData_ReturnsNull()
+    {
+        Assert.Null(NativeMethods.UnprotectForCurrentUser([1, 2, 3, 4]));
+    }
 }

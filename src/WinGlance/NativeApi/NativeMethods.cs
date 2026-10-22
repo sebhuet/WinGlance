@@ -21,7 +21,18 @@ internal static partial class NativeMethods
     public const int ICON_BIG = 1;
     public const int ICON_SMALL2 = 2;
 
+    public const int GW_OWNER = 4;
     public const int GW_ENABLEDPOPUP = 6;
+
+    public const uint SMTO_ABORTIFHUNG = 0x0002;
+
+    public const int DWMWA_CLOAKED = 14;
+
+    public static readonly IntPtr HWND_BROADCAST = new(0xFFFF);
+
+    public const int HSHELL_REDRAW = 6;
+
+    public const uint MOD_NOREPEAT = 0x4000;
 
     public const uint DWM_TNP_RECTDESTINATION = 0x00000001;
     public const uint DWM_TNP_RECTSOURCE = 0x00000002;
@@ -104,11 +115,27 @@ internal static partial class NativeMethods
         public static int Size => Marshal.SizeOf<INPUT>();
     }
 
+    // MOUSEINPUT is declared only to give the union its native size: SendInput rejects
+    // calls whose cbSize differs from sizeof(INPUT) (40 bytes on x64, 28 on x86).
     [StructLayout(LayoutKind.Explicit)]
     public struct InputUnion
     {
         [FieldOffset(0)]
+        public MOUSEINPUT Mouse;
+
+        [FieldOffset(0)]
         public KEYBDINPUT Keyboard;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct MOUSEINPUT
+    {
+        public int X;
+        public int Y;
+        public uint MouseData;
+        public uint Flags;
+        public uint Time;
+        public IntPtr ExtraInfo;
     }
 
     [StructLayout(LayoutKind.Sequential)]
@@ -149,6 +176,13 @@ internal static partial class NativeMethods
         public IntPtr BasePriority;
         public IntPtr UniqueProcessId;
         public IntPtr InheritedFromUniqueProcessId;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct DATA_BLOB
+    {
+        public int Size;
+        public IntPtr Data;
     }
 
     // ── Delegates ─────────────────────────────────────────────────────
@@ -195,6 +229,21 @@ internal static partial class NativeMethods
 
     [DllImport("user32.dll", EntryPoint = "SendMessageW")]
     public static extern IntPtr SendMessage(IntPtr hWnd, uint msg, IntPtr wParam, IntPtr lParam);
+
+    [DllImport("user32.dll", EntryPoint = "SendMessageTimeoutW")]
+    public static extern IntPtr SendMessageTimeout(IntPtr hWnd, uint msg, IntPtr wParam, IntPtr lParam, uint fuFlags, uint uTimeout, out IntPtr lpdwResult);
+
+    [DllImport("user32.dll", EntryPoint = "PostMessageW")]
+    public static extern bool PostMessage(IntPtr hWnd, uint msg, IntPtr wParam, IntPtr lParam);
+
+    [DllImport("user32.dll")]
+    public static extern bool EnumChildWindows(IntPtr hWndParent, EnumWindowsProc lpEnumFunc, IntPtr lParam);
+
+    [DllImport("user32.dll")]
+    public static extern bool IsWindow(IntPtr hWnd);
+
+    [DllImport("user32.dll")]
+    public static extern bool GetWindowRect(IntPtr hWnd, out RECT lpRect);
 
     [DllImport("user32.dll")]
     public static extern bool DestroyIcon(IntPtr hIcon);
@@ -252,6 +301,20 @@ internal static partial class NativeMethods
 
     [DllImport("dwmapi.dll")]
     public static extern int DwmIsCompositionEnabled(out bool pfEnabled);
+
+    [DllImport("dwmapi.dll")]
+    public static extern int DwmGetWindowAttribute(IntPtr hwnd, int dwAttribute, out int pvAttribute, int cbAttribute);
+
+    // ── Crypt32 (DPAPI) ───────────────────────────────────────────────
+
+    [DllImport("crypt32.dll", CharSet = CharSet.Unicode)]
+    public static extern bool CryptProtectData(ref DATA_BLOB pDataIn, string? szDataDescr, IntPtr pOptionalEntropy, IntPtr pvReserved, IntPtr pPromptStruct, int dwFlags, out DATA_BLOB pDataOut);
+
+    [DllImport("crypt32.dll", CharSet = CharSet.Unicode)]
+    public static extern bool CryptUnprotectData(ref DATA_BLOB pDataIn, IntPtr ppszDataDescr, IntPtr pOptionalEntropy, IntPtr pvReserved, IntPtr pPromptStruct, int dwFlags, out DATA_BLOB pDataOut);
+
+    [DllImport("kernel32.dll")]
+    public static extern IntPtr LocalFree(IntPtr hMem);
 
     // ── Kernel32 (UWP) ────────────────────────────────────────────────
 
@@ -400,5 +463,55 @@ internal static partial class NativeMethods
         return ReadProcessMemory(hProcess, address, bytes, bytes.Length, out var read) && read == bytes.Length
             ? (IntPtr)BitConverter.ToInt64(bytes, 0)
             : IntPtr.Zero;
+    }
+
+    /// <summary>
+    /// True if DWM hides the window: on another virtual desktop, or a suspended or
+    /// closed UWP frame kept alive by ApplicationFrameHost. Such windows give black thumbnails.
+    /// </summary>
+    public static bool IsCloaked(IntPtr hWnd) =>
+        DwmGetWindowAttribute(hWnd, DWMWA_CLOAKED, out var cloaked, sizeof(int)) == 0 && cloaked != 0;
+
+    /// <summary>
+    /// Encrypts data with DPAPI for the current Windows user. Returns null on failure.
+    /// </summary>
+    public static byte[]? ProtectForCurrentUser(byte[] data) => TransformWithDpapi(data, protect: true);
+
+    /// <summary>
+    /// Decrypts data encrypted by <see cref="ProtectForCurrentUser"/>. Returns null when the data
+    /// was encrypted by another user or machine, or is corrupt.
+    /// </summary>
+    public static byte[]? UnprotectForCurrentUser(byte[] data) => TransformWithDpapi(data, protect: false);
+
+    private static byte[]? TransformWithDpapi(byte[] data, bool protect)
+    {
+        const int CRYPTPROTECT_UI_FORBIDDEN = 0x1;
+
+        var handle = GCHandle.Alloc(data, GCHandleType.Pinned);
+        try
+        {
+            var input = new DATA_BLOB { Size = data.Length, Data = handle.AddrOfPinnedObject() };
+            var ok = protect
+                ? CryptProtectData(ref input, null, IntPtr.Zero, IntPtr.Zero, IntPtr.Zero, CRYPTPROTECT_UI_FORBIDDEN, out var output)
+                : CryptUnprotectData(ref input, IntPtr.Zero, IntPtr.Zero, IntPtr.Zero, IntPtr.Zero, CRYPTPROTECT_UI_FORBIDDEN, out output);
+            if (!ok)
+                return null;
+
+            try
+            {
+                var result = new byte[output.Size];
+                Marshal.Copy(output.Data, result, 0, output.Size);
+                return result;
+            }
+            finally
+            {
+                // The output buffer is allocated by crypt32 with LocalAlloc
+                LocalFree(output.Data);
+            }
+        }
+        finally
+        {
+            handle.Free();
+        }
     }
 }
