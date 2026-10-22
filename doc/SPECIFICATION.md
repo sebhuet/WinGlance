@@ -235,104 +235,35 @@ Shows, for each monitored window, whether a coding agent (**Claude Code** or **O
 
 ## Technical Architecture
 
+How the code is organized, which thread runs what, and how it is tested: see [ARCHITECTURE.md](ARCHITECTURE.md).
+
 ### Core Windows APIs (P/Invoke)
 
-| API                                           | Purpose                                                       |
-| --------------------------------------------- | ------------------------------------------------------------- |
-| `EnumWindows`                                 | Enumerate all top-level windows                               |
-| `GetWindowThreadProcessId`                    | Map window handles to process IDs                             |
-| `IsWindowVisible`                             | Filter invisible/hidden windows                               |
-| `GetWindowText`                               | Retrieve window titles                                        |
-| `DwmRegisterThumbnail`                        | Register a live DWM thumbnail relationship                    |
-| `DwmUpdateThumbnailProperties`                | Set thumbnail region, size, opacity                           |
-| `DwmUnregisterThumbnail`                      | Clean up when a source window closes                          |
-| `SetForegroundWindow`                         | Bring clicked window to front                                 |
-| `ShowWindow` / `IsIconic`                     | Restore minimized windows                                     |
-| `GetWindowPlacement`                          | Get window state (minimized, maximized, normal)               |
-| `GetClassLongPtr` / `SendMessage(WM_GETICON)` | Retrieve application icon                                     |
-| `RegisterHotKey` / `UnregisterHotKey`         | Register/unregister global keyboard shortcut                  |
-| `GetApplicationUserModelId`                   | Resolve UWP app identity from `ApplicationFrameHost.exe`      |
-| `DwmIsCompositionEnabled`                     | Check if DWM is enabled at startup                            |
-| `AllowSetForegroundWindow`                    | Workaround for focus-stealing prevention                      |
-| `RegisterShellHookWindow`                     | Receive shell notifications (window flash events)             |
-| `IsHungAppWindow`                             | Detect windows that stopped responding                        |
-| `IsWindowEnabled`                             | Detect windows blocked by a modal dialog                      |
-| `GetWindow(GW_ENABLEDPOPUP)`                  | Find the modal popup blocking a disabled window               |
-| `PrintWindow`                                 | Capture window content as bitmap (for graphical diff and LLM) |
+All declarations are in `NativeApi/NativeMethods.cs`.
 
-### Application Structure
-
-```text
-WinGlance/
-├── App.xaml                        # Application entry point
-├── App.xaml.cs                     # Startup logic, single-instance mutex, global error handling
-├── MainWindow.xaml                 # Floating panel; views switched from a right-click menu
-├── MainWindow.xaml.cs              # Panel logic: drag, show/hide, tray icon, hotkey, view switching
-├── Models/
-│   ├── AppConfig.cs                # Root config model (JSON serializable)
-│   ├── MonitoredApp.cs             # Process name + display name
-│   └── TrackedWindow.cs            # HWND + title + process info
-├── Services/
-│   ├── WindowEnumerator.cs         # EnumWindows + process filtering
-│   ├── ThumbnailManager.cs         # DWM thumbnail registration & lifecycle
-│   ├── AttentionDetector.cs        # Shell hook + IsHungAppWindow + modal detection
-│   ├── ScreenshotComparer.cs       # PrintWindow capture + perceptual hash diff
-│   ├── LlmAnalyzer.cs              # LLM API calls (OpenAI, Gemini, Ollama)
-│   ├── LlmService.cs               # Stale detection → LLM analysis orchestration
-│   ├── AgentMonitor.cs             # Coding agent discovery and window matching (FR-11)
-│   ├── HotkeyService.cs            # Global hotkey registration
-│   ├── ThemeService.cs             # Light/dark theme detection
-│   ├── AutoStartService.cs         # Run registry key
-│   ├── Log.cs                      # %LOCALAPPDATA%\WinGlance\winglance.log
-│   └── ConfigService.cs            # Load/save/normalize config.json
-├── NativeApi/
-│   └── NativeMethods.cs            # All P/Invoke declarations (DWM, User32)
-├── Views/
-│   ├── PreviewTab.xaml             # Thumbnail grid per app, with status badges
-│   ├── ApplicationsTab.xaml        # App list with checkboxes and display names
-│   ├── SettingsTab.xaml            # Layout/size/opacity, hotkey, agents, LLM
-│   └── PromptEditorTab.xaml        # LLM prompt editor and debug log
-├── ViewModels/
-│   ├── MainViewModel.cs            # Orchestrates views, holds config, LLM service lifecycle
-│   ├── PreviewViewModel.cs         # Observable collection of tracked windows
-│   ├── ApplicationsViewModel.cs    # Running apps list, add/remove monitoring
-│   └── SettingsViewModel.cs        # Bindable settings properties
-├── Controls/
-│   └── ThumbnailControl.cs         # Hosts one DWM thumbnail (aspect ratio, scroll clipping)
-├── Converters/                     # Border state, visibility, layout, LLM verdict
-├── Themes/                         # DarkTheme.xaml / LightTheme.xaml
-├── Assets/
-│   ├── icon.ico                    # App + system tray icon
-│   └── prompt.txt                  # Copy of the default LLM prompt
-```
-
-### Key Implementation Details
-
-1. **DWM Thumbnail Rendering**: The DWM API draws live window content directly — no screen capture or bitmap copying. This is the same mechanism Windows uses for taskbar previews. The host WPF window provides a region, and DWM composites the source window content into it in real-time.
-
-2. **Window Enumeration Loop**: A `DispatcherTimer` (1s interval) calls `EnumWindows`, filters by monitored process names, and diffs against the current tracked set to add/remove thumbnails.
-
-3. **Click-to-Switch**: Each thumbnail has a click handler that calls `SetForegroundWindow(hwnd)`. If `IsIconic(hwnd)` returns true, `ShowWindow(hwnd, SW_RESTORE)` is called first.
-
-4. **Panel Always-On-Top**: The WPF window has `Topmost = true` and `WindowStyle = None` (borderless). A custom title bar area enables drag-move.
-
-5. **Multi-App Grouping**: In the Preview tab, thumbnails are grouped by application using an `ItemsControl` with `GroupStyle`. Each group header shows the app icon and name.
-
-6. **Config Persistence**: On save or close, the panel writes position, size, monitored apps, and settings to `config.json`.
-
-7. **Single Instance**: A named `Mutex` prevents multiple instances. If a second instance is launched, it sends a message to the first to bring it to foreground.
-
-8. **UWP App Resolution**: UWP/Store app windows are hosted by `ApplicationFrameHost.exe`. The window enumerator detects this and resolves the real app name via `GetApplicationUserModelId` so thumbnails are grouped under the correct application.
-
-9. **Global Hotkey**: On startup, `RegisterHotKey` registers the configured shortcut. A WndProc handler listens for `WM_HOTKEY` to toggle panel visibility. `UnregisterHotKey` is called on exit.
-
-10. **Theme Detection**: The app reads `HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\Themes\Personalize\AppsUseLightTheme` and applies a matching WPF resource dictionary. A `SystemEvents.UserPreferenceChanged` handler detects live theme changes.
-
-11. **Attention Detection**: `AttentionDetector` uses three mechanisms: (a) `RegisterShellHookWindow` to receive `HSHELL_FLASH` when a window starts flashing, (b) `IsHungAppWindow` polled alongside window enumeration to detect hung apps, (c) `IsWindowEnabled` checked each cycle to detect modal-blocked windows. Detected states are exposed as properties on `TrackedWindow` and bound to visual indicators (colored border, badge under the thumbnail) in the Preview view.
-
-12. **Graphical Diff (Stale Detection)**: `ScreenshotComparer` captures each window via `PrintWindow` at the polling interval, computes a perceptual hash (average hash), and compares with the previous capture. If the hash is identical for longer than the configured stale threshold (default 30s), the window is marked as stale and triggers LLM analysis.
-
-13. **LLM Analysis**: `LlmAnalyzer` provides a unified interface for OpenAI, Gemini, and Ollama APIs. When a stale window is detected: (a) the latest screenshot is encoded as base64, (b) the system prompt is taken from `config.json` (edited in the Prompt Editor), (c) a single API call is made with the screenshot + window title, (d) the response is parsed to classify the window as "awaiting action" or "idle", (e) the result is set on `TrackedWindow.LlmVerdict` and bound to the appropriate visual indicator. No further calls are made until the window content changes again.
+| API                                                               | Purpose                                                                    |
+| ----------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| `EnumWindows` / `GetWindowThreadProcessId`                        | Enumerate top-level windows and map them to processes                      |
+| `IsWindowVisible` / `GetWindowLong` / `GetWindow(GW_OWNER)`       | Apply the taskbar's rules (visible, not a tool window, not owned)          |
+| `DwmGetWindowAttribute(DWMWA_CLOAKED)`                            | Skip windows on other virtual desktops and ghost UWP frames                |
+| `GetWindowText` / `GetWindowTextLength`                           | Retrieve window titles                                                     |
+| `GetApplicationUserModelId` / `EnumChildWindows`                  | Resolve the real app behind `ApplicationFrameHost.exe` (UWP)               |
+| `SendMessageTimeout(WM_GETICON)` / `GetClassLongPtr`              | Retrieve application icons without blocking on a hung window               |
+| `DwmRegisterThumbnail` / `DwmUpdateThumbnailProperties`           | Register a live DWM thumbnail and set its rectangle and opacity            |
+| `DwmQueryThumbnailSourceSize` / `DwmUnregisterThumbnail`          | Keep the source proportions; clean up when a window closes                 |
+| `DwmIsCompositionEnabled`                                         | Check that DWM is enabled at startup                                       |
+| `IsIconic` / `ShowWindow` / `SendInput` / `SetForegroundWindow`   | Restore and activate a window (a simulated Alt press lifts the focus lock) |
+| `SetWindowPos` / `SetWindowLong`                                  | Place the click-through red frame over the window switched to              |
+| `MonitorFromWindow` / `GetMonitorInfo` / `EnumDisplayMonitors`    | Find the side of the screen a window is on, for the click                  |
+| `RegisterHotKey` / `UnregisterHotKey`                             | Global keyboard shortcuts                                                  |
+| `RegisterShellHookWindow` / `RegisterWindowMessage`               | Receive `HSHELL_FLASH` (flashing windows)                                  |
+| `PostMessage(HWND_BROADCAST)`                                     | Ask the running instance to show its panel (single instance)               |
+| `IsHungAppWindow`                                                 | Detect windows that stopped responding                                     |
+| `IsWindowEnabled`                                                 | Detect windows blocked by a modal dialog                                   |
+| `PrintWindow` / `GetWindowRect`                                   | Capture window content (graphical diff and LLM analysis)                   |
+| `CreateToolhelp32Snapshot` / `Process32First` / `Process32Next`   | Process tree, to tie coding agent sessions to their windows                |
+| `OpenProcess` / `NtQueryInformationProcess` / `ReadProcessMemory` | Working folder of OpenCode processes                                       |
+| `CryptProtectData` / `CryptUnprotectData`                         | Encrypt the LLM API key for the current Windows user (DPAPI)               |
 
 ---
 

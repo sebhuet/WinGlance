@@ -40,7 +40,14 @@ Respond in **French** when the user writes in French. Use English for code, comm
 - Mirror the main project folder structure (e.g., `ViewModels/`, `NativeApi/`, `Models/`, `Services/`)
 - Test naming: `MethodName_Condition_ExpectedResult`
 - Run tests with: `dotnet test src/WinGlance.slnx --verbosity minimal`
-- WPF elements in tests must be created on an STA thread (see `Views/PreviewTabTests.cs`)
+- WPF elements in tests must be created on an STA thread (`Views/ViewTestHelpers.RunOnSta`)
+- A test never touches the user's state: no registry write (pass `applyAutoStart` to `SettingsViewModel`/`MainViewModel`), no file outside a temporary folder, no real window. Code that touches the system takes its dependencies through an `internal` constructor; the seams are listed in `doc/ARCHITECTURE.md`
+- Coverage: `dotnet test src/WinGlance.slnx --settings src/coverage.runsettings --collect:"XPlat Code Coverage" --results-directory TestResults`
+
+## Documentation
+
+- User-visible changes update `doc/USER_MANUAL.md` (and `README.md` when a listed feature changes); behavior or configuration changes update `doc/SPECIFICATION.md`; structural changes update `doc/ARCHITECTURE.md`
+- Screenshots in `doc/images/` are taken at 200 % scaling on staged windows with fictitious content, never on the user's real windows, and shown with `<img width>` at half their pixel width
 
 ## Build
 
@@ -61,5 +68,7 @@ Run before handing work back; pre-commit runs the same checks on every commit (`
 ## References
 
 - Full specification: `doc/SPECIFICATION.md`
+- Architecture, threading and test seams: `doc/ARCHITECTURE.md`
+- User manual: `doc/USER_MANUAL.md`
 - Development roadmap: `TODO.md`
 - GitHub: `https://github.com/sebhuet/WinGlance`

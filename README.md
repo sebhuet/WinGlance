@@ -90,6 +90,7 @@ WinGlance/
 │   ├── WinGlance/          # Main WPF application
 │   └── WinGlance.Tests/    # xUnit test project
 ├── doc/
+│   ├── ARCHITECTURE.md     # How the code works: components, threads, tests
 │   ├── SPECIFICATION.md    # Full technical specification
 │   ├── USER_MANUAL.md      # User manual
 │   └── images/             # Screenshots used by the manual and this README
@@ -101,7 +102,7 @@ WinGlance/
 
 ## Contributing
 
-Contributions are welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) before submitting a pull request.
+Contributions are welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) and [doc/ARCHITECTURE.md](doc/ARCHITECTURE.md) before submitting a pull request.
 
 ## License
 
