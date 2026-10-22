@@ -47,6 +47,12 @@ public class TrackedWindow : ViewModels.ViewModelBase, IEquatable<TrackedWindow>
     /// <summary>ID of the process owning the window; links agent processes to their window.</summary>
     public uint ProcessId { get; init; }
 
+    /// <summary>
+    /// Width / height of the window's client area (what the thumbnail shows); 0 when unknown,
+    /// e.g. while minimized. Sizes the cells of the "fit" layout.
+    /// </summary>
+    public double AspectRatio { get; set; }
+
     // ── Observable properties (updated each polling cycle) ─────────────
 
     /// <summary>Window title text, truncated in the UI if needed.</summary>

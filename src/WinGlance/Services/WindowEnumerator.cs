@@ -57,6 +57,7 @@ internal sealed class WindowEnumerator
             var window = new TrackedWindow(hWnd, app.ProcessName, app.DisplayName)
             {
                 ProcessId = pid,
+                AspectRatio = GetClientAspectRatio(hWnd),
                 Title = title,
                 IsActive = hWnd == foregroundHwnd,
                 Icon = needsIcon is null || needsIcon(hWnd) ? ExtractIcon(hWnd) : null,
@@ -132,6 +133,20 @@ internal sealed class WindowEnumerator
         }
 
         return !NativeMethods.IsCloaked(hWnd);
+    }
+
+    /// <summary>
+    /// Width / height of the client area (the part the thumbnail shows), or 0 when unknown:
+    /// a minimized window reports an empty client area.
+    /// </summary>
+    private static double GetClientAspectRatio(IntPtr hWnd)
+    {
+        if (NativeMethods.IsIconic(hWnd) || !NativeMethods.GetClientRect(hWnd, out var rect))
+            return 0;
+
+        var width = rect.Right - rect.Left;
+        var height = rect.Bottom - rect.Top;
+        return width > 0 && height > 0 ? (double)width / height : 0;
     }
 
     // ── Process resolution ──────────────────────────────────────────────

@@ -126,6 +126,40 @@ public class PreviewTabTests
         });
     }
 
+    // ── Fit layout ───────────────────────────────────────────────────────
+
+    [Theory]
+    [InlineData(900, 560, 5, 0)]
+    [InlineData(900, 560, 5, 3)] // two applications: two group headers
+    [InlineData(1600, 900, 8, 2)]
+    [InlineData(500, 700, 3, 1)]
+    public void FitLayout_FillsThePanelWithoutScrolling(double width, double height, int codeWindows, int terminalWindows)
+    {
+        RunOnSta(() =>
+        {
+            var viewModel = new PreviewViewModel { Layout = PreviewViewModel.FitLayout };
+            for (var i = 0; i < codeWindows; i++)
+                viewModel.Windows.Add(new TrackedWindow((IntPtr)(i + 1), "Code", "VS Code") { AspectRatio = 1.84 });
+            for (var i = 0; i < terminalWindows; i++)
+                viewModel.Windows.Add(new TrackedWindow((IntPtr)(100 + i), "WindowsTerminal", "Terminal") { AspectRatio = 1.6 });
+
+            var view = new PreviewTab { DataContext = viewModel };
+            for (var pass = 0; pass < 3; pass++) // size reported → thumbnails resized → layout again
+            {
+                view.Measure(new Size(width, height));
+                view.Arrange(new Rect(0, 0, width, height));
+                view.UpdateLayout();
+            }
+
+            var scroller = FindDescendants<ScrollViewer>(view).First();
+            Assert.True(scroller.ExtentHeight <= scroller.ViewportHeight,
+                $"content {scroller.ExtentHeight} px high in a {scroller.ViewportHeight} px panel");
+            Assert.True(scroller.ExtentWidth <= scroller.ViewportWidth);
+            // ...and the space is used: thumbnails are larger than the 200 px fixed default
+            Assert.True(viewModel.DisplayThumbnailWidth > 200, $"thumbnails only {viewModel.DisplayThumbnailWidth} px wide");
+        });
+    }
+
     // ── Helpers ──────────────────────────────────────────────────────────
 
     private static Border RenderAndFindBadge(TrackedWindow window)

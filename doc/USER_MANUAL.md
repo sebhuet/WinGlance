@@ -66,7 +66,7 @@ When you start WinGlance for the first time:
 WinGlance appears as a borderless, semi-transparent window that stays **always on top** of other windows. Key characteristics:
 
 - **Drag** the title bar to move the panel anywhere on screen.
-- A **resize grip** at the bottom-right corner lets you resize the panel.
+- A **resize grip** at the bottom-right corner lets you resize the panel. In the **Fit to panel** layout (default), thumbnails grow and shrink with it.
 - The panel's **transparency** is adjustable (default: 85% opaque).
 - The panel automatically follows your **Windows dark/light theme** and adapts in real time if you change your system theme.
 
@@ -122,13 +122,14 @@ Thumbnails are **grouped by application**. Each group has a header showing:
 
 ### 3.3 Layout Modes
 
-Three layout modes are available (configurable in Settings):
+Four layout modes are available (configurable in Settings):
 
-| Mode           | Description                                         |
-| -------------- | --------------------------------------------------- |
-| **Horizontal** | Thumbnails arranged in a horizontal strip (default) |
-| **Vertical**   | Thumbnails stacked top-to-bottom                    |
-| **Grid**       | Thumbnails arranged in a multi-column grid          |
+| Mode             | Description                                                                                                 |
+| ---------------- | ----------------------------------------------------------------------------------------------------------- |
+| **Fit to panel** | Thumbnails take the largest size the panel allows, spread over as many rows and columns as needed (default) |
+| **Horizontal**   | Thumbnails arranged in a horizontal strip                                                                   |
+| **Vertical**     | Thumbnails stacked top-to-bottom                                                                            |
+| **Grid**         | Thumbnails arranged in a multi-column grid                                                                  |
 
 ### 3.4 Thumbnail Contents
 
@@ -242,7 +243,9 @@ Open the Settings view by right-clicking the panel and selecting **Settings**, o
 
 ### 5.1 Layout
 
-Choose between **Horizontal** (default), **Vertical**, or **Grid** using radio buttons. Changes apply immediately to the Preview view.
+Choose between **Fit to panel** (default), **Horizontal**, **Vertical**, or **Grid** using radio buttons. Changes apply immediately to the Preview view.
+
+In **Fit to panel**, resize the panel with its grip: WinGlance tries every arrangement of rows and columns and keeps the one giving the largest thumbnails, taking the typical proportions of your windows. Each window keeps its own proportions inside its thumbnail. The panel size is remembered. In the other layouts the panel sizes itself to the thumbnails.
 
 ### 5.2 Thumbnail Size
 
@@ -251,7 +254,7 @@ Choose between **Horizontal** (default), **Vertical**, or **Grid** using radio b
 | **Width**  | 100 – 500 px | 200 px  | 10 px     |
 | **Height** | 75 – 400 px  | 150 px  | 10 px     |
 
-Drag the sliders to resize thumbnails. The current value is displayed next to each slider. Changes apply immediately.
+Drag the sliders to resize thumbnails. The current value is displayed next to each slider. Changes apply immediately. The sliders apply to the Horizontal, Vertical and Grid layouts; in Fit to panel the size follows the panel.
 
 ### 5.3 Panel Opacity
 
@@ -447,7 +450,7 @@ Records startup, warnings and errors: hotkey registration failures, LLM analysis
 
 | Setting             | Default Value               |
 | ------------------- | --------------------------- |
-| Layout              | Horizontal                  |
+| Layout              | Fit to panel                |
 | Thumbnail width     | 200 px                      |
 | Thumbnail height    | 150 px                      |
 | Panel opacity       | 85%                         |

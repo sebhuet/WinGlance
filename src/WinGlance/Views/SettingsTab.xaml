@@ -32,6 +32,9 @@
             <!-- ── Layout ─────────────────────────────────── -->
             <TextBlock Text="Layout" Style="{StaticResource SectionHeader}" />
             <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                <RadioButton Content="Fit to panel" GroupName="Layout"
+                             Foreground="{DynamicResource PrimaryText}" Margin="0,0,16,0"
+                             IsChecked="{Binding Layout, Converter={StaticResource LayoutRadioConverter}, ConverterParameter=fit}" />
                 <RadioButton Content="Horizontal" GroupName="Layout"
                              Foreground="{DynamicResource PrimaryText}" Margin="0,0,16,0"
                              IsChecked="{Binding Layout, Converter={StaticResource LayoutRadioConverter}, ConverterParameter=horizontal}" />
@@ -45,7 +48,20 @@
 
             <!-- ── Thumbnail Size ─────────────────────────── -->
             <TextBlock Text="Thumbnail Size" Style="{StaticResource SectionHeader}" />
+            <TextBlock Text="In Fit to panel, thumbnails take the largest size the panel allows: resize the panel to resize them."
+                       Foreground="{DynamicResource DimText}" FontSize="11" TextWrapping="Wrap" Margin="0,0,0,4"
+                       Visibility="{Binding IsFitLayout, Converter={StaticResource BoolToVisibility}}" />
             <Grid Margin="0,0,0,4">
+                <Grid.Style>
+                    <Style TargetType="Grid">
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding IsFitLayout}" Value="True">
+                                <Setter Property="IsEnabled" Value="False" />
+                                <Setter Property="Opacity" Value="0.5" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Grid.Style>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="60" />
                     <ColumnDefinition Width="*" />

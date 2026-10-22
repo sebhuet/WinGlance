@@ -34,7 +34,7 @@ public class ConfigServiceTests : IDisposable
         var config = svc.Load();
 
         Assert.NotNull(config);
-        Assert.Equal("horizontal", config.Layout);
+        Assert.Equal("fit", config.Layout);
         Assert.Equal(200, config.ThumbnailWidth);
         Assert.Empty(config.MonitoredApps);
     }
@@ -73,7 +73,7 @@ public class ConfigServiceTests : IDisposable
         var config = svc.Load();
 
         Assert.NotNull(config);
-        Assert.Equal("horizontal", config.Layout); // default
+        Assert.Equal("fit", config.Layout); // default
     }
 
     [Fact]
@@ -85,7 +85,7 @@ public class ConfigServiceTests : IDisposable
         var config = svc.Load();
 
         Assert.NotNull(config);
-        Assert.Equal("horizontal", config.Layout);
+        Assert.Equal("fit", config.Layout);
     }
 
     [Fact]
@@ -158,7 +158,7 @@ public class ConfigServiceTests : IDisposable
         Assert.NotNull(config.Llm);
         Assert.NotNull(config.AgentDetection);
         Assert.Equal("Ctrl+Alt+G", config.Hotkey);
-        Assert.Equal("horizontal", config.Layout);
+        Assert.Equal("fit", config.Layout);
     }
 
     [Fact]
@@ -194,12 +194,12 @@ public class ConfigServiceTests : IDisposable
     }
 
     [Fact]
-    public void Load_UnknownLayout_FallsBackToHorizontal()
+    public void Load_UnknownLayout_FallsBackToTheDefault()
     {
         var svc = new ConfigService(_tempDir);
         File.WriteAllText(svc.ConfigPath, """{"layout":"Diagonal"}""");
 
-        Assert.Equal("horizontal", svc.Load().Layout);
+        Assert.Equal("fit", svc.Load().Layout);
     }
 
     // ── Config location ──────────────────────────────────────────────────

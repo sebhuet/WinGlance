@@ -84,9 +84,15 @@ internal sealed class SettingsViewModel : ViewModelBase
         set
         {
             if (SetProperty(ref _layout, value))
+            {
                 _previewViewModel.Layout = value;
+                OnPropertyChanged(nameof(IsFitLayout));
+            }
         }
     }
+
+    /// <summary>True in "Fit to panel", where the thumbnail size sliders do not apply.</summary>
+    public bool IsFitLayout => string.Equals(_layout, PreviewViewModel.FitLayout, StringComparison.OrdinalIgnoreCase);
 
     // ── Thumbnail size ──────────────────────────────────────────────────
 

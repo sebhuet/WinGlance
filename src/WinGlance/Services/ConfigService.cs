@@ -101,9 +101,11 @@ internal sealed class ConfigService
             })
             .ToList();
 
-        config.Layout = config.Layout?.ToLowerInvariant() is "horizontal" or "vertical" or "grid"
+        config.Layout = config.Layout?.ToLowerInvariant() is "fit" or "horizontal" or "vertical" or "grid"
             ? config.Layout.ToLowerInvariant()
             : defaults.Layout;
+        config.PanelWidth = double.IsFinite(config.PanelWidth) ? Math.Clamp(config.PanelWidth, 320, 10000) : defaults.PanelWidth;
+        config.PanelHeight = double.IsFinite(config.PanelHeight) ? Math.Clamp(config.PanelHeight, 220, 10000) : defaults.PanelHeight;
         config.ThumbnailWidth = Math.Clamp(config.ThumbnailWidth, 100, 500);
         config.ThumbnailHeight = Math.Clamp(config.ThumbnailHeight, 75, 400);
         config.PanelOpacity = double.IsFinite(config.PanelOpacity)

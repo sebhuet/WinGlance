@@ -37,9 +37,21 @@
         </DataTemplate>
     </UserControl.Resources>
 
-    <ScrollViewer VerticalScrollBarVisibility="Auto"
-                  HorizontalScrollBarVisibility="Auto"
+    <!-- In the "fit" layout rows wrap at the panel width instead of scrolling sideways;
+         the view model sizes the thumbnails from this scroll viewer's size (code-behind) -->
+    <ScrollViewer x:Name="Scroller"
+                  VerticalScrollBarVisibility="Auto"
                   Background="Transparent">
+        <ScrollViewer.Style>
+            <Style TargetType="ScrollViewer">
+                <Setter Property="HorizontalScrollBarVisibility" Value="Auto" />
+                <Style.Triggers>
+                    <DataTrigger Binding="{Binding IsFitLayout}" Value="True">
+                        <Setter Property="HorizontalScrollBarVisibility" Value="Disabled" />
+                    </DataTrigger>
+                </Style.Triggers>
+            </Style>
+        </ScrollViewer.Style>
         <ItemsControl ItemsSource="{Binding GroupedWindows}"
                       ItemsPanel="{Binding Layout, Converter={StaticResource LayoutToPanelConverter}}">
 
@@ -81,15 +93,15 @@
                                 SourceHwnd="{Binding Hwnd}"
                                 ThumbnailManager="{Binding DataContext.ThumbnailManager, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                 ThumbnailOpacity="{Binding LlmVerdict, Converter={StaticResource LlmVerdictToOpacity}}"
-                                Width="{Binding DataContext.ThumbnailWidth, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                Height="{Binding DataContext.ThumbnailHeight, RelativeSource={RelativeSource AncestorType=UserControl}}" />
+                                Width="{Binding DataContext.DisplayThumbnailWidth, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                Height="{Binding DataContext.DisplayThumbnailHeight, RelativeSource={RelativeSource AncestorType=UserControl}}" />
 
                             <!-- Badges + window title. Badges sit below the thumbnail because DWM draws
                                  thumbnails above WPF content, and the row height is fixed: a badge
                                  appearing must not shift the thumbnails that follow. -->
                             <DockPanel Height="20"
                                        LastChildFill="True"
-                                       MaxWidth="{Binding DataContext.ThumbnailWidth, RelativeSource={RelativeSource AncestorType=UserControl}}">
+                                       MaxWidth="{Binding DataContext.DisplayThumbnailWidth, RelativeSource={RelativeSource AncestorType=UserControl}}">
                                 <!-- Coding agent badge (Claude Code / OpenCode) -->
                                 <Border DockPanel.Dock="Left"
                                         CornerRadius="3"

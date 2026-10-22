@@ -54,7 +54,7 @@ The panel has **4 views**, switched from a **right-click context menu** on the p
 
 #### Tab 3 — Settings
 
-- **Layout**: horizontal strip / vertical strip / grid
+- **Layout**: fit to panel (default) / horizontal strip / vertical strip / grid
 - **Thumbnail size**: width x height (slider or numeric input)
 - **Panel opacity**: slider (30%-100%)
 - **Panel position**: X / Y coordinates (or "remember last position" checkbox)
@@ -76,7 +76,7 @@ The panel has **4 views**, switched from a **right-click context menu** on the p
 
 - The panel must be **draggable** (user can reposition it anywhere on screen)
 - The panel must **remember its position** between sessions (persist to config file)
-- The panel should be **resizable**, with thumbnails scaling proportionally
+- The panel should be **resizable**, with thumbnails scaling proportionally: in the **fit to panel** layout, the thumbnail size is the largest at which all windows fit (rows wrapping at the panel width, a header row per application, the vertical scrollbar width kept free), computed by binary search; the cell aspect ratio is the median of the windows' client-area ratios, and the panel size is saved (`panelWidth`, `panelHeight`)
 - A **minimize to tray** option to hide the panel when not needed
 - The **close button [×]** behavior is **configurable**: either minimize to tray (default) or exit the application
 - System tray icon with right-click menu (Show/Hide, Settings, Exit)

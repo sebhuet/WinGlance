@@ -11,7 +11,7 @@ public class AppConfigTests
         var config = new AppConfig();
 
         Assert.Empty(config.MonitoredApps);
-        Assert.Equal("horizontal", config.Layout);
+        Assert.Equal("fit", config.Layout);
         Assert.Equal(200, config.ThumbnailWidth);
         Assert.Equal(150, config.ThumbnailHeight);
         Assert.Equal(0.85, config.PanelOpacity);

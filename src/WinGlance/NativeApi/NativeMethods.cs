@@ -246,6 +246,9 @@ internal static partial class NativeMethods
     public static extern bool GetWindowRect(IntPtr hWnd, out RECT lpRect);
 
     [DllImport("user32.dll")]
+    public static extern bool GetClientRect(IntPtr hWnd, out RECT lpRect);
+
+    [DllImport("user32.dll")]
     public static extern bool DestroyIcon(IntPtr hIcon);
 
     [DllImport("user32.dll", EntryPoint = "GetWindowLongW")]

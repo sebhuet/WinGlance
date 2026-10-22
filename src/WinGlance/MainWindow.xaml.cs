@@ -46,8 +46,15 @@ public partial class MainWindow : Window
 
         Opacity = config.PanelOpacity;
 
-        // Auto-size to content
-        SizeToContent = SizeToContent.WidthAndHeight;
+        // "fit": the user sizes the panel and thumbnails follow; other layouts size to content
+        Width = Math.Min(config.PanelWidth, virtualScreen.Width);
+        Height = Math.Min(config.PanelHeight, virtualScreen.Height);
+        ApplySizingMode();
+        _viewModel.PreviewViewModel.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(PreviewViewModel.IsFitLayout))
+                ApplySizingMode();
+        };
 
         // System tray icon
         _trayIcon = new TaskbarIcon
@@ -129,6 +136,13 @@ public partial class MainWindow : Window
         {
             config.PanelX = Left;
             config.PanelY = Top;
+        }
+
+        // Only the "fit" layout has a user-chosen size; the others size to their content
+        if (_viewModel.PreviewViewModel.IsFitLayout && WindowState == WindowState.Normal && ActualWidth > 0)
+        {
+            config.PanelWidth = ActualWidth;
+            config.PanelHeight = ActualHeight;
         }
 
         try
@@ -225,9 +239,33 @@ public partial class MainWindow : Window
         if (index == 1)
             _viewModel.ApplicationsViewModel.Refresh();
 
-        // Force SizeToContent recalculation (WPF resets it to Manual after user resize)
-        SizeToContent = SizeToContent.Manual;
-        SizeToContent = SizeToContent.WidthAndHeight;
+        // Force SizeToContent recalculation (WPF resets it to Manual after user resize);
+        // the "fit" layout keeps the size the user chose
+        if (!_viewModel.PreviewViewModel.IsFitLayout)
+        {
+            SizeToContent = SizeToContent.Manual;
+            SizeToContent = SizeToContent.WidthAndHeight;
+        }
+    }
+
+    /// <summary>
+    /// "fit" layout: free panel size (thumbnails follow it). Other layouts: the panel sizes
+    /// itself to the thumbnails.
+    /// </summary>
+    private void ApplySizingMode()
+    {
+        if (_viewModel.PreviewViewModel.IsFitLayout)
+        {
+            SizeToContent = SizeToContent.Manual;
+            MinWidth = 320;
+            MinHeight = 220;
+        }
+        else
+        {
+            MinWidth = 0;
+            MinHeight = 0;
+            SizeToContent = SizeToContent.WidthAndHeight;
+        }
     }
 
     // ── Right-click context menu ──────────────────────────────────

@@ -8,7 +8,7 @@ namespace WinGlance.Models;
 internal sealed class AppConfig
 {
     public List<MonitoredAppConfig> MonitoredApps { get; set; } = [];
-    public string Layout { get; set; } = "horizontal";
+    public string Layout { get; set; } = "fit";
     public int ThumbnailWidth { get; set; } = 200;
     public int ThumbnailHeight { get; set; } = 150;
     public double PanelOpacity { get; set; } = 0.85;
@@ -16,6 +16,12 @@ internal sealed class AppConfig
     public bool RememberPosition { get; set; } = true;
     public double PanelX { get; set; } = 100;
     public double PanelY { get; set; } = 100;
+
+    /// <summary>Panel size in the "fit" layout, where the user sizes the panel freely.</summary>
+    public double PanelWidth { get; set; } = 900;
+
+    /// <summary>Panel height in the "fit" layout.</summary>
+    public double PanelHeight { get; set; } = 560;
     public bool AutoStart { get; set; }
     public bool CloseToTray { get; set; } = true;
     public string Hotkey { get; set; } = "Ctrl+Alt+G";

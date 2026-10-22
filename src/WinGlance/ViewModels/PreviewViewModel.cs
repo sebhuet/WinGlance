@@ -25,10 +25,16 @@ internal sealed class PreviewViewModel : ViewModelBase, IDisposable
     private int _isScanning;
     private int _isEvaluating;
 
+    /// <summary>Layout in which thumbnails grow with the panel, as large as possible.</summary>
+    public const string FitLayout = "fit";
+
     private ObservableCollection<TrackedWindow> _windows = [];
-    private string _layout = "horizontal";
+    private string _layout = FitLayout;
     private int _thumbnailWidth = 200;
     private int _thumbnailHeight = 150;
+    private double _displayThumbnailWidth = 200;
+    private double _displayThumbnailHeight = 150;
+    private System.Windows.Size _viewportSize = System.Windows.Size.Empty;
 
     public PreviewViewModel()
     {
@@ -83,26 +89,104 @@ internal sealed class PreviewViewModel : ViewModelBase, IDisposable
     public AgentMonitor? AgentMonitor { get; set; }
 
     /// <summary>
-    /// Layout mode: "horizontal", "vertical", or "grid".
+    /// Layout mode: "fit" (thumbnails follow the panel size), "horizontal", "vertical", or "grid".
     /// </summary>
     public string Layout
     {
         get => _layout;
-        set => SetProperty(ref _layout, value);
+        set
+        {
+            if (SetProperty(ref _layout, value))
+            {
+                OnPropertyChanged(nameof(IsFitLayout));
+                UpdateDisplaySize();
+            }
+        }
     }
 
-    /// <summary>Desired thumbnail width in device-independent pixels.</summary>
+    /// <summary>True in the "fit" layout, where the panel has a free size.</summary>
+    public bool IsFitLayout => string.Equals(_layout, FitLayout, StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>Configured thumbnail width (Settings), used by the fixed-size layouts.</summary>
     public int ThumbnailWidth
     {
         get => _thumbnailWidth;
-        set => SetProperty(ref _thumbnailWidth, value);
+        set
+        {
+            if (SetProperty(ref _thumbnailWidth, value))
+                UpdateDisplaySize();
+        }
     }
 
-    /// <summary>Desired thumbnail height in device-independent pixels.</summary>
+    /// <summary>Configured thumbnail height (Settings), used by the fixed-size layouts.</summary>
     public int ThumbnailHeight
     {
         get => _thumbnailHeight;
-        set => SetProperty(ref _thumbnailHeight, value);
+        set
+        {
+            if (SetProperty(ref _thumbnailHeight, value))
+                UpdateDisplaySize();
+        }
+    }
+
+    /// <summary>
+    /// Width at which thumbnails are drawn: computed from the panel size in the "fit" layout,
+    /// <see cref="ThumbnailWidth"/> otherwise.
+    /// </summary>
+    public double DisplayThumbnailWidth
+    {
+        get => _displayThumbnailWidth;
+        private set => SetProperty(ref _displayThumbnailWidth, value);
+    }
+
+    /// <summary>Height at which thumbnails are drawn (see <see cref="DisplayThumbnailWidth"/>).</summary>
+    public double DisplayThumbnailHeight
+    {
+        get => _displayThumbnailHeight;
+        private set => SetProperty(ref _displayThumbnailHeight, value);
+    }
+
+    /// <summary>
+    /// Size of the Preview area, reported by the view when it changes: the "fit" layout
+    /// recomputes the thumbnail size from it.
+    /// </summary>
+    public void SetViewportSize(System.Windows.Size size)
+    {
+        lock (_lock)
+            _viewportSize = size;
+        UpdateDisplaySize();
+    }
+
+    /// <summary>
+    /// Recomputes <see cref="DisplayThumbnailWidth"/>/<see cref="DisplayThumbnailHeight"/>.
+    /// Called when the panel is resized, the layout or configured size changes, and after
+    /// every scan (windows opened, closed or resized). Safe from any thread.
+    /// </summary>
+    internal void UpdateDisplaySize()
+    {
+        if (!IsFitLayout)
+        {
+            DisplayThumbnailWidth = _thumbnailWidth;
+            DisplayThumbnailHeight = _thumbnailHeight;
+            return;
+        }
+
+        System.Windows.Size viewport;
+        List<int> groupSizes;
+        double aspectRatio;
+        lock (_lock)
+        {
+            viewport = _viewportSize;
+            groupSizes = _windows.GroupBy(w => w.DisplayName).Select(g => g.Count()).ToList();
+            aspectRatio = ThumbnailLayoutCalculator.TypicalAspectRatio(_windows.Select(w => w.AspectRatio));
+        }
+
+        // Before the first layout pass or without windows, keep the current size
+        if (viewport.IsEmpty || ThumbnailLayoutCalculator.Fit(viewport, groupSizes, aspectRatio) is not { } size)
+            return;
+
+        DisplayThumbnailWidth = size.Width;
+        DisplayThumbnailHeight = size.Height;
     }
 
     /// <summary>
@@ -332,6 +416,9 @@ internal sealed class PreviewViewModel : ViewModelBase, IDisposable
                 {
                     // Update mutable properties
                     existing.Title = scannedWindow.Title;
+                    // A minimized window reports no ratio: keep the last known one
+                    if (scannedWindow.AspectRatio > 0)
+                        existing.AspectRatio = scannedWindow.AspectRatio;
                     existing.IsActive = scannedWindow.IsActive;
                     existing.IsHung = scannedWindow.IsHung;
                     existing.IsModalBlocked = scannedWindow.IsModalBlocked;
@@ -364,5 +451,8 @@ internal sealed class PreviewViewModel : ViewModelBase, IDisposable
                 }
             }
         }
+
+        // Windows opened, closed or resized change the best "fit" size
+        UpdateDisplaySize();
     }
 }

@@ -415,9 +415,18 @@ An audit of the code against the specification (October 2026) found bugs in ever
 ### Not done (specification gaps, not bugs)
 
 - Hotkey **Record** button; pulsating attention border; per-thumbnail app icon
-- Thumbnails scaling with the panel size; saved panel size
 - `IsStale` indicator; text-only fallback for models without vision
 - Single-file size (166 MB vs. 30–60 MB in NFR-1): trimming or compression not enabled
+
+---
+
+## Phase 20 — Fit to Panel Layout ✅
+
+- [x] **20.1** `Services/ThumbnailLayoutCalculator.cs`: largest thumbnail size at which all groups fit (binary search over the view's wrap layout)
+- [x] **20.2** "fit" layout (default): thumbnails follow the panel size; median client-area aspect ratio; panel size saved
+- [x] **20.3** Vertical scrollbar width kept free, so that a scrollbar shown during a layout pass cannot lock in an extra row
+- [x] **20.4** Idle Claude sessions with background commands shown as working ("N background tasks")
+- [x] **20.5** Tests: calculator maximality, offscreen rendering of the view without overflow
 
 ---
 
@@ -445,3 +454,4 @@ An audit of the code against the specification (October 2026) found bugs in ever
 | 17    | Polish & Final Touches ✅        | All        |
 | 18    | Coding Agent Detection ✅        | 3, 4, 15   |
 | 19    | Bug Fixes from the Audit ✅      | All        |
+| 20    | Fit to Panel Layout ✅           | 4, 19      |

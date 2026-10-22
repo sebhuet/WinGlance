@@ -53,10 +53,10 @@ public class PreviewViewModelTests
     // ── Layout property ──────────────────────────────────────────────────
 
     [Fact]
-    public void Layout_DefaultsToHorizontal()
+    public void Layout_DefaultsToFit()
     {
         using var vm = new PreviewViewModel();
-        Assert.Equal("horizontal", vm.Layout);
+        Assert.Equal("fit", vm.Layout);
     }
 
     [Fact]
@@ -82,7 +82,7 @@ public class PreviewViewModelTests
         var raised = false;
         vm.PropertyChanged += (_, _) => raised = true;
 
-        vm.Layout = "horizontal"; // same as default
+        vm.Layout = "fit"; // same as default
 
         Assert.False(raised);
     }
@@ -312,6 +312,70 @@ public class PreviewViewModelTests
 
         vm.Stop();
         Assert.False(vm.IsPolling);
+    }
+
+    // ── Fit layout ───────────────────────────────────────────────────────
+
+    private static PreviewViewModel FitViewModel(int windows)
+    {
+        var vm = new PreviewViewModel { Layout = PreviewViewModel.FitLayout };
+        for (var i = 0; i < windows; i++)
+            vm.Windows.Add(new TrackedWindow((IntPtr)(i + 1), "Code", "VS Code") { AspectRatio = 1.84 });
+        return vm;
+    }
+
+    [Fact]
+    public void FitLayout_ThumbnailsFollowThePanelSize()
+    {
+        using var vm = FitViewModel(5);
+
+        vm.SetViewportSize(new System.Windows.Size(900, 560));
+        var small = vm.DisplayThumbnailWidth;
+        vm.SetViewportSize(new System.Windows.Size(1800, 1120));
+
+        Assert.True(vm.DisplayThumbnailWidth > small * 1.8);
+        Assert.Equal(1.84, vm.DisplayThumbnailWidth / vm.DisplayThumbnailHeight, precision: 1);
+    }
+
+    [Fact]
+    public void FitLayout_IgnoresTheConfiguredSize()
+    {
+        using var vm = FitViewModel(1);
+        vm.SetViewportSize(new System.Windows.Size(900, 560));
+
+        vm.ThumbnailWidth = 120;
+
+        Assert.NotEqual(120, vm.DisplayThumbnailWidth);
+    }
+
+    [Theory]
+    [InlineData("horizontal")]
+    [InlineData("vertical")]
+    [InlineData("grid")]
+    public void FixedLayouts_UseTheConfiguredSize(string layout)
+    {
+        using var vm = FitViewModel(5);
+        vm.SetViewportSize(new System.Windows.Size(1800, 1120));
+        vm.ThumbnailWidth = 240;
+        vm.ThumbnailHeight = 130;
+
+        vm.Layout = layout;
+
+        Assert.Equal((240.0, 130.0), (vm.DisplayThumbnailWidth, vm.DisplayThumbnailHeight));
+        Assert.False(vm.IsFitLayout);
+    }
+
+    [Fact]
+    public void FitLayout_RaisesIsFitLayoutChanges()
+    {
+        using var vm = new PreviewViewModel { Layout = "grid" };
+        var raised = false;
+        vm.PropertyChanged += (_, e) => raised |= e.PropertyName == nameof(PreviewViewModel.IsFitLayout);
+
+        vm.Layout = PreviewViewModel.FitLayout;
+
+        Assert.True(raised);
+        Assert.True(vm.IsFitLayout);
     }
 
     [Fact]
