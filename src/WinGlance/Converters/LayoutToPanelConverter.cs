@@ -6,7 +6,7 @@ using System.Windows.Data;
 namespace WinGlance.Converters;
 
 /// <summary>
-/// Converts a layout string ("horizontal", "vertical", "grid") to the
+/// Converts a layout string ("fit", "horizontal", "vertical", "grid") to the
 /// appropriate ItemsPanelTemplate for the Preview tab.
 /// </summary>
 internal sealed class LayoutToPanelConverter : IValueConverter
@@ -16,11 +16,24 @@ internal sealed class LayoutToPanelConverter : IValueConverter
         var layout = value as string ?? "horizontal";
         var panel = layout.ToLowerInvariant() switch
         {
+            "fit" => CreateFitPanel(),
             "vertical" => CreateVerticalPanel(),
             "grid" => CreateGridPanel(),
             _ => CreateHorizontalPanel(),
         };
         return panel;
+    }
+
+    /// <summary>
+    /// Rows that wrap at the panel width, centered. The items are sized by the view model so
+    /// that the wrapped rows fill the panel without scrolling.
+    /// </summary>
+    private static ItemsPanelTemplate CreateFitPanel()
+    {
+        var factory = new System.Windows.FrameworkElementFactory(typeof(WrapPanel));
+        factory.SetValue(WrapPanel.OrientationProperty, Orientation.Horizontal);
+        factory.SetValue(System.Windows.FrameworkElement.HorizontalAlignmentProperty, System.Windows.HorizontalAlignment.Center);
+        return new ItemsPanelTemplate(factory);
     }
 
     public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)

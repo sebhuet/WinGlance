@@ -12,12 +12,12 @@
         <converters:LayoutRadioConverter x:Key="LayoutRadioConverter" />
 
         <Style TargetType="TextBlock" x:Key="Label">
-            <Setter Property="Foreground" Value="#FFCCCCCC" />
+            <Setter Property="Foreground" Value="{DynamicResource PrimaryText}" />
             <Setter Property="FontSize" Value="12" />
             <Setter Property="VerticalAlignment" Value="Center" />
         </Style>
         <Style TargetType="TextBlock" x:Key="SectionHeader">
-            <Setter Property="Foreground" Value="#FFDDDDDD" />
+            <Setter Property="Foreground" Value="{DynamicResource HeaderText}" />
             <Setter Property="FontSize" Value="13" />
             <Setter Property="FontWeight" Value="SemiBold" />
             <Setter Property="Margin" Value="0,12,0,6" />
@@ -32,20 +32,36 @@
             <!-- ── Layout ─────────────────────────────────── -->
             <TextBlock Text="Layout" Style="{StaticResource SectionHeader}" />
             <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                <RadioButton Content="Fit to panel" GroupName="Layout"
+                             Foreground="{DynamicResource PrimaryText}" Margin="0,0,16,0"
+                             IsChecked="{Binding Layout, Converter={StaticResource LayoutRadioConverter}, ConverterParameter=fit}" />
                 <RadioButton Content="Horizontal" GroupName="Layout"
-                             Foreground="#FFCCCCCC" Margin="0,0,16,0"
+                             Foreground="{DynamicResource PrimaryText}" Margin="0,0,16,0"
                              IsChecked="{Binding Layout, Converter={StaticResource LayoutRadioConverter}, ConverterParameter=horizontal}" />
                 <RadioButton Content="Vertical" GroupName="Layout"
-                             Foreground="#FFCCCCCC" Margin="0,0,16,0"
+                             Foreground="{DynamicResource PrimaryText}" Margin="0,0,16,0"
                              IsChecked="{Binding Layout, Converter={StaticResource LayoutRadioConverter}, ConverterParameter=vertical}" />
                 <RadioButton Content="Grid" GroupName="Layout"
-                             Foreground="#FFCCCCCC"
+                             Foreground="{DynamicResource PrimaryText}"
                              IsChecked="{Binding Layout, Converter={StaticResource LayoutRadioConverter}, ConverterParameter=grid}" />
             </StackPanel>
 
             <!-- ── Thumbnail Size ─────────────────────────── -->
             <TextBlock Text="Thumbnail Size" Style="{StaticResource SectionHeader}" />
+            <TextBlock Text="In Fit to panel, thumbnails take the largest size the panel allows: resize the panel to resize them."
+                       Foreground="{DynamicResource DimText}" FontSize="11" TextWrapping="Wrap" Margin="0,0,0,4"
+                       Visibility="{Binding IsFitLayout, Converter={StaticResource BoolToVisibility}}" />
             <Grid Margin="0,0,0,4">
+                <Grid.Style>
+                    <Style TargetType="Grid">
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding IsFitLayout}" Value="True">
+                                <Setter Property="IsEnabled" Value="False" />
+                                <Setter Property="Opacity" Value="0.5" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Grid.Style>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="60" />
                     <ColumnDefinition Width="*" />
@@ -111,26 +127,50 @@
             <TextBlock Text="General" Style="{StaticResource SectionHeader}" />
             <CheckBox Content="Remember window position"
                       IsChecked="{Binding RememberPosition}"
-                      Foreground="#FFCCCCCC" Margin="0,2" />
+                      Foreground="{DynamicResource PrimaryText}" Margin="0,2" />
             <CheckBox Content="Close to system tray"
                       IsChecked="{Binding CloseToTray}"
-                      Foreground="#FFCCCCCC" Margin="0,2" />
+                      Foreground="{DynamicResource PrimaryText}" Margin="0,2" />
             <CheckBox Content="Start with Windows"
                       IsChecked="{Binding AutoStart}"
-                      Foreground="#FFCCCCCC" Margin="0,2" />
+                      Foreground="{DynamicResource PrimaryText}" Margin="0,2" />
+            <CheckBox Content="Outline the window with a blinking frame after switching to it"
+                      IsChecked="{Binding HighlightOnSwitch}"
+                      Foreground="{DynamicResource PrimaryText}" Margin="0,2" />
 
             <!-- ── Hotkey ─────────────────────────────────── -->
             <TextBlock Text="Global Hotkey" Style="{StaticResource SectionHeader}" />
             <TextBox Text="{Binding Hotkey, UpdateSourceTrigger=PropertyChanged}"
-                     Background="#FF2A2A2A" Foreground="#FFCCCCCC"
-                     BorderBrush="#FF555555" Padding="4,3"
+                     Background="{DynamicResource InputBackground}" Foreground="{DynamicResource PrimaryText}"
+                     BorderBrush="{DynamicResource InputBorder}" Padding="4,3"
                      Width="180" HorizontalAlignment="Left" />
+            <TextBlock Text="{Binding HotkeyStatus}"
+                       Foreground="{DynamicResource ErrorText}"
+                       FontSize="11"
+                       TextWrapping="Wrap"
+                       Margin="0,4,0,0">
+                <TextBlock.Style>
+                    <Style TargetType="TextBlock">
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding HotkeyStatus}" Value="">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </TextBlock.Style>
+            </TextBlock>
+
+            <!-- ── Coding Agents ──────────────────────────── -->
+            <TextBlock Text="Coding Agents" Style="{StaticResource SectionHeader}" />
+            <CheckBox Content="Show Claude Code / OpenCode status on thumbnails"
+                      IsChecked="{Binding AgentDetectionEnabled}"
+                      Foreground="{DynamicResource PrimaryText}" Margin="0,2" />
 
             <!-- ── LLM Analysis ───────────────────────────── -->
             <TextBlock Text="LLM Analysis" Style="{StaticResource SectionHeader}" />
             <CheckBox Content="Enable LLM analysis"
                       IsChecked="{Binding LlmEnabled}"
-                      Foreground="#FFCCCCCC" Margin="0,2,0,6" />
+                      Foreground="{DynamicResource PrimaryText}" Margin="0,2,0,6" />
 
             <StackPanel Visibility="{Binding LlmEnabled, Converter={StaticResource BoolToVisibility}}"
                         Margin="16,0,0,0">
@@ -151,7 +191,7 @@
                     <ComboBox Grid.Row="0" Grid.Column="1"
                               SelectedValue="{Binding LlmProvider}"
                               SelectedValuePath="Content"
-                              Background="#FF2A2A2A" Foreground="#FFCCCCCC"
+                              Background="{DynamicResource InputBackground}" Foreground="{DynamicResource PrimaryText}"
                               Margin="0,2">
                         <ComboBoxItem Content="openai" />
                         <ComboBoxItem Content="google" />
@@ -161,20 +201,21 @@
                     <TextBlock Grid.Row="1" Grid.Column="0" Text="Endpoint" Style="{StaticResource Label}" Margin="0,3" />
                     <TextBox Grid.Row="1" Grid.Column="1"
                              Text="{Binding LlmEndpoint, UpdateSourceTrigger=PropertyChanged}"
-                             Background="#FF2A2A2A" Foreground="#FFCCCCCC"
-                             BorderBrush="#FF555555" Padding="4,3" Margin="0,2" />
+                             Background="{DynamicResource InputBackground}" Foreground="{DynamicResource PrimaryText}"
+                             BorderBrush="{DynamicResource InputBorder}" Padding="4,3" Margin="0,2" />
 
                     <TextBlock Grid.Row="2" Grid.Column="0" Text="API Key" Style="{StaticResource Label}" Margin="0,3" />
-                    <TextBox Grid.Row="2" Grid.Column="1"
-                             Text="{Binding LlmApiKey, UpdateSourceTrigger=PropertyChanged}"
-                             Background="#FF2A2A2A" Foreground="#FFCCCCCC"
-                             BorderBrush="#FF555555" Padding="4,3" Margin="0,2" />
+                    <!-- PasswordBox.Password cannot be bound: synced in code-behind -->
+                    <PasswordBox x:Name="ApiKeyBox" Grid.Row="2" Grid.Column="1"
+                                 PasswordChanged="ApiKeyBox_PasswordChanged"
+                                 Background="{DynamicResource InputBackground}" Foreground="{DynamicResource PrimaryText}"
+                                 BorderBrush="{DynamicResource InputBorder}" Padding="4,3" Margin="0,2" />
 
                     <TextBlock Grid.Row="3" Grid.Column="0" Text="Model" Style="{StaticResource Label}" Margin="0,3" />
                     <TextBox Grid.Row="3" Grid.Column="1"
                              Text="{Binding LlmModel, UpdateSourceTrigger=PropertyChanged}"
-                             Background="#FF2A2A2A" Foreground="#FFCCCCCC"
-                             BorderBrush="#FF555555" Padding="4,3" Margin="0,2" />
+                             Background="{DynamicResource InputBackground}" Foreground="{DynamicResource PrimaryText}"
+                             BorderBrush="{DynamicResource InputBorder}" Padding="4,3" Margin="0,2" />
 
                     <TextBlock Grid.Row="4" Grid.Column="0" Text="Stale (s)" Style="{StaticResource Label}" Margin="0,3" />
                     <StackPanel Grid.Row="4" Grid.Column="1" Orientation="Horizontal" Margin="0,2">
@@ -191,8 +232,8 @@
                         Command="{Binding EditPromptCommand}"
                         Padding="10,3" Margin="0,4,0,0"
                         HorizontalAlignment="Left"
-                        Background="#FF3A3A3A" Foreground="#FFCCCCCC"
-                        BorderBrush="#FF555555" BorderThickness="1"
+                        Background="{DynamicResource ButtonBackground}" Foreground="{DynamicResource PrimaryText}"
+                        BorderBrush="{DynamicResource InputBorder}" BorderThickness="1"
                         Cursor="Hand" />
             </StackPanel>
 
@@ -203,9 +244,9 @@
                     Margin="0,16,0,4"
                     Padding="14,5"
                     FontSize="12"
-                    Background="#FF3A3A3A"
-                    Foreground="#FFCCCCCC"
-                    BorderBrush="#FF555555"
+                    Background="{DynamicResource ButtonBackground}"
+                    Foreground="{DynamicResource PrimaryText}"
+                    BorderBrush="{DynamicResource InputBorder}"
                     BorderThickness="1"
                     Cursor="Hand" />
 

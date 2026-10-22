@@ -23,11 +23,11 @@
                        Margin="0,0,6,0"
                        VerticalAlignment="Center" />
                 <TextBlock Text="{Binding Name}"
-                           Foreground="#FFCCCCCC"
+                           Foreground="{DynamicResource PrimaryText}"
                            FontWeight="SemiBold"
                            FontSize="12"
                            VerticalAlignment="Center" />
-                <TextBlock Foreground="#FF888888"
+                <TextBlock Foreground="{DynamicResource DimText}"
                            FontSize="11"
                            VerticalAlignment="Center"
                            Margin="6,0,0,0">
@@ -37,9 +37,21 @@
         </DataTemplate>
     </UserControl.Resources>
 
-    <ScrollViewer VerticalScrollBarVisibility="Auto"
-                  HorizontalScrollBarVisibility="Auto"
+    <!-- In the "fit" layout rows wrap at the panel width instead of scrolling sideways;
+         the view model sizes the thumbnails from this scroll viewer's size (code-behind) -->
+    <ScrollViewer x:Name="Scroller"
+                  VerticalScrollBarVisibility="Auto"
                   Background="Transparent">
+        <ScrollViewer.Style>
+            <Style TargetType="ScrollViewer">
+                <Setter Property="HorizontalScrollBarVisibility" Value="Auto" />
+                <Style.Triggers>
+                    <DataTrigger Binding="{Binding IsFitLayout}" Value="True">
+                        <Setter Property="HorizontalScrollBarVisibility" Value="Disabled" />
+                    </DataTrigger>
+                </Style.Triggers>
+            </Style>
+        </ScrollViewer.Style>
         <ItemsControl ItemsSource="{Binding GroupedWindows}"
                       ItemsPanel="{Binding Layout, Converter={StaticResource LayoutToPanelConverter}}">
 
@@ -55,17 +67,19 @@
                             Padding="2"
                             CornerRadius="4"
                             BorderThickness="2"
-                            Background="#33000000"
+                            Background="{DynamicResource ItemBackground}"
                             ToolTip="{Binding Title}"
                             Cursor="Hand"
                             Opacity="{Binding LlmVerdict, Converter={StaticResource LlmVerdictToOpacity}}">
-                        <!-- Multi-value border: IsActive, IsFlashing, IsHung, IsModalBlocked -->
+                        <!-- Multi-value border: IsActive, IsFlashing, IsHung, IsModalBlocked, NeedsAgentAttention, LlmVerdict -->
                         <Border.BorderBrush>
                             <MultiBinding Converter="{StaticResource StateBorderConverter}">
                                 <Binding Path="IsActive" />
                                 <Binding Path="IsFlashing" />
                                 <Binding Path="IsHung" />
                                 <Binding Path="IsModalBlocked" />
+                                <Binding Path="NeedsAgentAttention" />
+                                <Binding Path="LlmVerdict" />
                             </MultiBinding>
                         </Border.BorderBrush>
                         <Border.InputBindings>
@@ -73,61 +87,109 @@
                                           Command="{Binding DataContext.ActivateWindowCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                           CommandParameter="{Binding}" />
                         </Border.InputBindings>
-                        <Grid>
-                            <StackPanel>
-                                <!-- DWM thumbnail area -->
-                                <controls:ThumbnailControl
-                                    SourceHwnd="{Binding Hwnd}"
-                                    ThumbnailManager="{Binding DataContext.ThumbnailManager, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                    Width="{Binding DataContext.ThumbnailWidth, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                    Height="{Binding DataContext.ThumbnailHeight, RelativeSource={RelativeSource AncestorType=UserControl}}" />
+                        <StackPanel>
+                            <!-- DWM thumbnail area. WPF opacity does not reach the DWM image, hence ThumbnailOpacity -->
+                            <controls:ThumbnailControl
+                                SourceHwnd="{Binding Hwnd}"
+                                ThumbnailManager="{Binding DataContext.ThumbnailManager, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                ThumbnailOpacity="{Binding LlmVerdict, Converter={StaticResource LlmVerdictToOpacity}}"
+                                Width="{Binding DataContext.DisplayThumbnailWidth, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                Height="{Binding DataContext.DisplayThumbnailHeight, RelativeSource={RelativeSource AncestorType=UserControl}}" />
+
+                            <!-- Badges + window title. Badges sit below the thumbnail because DWM draws
+                                 thumbnails above WPF content, and the row height is fixed: a badge
+                                 appearing must not shift the thumbnails that follow. The whole row
+                                 is scaled with the thumbnail (StatusRowScale), text included. -->
+                            <DockPanel Height="20"
+                                       LastChildFill="True"
+                                       HorizontalAlignment="Left"
+                                       Width="{Binding DataContext.StatusRowWidth, RelativeSource={RelativeSource AncestorType=UserControl}}">
+                                <DockPanel.LayoutTransform>
+                                    <ScaleTransform ScaleX="{Binding DataContext.StatusRowScale, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                    ScaleY="{Binding DataContext.StatusRowScale, RelativeSource={RelativeSource AncestorType=UserControl}}" />
+                                </DockPanel.LayoutTransform>
+                                <!-- Coding agent badge (Claude Code / OpenCode) -->
+                                <Border DockPanel.Dock="Left"
+                                        CornerRadius="3"
+                                        Margin="2,2,0,2"
+                                        Padding="5,0"
+                                        VerticalAlignment="Center"
+                                        ToolTip="{Binding Agent.Details}">
+                                    <Border.Style>
+                                        <Style TargetType="Border">
+                                            <Setter Property="Background" Value="#CC555555" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding Agent}" Value="{x:Null}">
+                                                    <Setter Property="Visibility" Value="Collapsed" />
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding Agent.Status}" Value="Busy">
+                                                    <Setter Property="Background" Value="#CC0078D7" />
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding Agent.Status}" Value="Waiting">
+                                                    <Setter Property="Background" Value="#CCFF8C00" />
+                                                </DataTrigger>
+                                                <!-- Idle: the agent finished and waits for the next prompt, it needs you too -->
+                                                <DataTrigger Binding="{Binding Agent.Status}" Value="Idle">
+                                                    <Setter Property="Background" Value="#CCFF8C00" />
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding Agent.Status}" Value="Running">
+                                                    <Setter Property="Background" Value="#CC00897B" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Border.Style>
+                                    <TextBlock Text="{Binding Agent.Text}"
+                                               Foreground="White"
+                                               FontSize="10"
+                                               FontWeight="Bold" />
+                                </Border>
+
+                                <!-- Not Responding badge -->
+                                <Border DockPanel.Dock="Left"
+                                        Background="#CCE81123"
+                                        CornerRadius="3"
+                                        Margin="2,2,0,2"
+                                        Padding="5,0"
+                                        VerticalAlignment="Center"
+                                        Visibility="{Binding IsHung, Converter={StaticResource BoolToVisibility}}">
+                                    <TextBlock Text="Not Responding"
+                                               Foreground="White"
+                                               FontSize="10"
+                                               FontWeight="Bold" />
+                                </Border>
+
+                                <!-- Awaiting Action badge (LLM verdict) -->
+                                <Border DockPanel.Dock="Left"
+                                        Background="#CCFF8C00"
+                                        CornerRadius="3"
+                                        Margin="2,2,0,2"
+                                        Padding="5,0"
+                                        VerticalAlignment="Center">
+                                    <Border.Style>
+                                        <Style TargetType="Border">
+                                            <Setter Property="Visibility" Value="Collapsed" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding LlmVerdict}" Value="awaiting_action">
+                                                    <Setter Property="Visibility" Value="Visible" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Border.Style>
+                                    <TextBlock Text="Awaiting Action"
+                                               Foreground="White"
+                                               FontSize="10"
+                                               FontWeight="Bold" />
+                                </Border>
 
                                 <!-- Window title -->
                                 <TextBlock Text="{Binding Title}"
-                                           Foreground="#FFAAAAAA"
+                                           Foreground="{DynamicResource SecondaryText}"
                                            FontSize="11"
                                            Margin="4,2,4,2"
-                                           TextTrimming="CharacterEllipsis"
-                                           MaxWidth="{Binding DataContext.ThumbnailWidth, RelativeSource={RelativeSource AncestorType=UserControl}}" />
-                            </StackPanel>
-
-                            <!-- Not Responding overlay -->
-                            <Border Background="#88FF0000"
-                                    CornerRadius="3"
-                                    Visibility="{Binding IsHung, Converter={StaticResource BoolToVisibility}}"
-                                    VerticalAlignment="Top"
-                                    HorizontalAlignment="Center"
-                                    Margin="0,4,0,0"
-                                    Padding="6,2">
-                                <TextBlock Text="Not Responding"
-                                           Foreground="White"
-                                           FontSize="10"
-                                           FontWeight="Bold" />
-                            </Border>
-
-                            <!-- Awaiting Action overlay (LLM verdict) -->
-                            <Border Background="#CCFFA500"
-                                    CornerRadius="3"
-                                    VerticalAlignment="Bottom"
-                                    HorizontalAlignment="Center"
-                                    Margin="0,0,0,20"
-                                    Padding="6,2">
-                                <Border.Style>
-                                    <Style TargetType="Border">
-                                        <Setter Property="Visibility" Value="Collapsed" />
-                                        <Style.Triggers>
-                                            <DataTrigger Binding="{Binding LlmVerdict}" Value="awaiting_action">
-                                                <Setter Property="Visibility" Value="Visible" />
-                                            </DataTrigger>
-                                        </Style.Triggers>
-                                    </Style>
-                                </Border.Style>
-                                <TextBlock Text="Awaiting Action"
-                                           Foreground="White"
-                                           FontSize="10"
-                                           FontWeight="Bold" />
-                            </Border>
-                        </Grid>
+                                           VerticalAlignment="Center"
+                                           TextTrimming="CharacterEllipsis" />
+                            </DockPanel>
+                        </StackPanel>
                     </Border>
                 </DataTemplate>
             </ItemsControl.ItemTemplate>

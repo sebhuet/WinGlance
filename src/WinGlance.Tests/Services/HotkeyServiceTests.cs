@@ -23,6 +23,12 @@ public class HotkeyServiceTests
     [InlineData("   ")]
     [InlineData("Ctrl+")]
     [InlineData("Ctrl+Unknown+G")]
+    [InlineData("G")] // no modifier: would capture the key system-wide
+    [InlineData("F5")]
+    [InlineData("Ctrl+65")] // Enum.TryParse accepts numbers
+    [InlineData("Ctrl+999")]
+    [InlineData("Ctrl+A,B")] // ...and comma-separated flags
+    [InlineData("Ctrl+Shift")] // modifiers only
     public void TryParseHotkey_InvalidInput_ReturnsFalse(string input)
     {
         var result = HotkeyService.TryParseHotkey(input, out _, out _);
@@ -76,5 +82,24 @@ public class HotkeyServiceTests
 
         Assert.True(result);
         Assert.Equal(0x0008u, modifiers); // MOD_WIN
+    }
+
+    [Theory]
+    [InlineData("Ctrl+Space", 0x20u)]
+    [InlineData("Win+F12", 0x7Bu)]
+    [InlineData("Alt+Home", 0x24u)]
+    public void TryParseHotkey_NamedKeys_AreAccepted(string input, uint expectedVk)
+    {
+        Assert.True(HotkeyService.TryParseHotkey(input, out _, out var vk));
+        Assert.Equal(expectedVk, vk);
+    }
+
+    [Fact]
+    public void Register_InvalidString_KeepsNothingRegistered()
+    {
+        using var service = new HotkeyService();
+
+        Assert.False(service.Register("G"));
+        Assert.False(service.IsRegistered);
     }
 }

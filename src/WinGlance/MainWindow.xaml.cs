@@ -1,10 +1,13 @@
 using System.Drawing;
+using System.IO;
 using System.Windows;
+using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media.Animation;
 using Hardcodet.Wpf.TaskbarNotification;
 using WinGlance.Models;
+using WinGlance.NativeApi;
 using WinGlance.Services;
 using WinGlance.ViewModels;
 
@@ -16,6 +19,9 @@ public partial class MainWindow : Window
     private readonly TaskbarIcon _trayIcon;
     private readonly HotkeyService _hotkeyService = new();
     private readonly AttentionDetector _attentionDetector = new();
+    private readonly WindowHighlighter _windowHighlighter = new();
+    private readonly uint _showPanelMessage = NativeMethods.RegisterWindowMessage(App.ShowPanelMessageName);
+    private HwndSource? _hwndSource;
     private bool _isExiting;
 
     internal MainWindow(ConfigService configService, AppConfig config)
@@ -24,22 +30,38 @@ public partial class MainWindow : Window
         _viewModel = new MainViewModel(configService, config, opacity => Opacity = opacity);
         DataContext = _viewModel;
 
-        // Restore saved panel position
-        if (config.RememberPosition)
+        // Restore the saved position only if the title bar would be reachable: the monitor it
+        // was on may have been disconnected since
+        var virtualScreen = new Rect(
+            SystemParameters.VirtualScreenLeft, SystemParameters.VirtualScreenTop,
+            SystemParameters.VirtualScreenWidth, SystemParameters.VirtualScreenHeight);
+        if (MainViewModel.GetRestorablePosition(config, virtualScreen) is { } position)
         {
-            Left = config.PanelX;
-            Top = config.PanelY;
+            WindowStartupLocation = WindowStartupLocation.Manual;
+            Left = position.X;
+            Top = position.Y;
+        }
+        else
+        {
+            WindowStartupLocation = WindowStartupLocation.CenterScreen;
         }
 
         Opacity = config.PanelOpacity;
 
-        // Auto-size to content
-        SizeToContent = SizeToContent.WidthAndHeight;
+        // "fit": the user sizes the panel and thumbnails follow; other layouts size to content
+        Width = Math.Min(config.PanelWidth, virtualScreen.Width);
+        Height = Math.Min(config.PanelHeight, virtualScreen.Height);
+        ApplySizingMode();
+        _viewModel.PreviewViewModel.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(PreviewViewModel.IsFitLayout))
+                ApplySizingMode();
+        };
 
         // System tray icon
         _trayIcon = new TaskbarIcon
         {
-            Icon = SystemIcons.Application,
+            Icon = LoadApplicationIcon(),
             ToolTipText = "WinGlance",
             ContextMenu = CreateTrayContextMenu(),
         };
@@ -47,6 +69,12 @@ public partial class MainWindow : Window
 
         Loaded += OnLoaded;
         Closing += OnClosing;
+        StateChanged += OnStateChanged;
+        KeyDown += OnKeyDown;
+
+        // Options panel: under the title bar, right-aligned with the panel, so it stays inside it
+        OptionsPopup.CustomPopupPlacementCallback = (popupSize, titleBarSize, _) =>
+            [new CustomPopupPlacement(new System.Windows.Point(titleBarSize.Width - popupSize.Width - 4, titleBarSize.Height), PopupPrimaryAxis.Horizontal)];
     }
 
     private void OnLoaded(object sender, RoutedEventArgs e)
@@ -55,41 +83,48 @@ public partial class MainWindow : Window
         _viewModel.PreviewViewModel.SetDestinationHwnd(hwnd);
         _viewModel.PreviewViewModel.Start();
 
-        // Register global hotkey
+        // A second instance broadcasts _showPanelMessage instead of starting
+        _hwndSource = HwndSource.FromHwnd(hwnd);
+        _hwndSource?.AddHook(WndProc);
+
+        // Register global hotkey; Settings re-registers it on Save
         _hotkeyService.Initialize(hwnd);
         _hotkeyService.HotkeyPressed += (_, _) => TogglePanel();
-        _hotkeyService.Register(_viewModel.Config.Hotkey);
+        _viewModel.SettingsViewModel.ApplyHotkey = _hotkeyService.Register;
+        var hotkeyRegistered = _hotkeyService.Register(_viewModel.Config.Hotkey);
+        if (!hotkeyRegistered)
+            Log.Warning($"Global hotkey '{_viewModel.Config.Hotkey}' could not be registered");
+        _viewModel.SettingsViewModel.ReportHotkeyResult(hotkeyRegistered);
 
         // Attention detection (shell hook for flashing)
         _attentionDetector.Initialize(hwnd);
         _viewModel.PreviewViewModel.AttentionDetector = _attentionDetector;
 
-        // LLM analysis service
-        if (_viewModel.Config.Llm.Enabled)
+        // Outline the window a thumbnail click switched to (the checkbox applies without saving)
+        _windowHighlighter.Prepare();
+        _viewModel.PreviewViewModel.WindowActivated = target =>
         {
-            var llmService = new LlmService(_viewModel.Config.Llm);
-            llmService.DebugLogger = _viewModel.PromptEditorViewModel;
-            _viewModel.PreviewViewModel.LlmService = llmService;
+            // A full-screen panel stays on top of the window just switched to: step aside
+            if (WindowState == WindowState.Maximized)
+                WindowState = WindowState.Normal;
 
-            // Wire "Run" button in Prompt Editor
-            _viewModel.PromptEditorViewModel.RunAnalysisFunc = async () =>
-            {
-                llmService.ReloadPrompt(_viewModel.PromptEditorViewModel.PromptText);
-                var windows = _viewModel.PreviewViewModel.Windows.ToArray();
-                if (windows.Length == 0)
-                {
-                    _viewModel.PromptEditorViewModel.AppendLog("—", "—", "No monitored windows found");
-                    return;
-                }
-                foreach (var w in windows)
-                {
-                    await llmService.ForceEvaluateAsync(w);
-                }
-            };
-        }
+            if (_viewModel.SettingsViewModel.HighlightOnSwitch)
+                _windowHighlighter.Flash(target);
+        };
 
         // Allow settings to navigate to prompt editor
         _viewModel.SettingsViewModel.NavigateToPromptEditor = () => SwitchToView(3);
+    }
+
+    private IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
+    {
+        if ((uint)msg == _showPanelMessage)
+        {
+            ShowPanel();
+            handled = true;
+        }
+
+        return IntPtr.Zero;
     }
 
     private void OnClosing(object? sender, System.ComponentModel.CancelEventArgs e)
@@ -101,19 +136,45 @@ public partial class MainWindow : Window
             return;
         }
 
-        // Persist panel position if configured
+        PersistState();
+        _viewModel.PreviewViewModel.Dispose();
+        _attentionDetector.Dispose();
+        _windowHighlighter.Dispose();
+        _hotkeyService.Dispose();
+        _hwndSource?.RemoveHook(WndProc);
+        _trayIcon.Dispose();
+    }
+
+    /// <summary>
+    /// Saves the panel position (if enabled) with the configuration. Called on exit, when the
+    /// panel is hidden to the tray and when Windows ends the session: WPF raises no Closing
+    /// event on logoff, and with close-to-tray the user may never pick Exit.
+    /// </summary>
+    internal void PersistState()
+    {
         var config = _viewModel.Config;
-        if (config.RememberPosition)
+        if (config.RememberPosition && WindowState == WindowState.Normal)
         {
             config.PanelX = Left;
             config.PanelY = Top;
         }
 
-        _viewModel.ConfigService.Save(config);
-        _viewModel.PreviewViewModel.Dispose();
-        _attentionDetector.Dispose();
-        _hotkeyService.Dispose();
-        _trayIcon.Dispose();
+        // Only the "fit" layout has a user-chosen size; the others size to their content
+        if (_viewModel.PreviewViewModel.IsFitLayout && WindowState == WindowState.Normal && ActualWidth > 0)
+        {
+            config.PanelWidth = ActualWidth;
+            config.PanelHeight = ActualHeight;
+        }
+
+        try
+        {
+            _viewModel.ConfigService.Save(config);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            // Must not prevent the cleanup that follows on exit
+            Log.Warning("Could not save the configuration", ex);
+        }
     }
 
     // ── Panel visibility ─────────────────────────────────────────────
@@ -131,14 +192,28 @@ public partial class MainWindow : Window
         Show();
         WindowState = WindowState.Normal;
         Activate();
-        var fadeIn = new DoubleAnimation(0, _viewModel.Config.PanelOpacity, TimeSpan.FromMilliseconds(150));
-        BeginAnimation(OpacityProperty, fadeIn);
+
+        // The live slider value, not the last saved one. FillBehavior.Stop hands the property
+        // back to its local value once the fade ends: a held animation would freeze the
+        // opacity and ignore the Settings slider from then on.
+        var opacity = _viewModel.SettingsViewModel.PanelOpacity;
+        Opacity = opacity;
+        BeginAnimation(OpacityProperty, new DoubleAnimation(0, opacity, TimeSpan.FromMilliseconds(150))
+        {
+            FillBehavior = FillBehavior.Stop,
+        });
     }
 
     private void HidePanel()
     {
-        var fadeOut = new DoubleAnimation(_viewModel.Config.PanelOpacity, 0, TimeSpan.FromMilliseconds(150));
-        fadeOut.Completed += (_, _) => Hide();
+        PersistState();
+
+        var fadeOut = new DoubleAnimation(Opacity, 0, TimeSpan.FromMilliseconds(150));
+        fadeOut.Completed += (_, _) =>
+        {
+            Hide();
+            BeginAnimation(OpacityProperty, null); // release the property for the next show
+        };
         BeginAnimation(OpacityProperty, fadeOut);
     }
 
@@ -146,6 +221,22 @@ public partial class MainWindow : Window
     {
         _isExiting = true;
         Close();
+    }
+
+    /// <summary>The executable's icon (Assets/icon.ico), or the generic one if unavailable.</summary>
+    private static Icon LoadApplicationIcon()
+    {
+        try
+        {
+            if (Environment.ProcessPath is { } exePath && System.Drawing.Icon.ExtractAssociatedIcon(exePath) is { } icon)
+                return icon;
+        }
+        catch (Exception ex) when (ex is ArgumentException or IOException)
+        {
+            Log.Warning("Could not load the application icon", ex);
+        }
+
+        return SystemIcons.Application;
     }
 
     // ── View switching ───────────────────────────────────────────
@@ -158,21 +249,44 @@ public partial class MainWindow : Window
         SettingsView.Visibility = index == 2 ? Visibility.Visible : Visibility.Collapsed;
         PromptEditorView.Visibility = index == 3 ? Visibility.Visible : Visibility.Collapsed;
 
-        // DWM thumbnails are rendered by the OS compositor and ignore WPF Visibility.
-        // We must unregister them when leaving Preview; they re-register on the next poll.
-        if (index == 0)
+        // DWM thumbnails are rendered by the OS compositor and ignore WPF Visibility:
+        // unregister them when leaving Preview; they re-register when it becomes visible.
+        // Polling keeps running so that attention, agent and LLM states stay current
+        // (the Prompt Editor's debug log shows live analyses).
+        if (index != 0)
+            _viewModel.PreviewViewModel.ThumbnailManager.UnregisterAll();
+
+        // The list is empty until scanned: scan whenever the view opens
+        if (index == 1)
+            _viewModel.ApplicationsViewModel.Refresh();
+
+        // Force SizeToContent recalculation (WPF resets it to Manual after user resize);
+        // the "fit" layout keeps the size the user chose
+        if (!_viewModel.PreviewViewModel.IsFitLayout)
         {
-            _viewModel.PreviewViewModel.Start();
+            SizeToContent = SizeToContent.Manual;
+            SizeToContent = SizeToContent.WidthAndHeight;
+        }
+    }
+
+    /// <summary>
+    /// "fit" layout: free panel size (thumbnails follow it). Other layouts: the panel sizes
+    /// itself to the thumbnails.
+    /// </summary>
+    private void ApplySizingMode()
+    {
+        if (_viewModel.PreviewViewModel.IsFitLayout)
+        {
+            SizeToContent = SizeToContent.Manual;
+            MinWidth = 320;
+            MinHeight = 220;
         }
         else
         {
-            _viewModel.PreviewViewModel.Stop();
-            _viewModel.PreviewViewModel.ThumbnailManager.UnregisterAll();
+            MinWidth = 0;
+            MinHeight = 0;
+            SizeToContent = SizeToContent.WidthAndHeight;
         }
-
-        // Force SizeToContent recalculation (WPF resets it to Manual after user resize)
-        SizeToContent = SizeToContent.Manual;
-        SizeToContent = SizeToContent.WidthAndHeight;
     }
 
     // ── Right-click context menu ──────────────────────────────────
@@ -238,15 +352,103 @@ public partial class MainWindow : Window
 
     private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
-        if (e.ClickCount == 1)
-        {
+        if (e.ClickCount == 2)
+            ToggleFullScreen(); // as a double-click on a standard title bar
+        else if (e.ClickCount == 1 && WindowState == WindowState.Normal)
             DragMove();
-        }
     }
 
     private void MinimizeButton_Click(object sender, RoutedEventArgs e)
     {
         WindowState = WindowState.Minimized;
+    }
+
+    // ── Options panel ────────────────────────────────────────────
+
+    private void OptionsButton_Click(object sender, RoutedEventArgs e)
+    {
+        OptionsPopup.IsOpen = !OptionsPopup.IsOpen;
+    }
+
+    private void OptionsPopup_Closed(object? sender, EventArgs e)
+    {
+        // Applied live while open; kept once the panel closes
+        try
+        {
+            _viewModel.SettingsViewModel.SavePanelOpacity();
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            Log.Warning("Could not save the panel opacity", ex);
+        }
+    }
+
+    private void AllSettingsButton_Click(object sender, RoutedEventArgs e)
+    {
+        OptionsPopup.IsOpen = false;
+        SwitchToView(2);
+    }
+
+    // ── Full screen ──────────────────────────────────────────────
+
+    private void FullScreenButton_Click(object sender, RoutedEventArgs e) => ToggleFullScreen();
+
+    /// <summary>
+    /// Full screen is the maximized state: a borderless window then covers its whole monitor,
+    /// and in the "fit" layout the thumbnails grow to fill it.
+    /// </summary>
+    private void ToggleFullScreen()
+    {
+        WindowState = WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized;
+    }
+
+    private void OnStateChanged(object? sender, EventArgs e)
+    {
+        var isFullScreen = WindowState == WindowState.Maximized;
+        FullScreenButton.Content = isFullScreen ? "❐" : "□";
+        FullScreenButton.ToolTip = isFullScreen ? "Exit full screen (F11, Esc)" : "Full screen (F11)";
+
+        // A maximized resizable window keeps its invisible resize frame, which overhangs the
+        // monitor (7 px at 100 %): pull the content back onto the screen
+        RootBorder.Margin = isFullScreen ? GetMonitorOverhang() : new Thickness(0);
+
+        // Maximizing turns SizeToContent off: the fixed-size layouts must get it back
+        if (WindowState == WindowState.Normal)
+            ApplySizingMode();
+    }
+
+    /// <summary>
+    /// How far the window extends past its monitor on each side, in device-independent pixels.
+    /// </summary>
+    private Thickness GetMonitorOverhang()
+    {
+        var hwnd = new WindowInteropHelper(this).Handle;
+        if (!NativeMethods.GetWindowRect(hwnd, out var window) || !NativeMethods.TryGetMonitorBounds(hwnd, out var monitor))
+            return new Thickness(0);
+
+        var dpi = System.Windows.Media.VisualTreeHelper.GetDpi(this);
+        return new Thickness(
+            Math.Max(0, monitor.Left - window.Left) / dpi.DpiScaleX,
+            Math.Max(0, monitor.Top - window.Top) / dpi.DpiScaleY,
+            Math.Max(0, window.Right - monitor.Right) / dpi.DpiScaleX,
+            Math.Max(0, window.Bottom - monitor.Bottom) / dpi.DpiScaleY);
+    }
+
+    private void BackButton_Click(object sender, RoutedEventArgs e) => SwitchToView(0);
+
+    private void OnKeyDown(object sender, KeyEventArgs e)
+    {
+        // Esc leaves the open view first, then full screen
+        if (e.Key == Key.Escape && _viewModel.IsSecondaryView)
+        {
+            SwitchToView(0);
+            e.Handled = true;
+        }
+        else if (e.Key == Key.F11 || (e.Key == Key.Escape && WindowState == WindowState.Maximized))
+        {
+            ToggleFullScreen();
+            e.Handled = true;
+        }
     }
 
     private void CloseButton_Click(object sender, RoutedEventArgs e)

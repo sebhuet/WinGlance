@@ -108,11 +108,18 @@ internal sealed class PromptEditorViewModel : ViewModelBase
             DebugLog.RemoveAt(0);
     }
 
+    /// <summary>
+    /// Called with the prompt after <see cref="Save"/>, so that the running LLM service uses it
+    /// from the next analysis on (the specification's hot-reload).
+    /// </summary>
+    public Action<string>? PromptSaved { get; set; }
+
     internal void Save()
     {
         _config.Llm.Prompt = PromptText;
         _config.Llm.DebugEnabled = IsDebugEnabled;
         _configService.Save(_config);
+        PromptSaved?.Invoke(PromptText);
     }
 
     private void ResetToDefault()
@@ -120,16 +127,18 @@ internal sealed class PromptEditorViewModel : ViewModelBase
         PromptText = LlmConfig.DefaultPrompt;
     }
 
-    private async Task RunAnalysis()
+    internal async Task RunAnalysis()
     {
+        // Auto-enable debug log so the user sees results, including the message below:
+        // AppendLog drops everything while the log is off
+        IsDebugEnabled = true;
+
         if (RunAnalysisFunc is null)
         {
             AppendLog("—", "—", "Enable LLM analysis in Settings first");
             return;
         }
 
-        // Auto-enable debug log so the user sees results
-        IsDebugEnabled = true;
         Save();
 
         IsRunning = true;

@@ -1,0 +1,12 @@
+# Markdown lint (markdownlint-cli2). Prettier formats the files; this checks their structure.
+config:
+  # Prose is not wrapped (Prettier proseWrap: preserve)
+  MD013: false
+  # The specification repeats tab names under different sections
+  MD024:
+    siblings_only: true
+  # GitHub issue and pull request templates start at level 2
+  MD041: false
+
+ignores:
+  - "node_modules/**"

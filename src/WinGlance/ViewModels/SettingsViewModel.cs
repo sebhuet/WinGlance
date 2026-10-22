@@ -14,6 +14,7 @@ internal sealed class SettingsViewModel : ViewModelBase
     private readonly AppConfig _config;
     private readonly PreviewViewModel _previewViewModel;
     private readonly Action<double>? _onOpacityChanged;
+    private readonly Action<bool> _applyAutoStart;
 
     private string _layout;
     private int _thumbnailWidth;
@@ -23,7 +24,10 @@ internal sealed class SettingsViewModel : ViewModelBase
     private bool _rememberPosition;
     private bool _autoStart;
     private bool _closeToTray;
+    private bool _highlightOnSwitch;
     private string _hotkey;
+    private string _hotkeyStatus = string.Empty;
+    private bool _agentDetectionEnabled;
 
     // LLM settings
     private bool _llmEnabled;
@@ -33,16 +37,22 @@ internal sealed class SettingsViewModel : ViewModelBase
     private string _llmModel;
     private int _llmStaleThresholdSeconds;
 
+    /// <param name="applyAutoStart">
+    /// Writes the "Start with Windows" registry entry; defaults to <see cref="AutoStartService.SetAutoStart"/>.
+    /// Tests replace it so that they never touch the user's Run key.
+    /// </param>
     public SettingsViewModel(
         ConfigService configService,
         AppConfig config,
         PreviewViewModel previewViewModel,
-        Action<double>? onOpacityChanged = null)
+        Action<double>? onOpacityChanged = null,
+        Action<bool>? applyAutoStart = null)
     {
         _configService = configService;
         _config = config;
         _previewViewModel = previewViewModel;
         _onOpacityChanged = onOpacityChanged;
+        _applyAutoStart = applyAutoStart ?? AutoStartService.SetAutoStart;
 
         // Initialize from config
         _layout = config.Layout;
@@ -53,7 +63,9 @@ internal sealed class SettingsViewModel : ViewModelBase
         _rememberPosition = config.RememberPosition;
         _autoStart = config.AutoStart;
         _closeToTray = config.CloseToTray;
+        _highlightOnSwitch = config.HighlightOnSwitch;
         _hotkey = config.Hotkey;
+        _agentDetectionEnabled = config.AgentDetection.Enabled;
 
         _llmEnabled = config.Llm.Enabled;
         _llmProvider = config.Llm.Provider;
@@ -74,9 +86,15 @@ internal sealed class SettingsViewModel : ViewModelBase
         set
         {
             if (SetProperty(ref _layout, value))
+            {
                 _previewViewModel.Layout = value;
+                OnPropertyChanged(nameof(IsFitLayout));
+            }
         }
     }
+
+    /// <summary>True in "Fit to panel", where the thumbnail size sliders do not apply.</summary>
+    public bool IsFitLayout => string.Equals(_layout, PreviewViewModel.FitLayout, StringComparison.OrdinalIgnoreCase);
 
     // ── Thumbnail size ──────────────────────────────────────────────────
 
@@ -108,8 +126,34 @@ internal sealed class SettingsViewModel : ViewModelBase
         set
         {
             if (SetProperty(ref _panelOpacity, value))
+            {
                 _onOpacityChanged?.Invoke(value);
+                OnPropertyChanged(nameof(PanelTransparency));
+            }
         }
+    }
+
+    /// <summary>
+    /// Transparency level in percent (0 = opaque, 70 = most transparent): the opacity seen
+    /// the other way round, as shown in the Options panel.
+    /// </summary>
+    public int PanelTransparency
+    {
+        get => (int)Math.Round((1 - _panelOpacity) * 100);
+        set => PanelOpacity = 1 - (Math.Clamp(value, 0, 70) / 100.0);
+    }
+
+    /// <summary>
+    /// Saves the panel opacity alone, without the other pending changes of the Settings view:
+    /// the Options panel applies its changes without a Save button.
+    /// </summary>
+    public void SavePanelOpacity()
+    {
+        if (_config.PanelOpacity == PanelOpacity)
+            return;
+
+        _config.PanelOpacity = PanelOpacity;
+        _configService.Save(_config);
     }
 
     // ── Polling interval ────────────────────────────────────────────────
@@ -144,10 +188,61 @@ internal sealed class SettingsViewModel : ViewModelBase
         set => SetProperty(ref _closeToTray, value);
     }
 
+    /// <summary>
+    /// Outlines the window switched to from a thumbnail with a blinking red frame.
+    /// Read live by MainWindow at each switch.
+    /// </summary>
+    public bool HighlightOnSwitch
+    {
+        get => _highlightOnSwitch;
+        set => SetProperty(ref _highlightOnSwitch, value);
+    }
+
     public string Hotkey
     {
         get => _hotkey;
         set => SetProperty(ref _hotkey, value);
+    }
+
+    /// <summary>Error shown under the hotkey field; empty while the hotkey is registered.</summary>
+    public string HotkeyStatus
+    {
+        get => _hotkeyStatus;
+        private set => SetProperty(ref _hotkeyStatus, value);
+    }
+
+    /// <summary>
+    /// Registers a hotkey string globally; returns false if it is invalid or taken.
+    /// Set by MainWindow, which owns the window the hotkey is bound to.
+    /// </summary>
+    public Func<string, bool>? ApplyHotkey { get; set; }
+
+    /// <summary>Updates <see cref="HotkeyStatus"/> after a registration attempt.</summary>
+    internal void ReportHotkeyResult(bool registered)
+    {
+        HotkeyStatus = registered
+            ? string.Empty
+            : "Not registered: use Modifier+Key (e.g. Ctrl+Alt+G). The combination may be used by another application.";
+    }
+
+    // ── Coding agents ──────────────────────────────────────────────────
+
+    /// <summary>
+    /// Shows Claude Code / OpenCode status on thumbnails. Applied live: turning it off
+    /// removes the monitor, and the next poll clears every badge.
+    /// </summary>
+    public bool AgentDetectionEnabled
+    {
+        get => _agentDetectionEnabled;
+        set
+        {
+            if (SetProperty(ref _agentDetectionEnabled, value))
+            {
+                _previewViewModel.AgentMonitor = value
+                    ? new AgentMonitor(_config.AgentDetection.RefreshIntervalMs)
+                    : null;
+            }
+        }
     }
 
     // ── LLM settings ───────────────────────────────────────────────────
@@ -158,10 +253,26 @@ internal sealed class SettingsViewModel : ViewModelBase
         set => SetProperty(ref _llmEnabled, value);
     }
 
+    /// <summary>
+    /// LLM provider. Switching provider also switches the endpoint and model when they still
+    /// hold a provider default: Gemini requests used to go to the OpenAI endpoint.
+    /// Custom values are kept.
+    /// </summary>
     public string LlmProvider
     {
         get => _llmProvider;
-        set => SetProperty(ref _llmProvider, value);
+        set
+        {
+            if (!SetProperty(ref _llmProvider, value)
+                || !LlmConfig.ProviderDefaults.TryGetValue(value ?? "", out var defaults))
+                return;
+
+            var knownDefaults = LlmConfig.ProviderDefaults.Values;
+            if (string.IsNullOrWhiteSpace(LlmEndpoint) || knownDefaults.Any(d => d.Endpoint == LlmEndpoint))
+                LlmEndpoint = defaults.Endpoint;
+            if (string.IsNullOrWhiteSpace(LlmModel) || knownDefaults.Any(d => d.Model == LlmModel))
+                LlmModel = defaults.Model;
+        }
     }
 
     public string LlmEndpoint
@@ -195,6 +306,12 @@ internal sealed class SettingsViewModel : ViewModelBase
     /// </summary>
     public Action? NavigateToPromptEditor { get; set; }
 
+    /// <summary>
+    /// Called after <see cref="Save"/> when an LLM setting changed, so that the analysis
+    /// service is started, stopped or rebuilt without a restart.
+    /// </summary>
+    public Action? LlmSettingsChanged { get; set; }
+
     // ── Commands ────────────────────────────────────────────────────────
 
     public ICommand SaveCommand { get; }
@@ -213,7 +330,13 @@ internal sealed class SettingsViewModel : ViewModelBase
         _config.RememberPosition = RememberPosition;
         _config.AutoStart = AutoStart;
         _config.CloseToTray = CloseToTray;
+        _config.HighlightOnSwitch = HighlightOnSwitch;
         _config.Hotkey = Hotkey;
+        _config.AgentDetection.Enabled = AgentDetectionEnabled;
+
+        var llm = _config.Llm;
+        var llmChanged = (llm.Enabled, llm.Provider, llm.Endpoint, llm.ApiKey, llm.Model, llm.StaleThresholdSeconds)
+            != (LlmEnabled, LlmProvider, LlmEndpoint, LlmApiKey, LlmModel, LlmStaleThresholdSeconds);
 
         _config.Llm.Enabled = LlmEnabled;
         _config.Llm.Provider = LlmProvider;
@@ -225,7 +348,14 @@ internal sealed class SettingsViewModel : ViewModelBase
         _configService.Save(_config);
 
         // Sync auto-start registry entry
-        Services.AutoStartService.SetAutoStart(AutoStart);
+        _applyAutoStart(AutoStart);
+
+        // The hotkey applies immediately, not at next launch
+        if (ApplyHotkey is { } applyHotkey)
+            ReportHotkeyResult(applyHotkey(Hotkey));
+
+        if (llmChanged)
+            LlmSettingsChanged?.Invoke();
     }
 
     /// <summary>

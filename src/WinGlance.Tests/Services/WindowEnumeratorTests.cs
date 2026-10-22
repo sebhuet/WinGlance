@@ -17,7 +17,7 @@ public class WindowEnumeratorTests
     [Fact]
     public void GetWindows_WithMonitoredApp_FindsMatchingWindows()
     {
-        // Monitor an app that's certainly running — the test host process
+        // Monitor an app that's certainly running â€” the test host process
         var testProcessName = System.Diagnostics.Process.GetCurrentProcess().ProcessName;
         var apps = new List<MonitoredApp> { new(testProcessName, testProcessName) };
 
@@ -52,7 +52,7 @@ public class WindowEnumeratorTests
         }
     }
 
-    // ── AUMID parsing ───────────────────────────────────────────────────
+    // â”€â”€ AUMID parsing â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     [Theory]
     [InlineData("Microsoft.WindowsCalculator_8wekyb3d8bbwe!App", "WindowsCalculator")]
@@ -72,7 +72,7 @@ public class WindowEnumeratorTests
         Assert.Equal("SimpleApp", result);
     }
 
-    // ── Filtering ───────────────────────────────────────────────────────
+    // â”€â”€ Filtering â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     [Fact]
     public void IsEligibleWindow_ZeroHandle_ReturnsFalse()
@@ -90,19 +90,19 @@ public class WindowEnumeratorTests
         Assert.False(result);
     }
 
-    // ── AUMID edge cases ─────────────────────────────────────────────────
+    // â”€â”€ AUMID edge cases â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     [Theory]
     [InlineData("Publisher.App_hash", "App")]         // no bang (no entry point)
     [InlineData("App_hash!Main", "App")]              // no publisher prefix
-    [InlineData("A.B.C_hash!Main", "B.C")]            // multiple dots → only first removed
+    [InlineData("A.B.C_hash!Main", "B.C")]            // multiple dots â†’ only first removed
     public void ExtractAppNameFromAumid_EdgeCases(string aumid, string expected)
     {
         var result = WindowEnumerator.ExtractAppNameFromAumid(aumid);
         Assert.Equal(expected, result);
     }
 
-    // ── DiscoveredApp model ──────────────────────────────────────────────
+    // â”€â”€ DiscoveredApp model â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     [Fact]
     public void DiscoveredApp_Properties()
@@ -143,5 +143,33 @@ public class WindowEnumeratorTests
         var result = enumerator.GetWindows(apps);
 
         Assert.Empty(result);
+    }
+
+    [Fact]
+    public void GetWindows_SameProcessListedTwice_DoesNotThrow()
+    {
+        // A hand-edited config.json can contain case-duplicates; this used to throw on every poll
+        var apps = new List<MonitoredApp> { new("explorer", "Explorer"), new("EXPLORER", "Explorer 2") };
+
+        var exception = Record.Exception(() => new WindowEnumerator().GetWindows(apps));
+
+        Assert.Null(exception);
+    }
+
+    [Fact]
+    public void GetWindows_RunningApps_ReturnsEligibleWindowsWithTheirProcessId()
+    {
+        var enumerator = new WindowEnumerator();
+        var apps = enumerator.DiscoverRunningApps().Select(a => new MonitoredApp(a.ProcessName, a.ProcessName));
+
+        var windows = enumerator.GetWindows(apps, needsIcon: _ => false);
+
+        Assert.All(windows, w =>
+        {
+            Assert.NotEqual(0u, w.ProcessId);
+            Assert.True(WindowEnumerator.IsEligibleWindow(w.Hwnd));
+            Assert.False(WinGlance.NativeApi.NativeMethods.IsCloaked(w.Hwnd));
+            Assert.Null(w.Icon); // needsIcon said no for every window
+        });
     }
 }

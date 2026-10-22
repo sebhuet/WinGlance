@@ -21,10 +21,20 @@ internal sealed class PreviewViewModel : ViewModelBase, IDisposable
     private readonly DispatcherTimer _timer;
     private readonly object _lock = new(); // guards _windows for cross-thread collection sync
 
+    // 1 while a scan / an LLM evaluation pass runs: ticks never pile up behind a slow one
+    private int _isScanning;
+    private int _isEvaluating;
+
+    /// <summary>Layout in which thumbnails grow with the panel, as large as possible.</summary>
+    public const string FitLayout = "fit";
+
     private ObservableCollection<TrackedWindow> _windows = [];
-    private string _layout = "horizontal";
+    private string _layout = FitLayout;
     private int _thumbnailWidth = 200;
     private int _thumbnailHeight = 150;
+    private double _displayThumbnailWidth = 200;
+    private double _displayThumbnailHeight = 150;
+    private System.Windows.Size _viewportSize = System.Windows.Size.Empty;
 
     public PreviewViewModel()
     {
@@ -74,26 +84,133 @@ internal sealed class PreviewViewModel : ViewModelBase, IDisposable
     public LlmService? LlmService { get; set; }
 
     /// <summary>
-    /// Layout mode: "horizontal", "vertical", or "grid".
+    /// Optional coding agent monitor (Claude Code, OpenCode). Null disables agent badges.
+    /// </summary>
+    public AgentMonitor? AgentMonitor { get; set; }
+
+    /// <summary>
+    /// Called with the window brought to the foreground by a thumbnail click; MainWindow
+    /// uses it to outline the window on its screen.
+    /// </summary>
+    public Action<IntPtr>? WindowActivated { get; set; }
+
+    /// <summary>
+    /// Layout mode: "fit" (thumbnails follow the panel size), "horizontal", "vertical", or "grid".
     /// </summary>
     public string Layout
     {
         get => _layout;
-        set => SetProperty(ref _layout, value);
+        set
+        {
+            if (SetProperty(ref _layout, value))
+            {
+                OnPropertyChanged(nameof(IsFitLayout));
+                UpdateDisplaySize();
+            }
+        }
     }
 
-    /// <summary>Desired thumbnail width in device-independent pixels.</summary>
+    /// <summary>True in the "fit" layout, where the panel has a free size.</summary>
+    public bool IsFitLayout => string.Equals(_layout, FitLayout, StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>Configured thumbnail width (Settings), used by the fixed-size layouts.</summary>
     public int ThumbnailWidth
     {
         get => _thumbnailWidth;
-        set => SetProperty(ref _thumbnailWidth, value);
+        set
+        {
+            if (SetProperty(ref _thumbnailWidth, value))
+                UpdateDisplaySize();
+        }
     }
 
-    /// <summary>Desired thumbnail height in device-independent pixels.</summary>
+    /// <summary>Configured thumbnail height (Settings), used by the fixed-size layouts.</summary>
     public int ThumbnailHeight
     {
         get => _thumbnailHeight;
-        set => SetProperty(ref _thumbnailHeight, value);
+        set
+        {
+            if (SetProperty(ref _thumbnailHeight, value))
+                UpdateDisplaySize();
+        }
+    }
+
+    /// <summary>
+    /// Width at which thumbnails are drawn: computed from the panel size in the "fit" layout,
+    /// <see cref="ThumbnailWidth"/> otherwise.
+    /// </summary>
+    public double DisplayThumbnailWidth
+    {
+        get => _displayThumbnailWidth;
+        private set
+        {
+            if (SetProperty(ref _displayThumbnailWidth, value))
+            {
+                OnPropertyChanged(nameof(StatusRowScale));
+                OnPropertyChanged(nameof(StatusRowWidth));
+            }
+        }
+    }
+
+    /// <summary>Height at which thumbnails are drawn (see <see cref="DisplayThumbnailWidth"/>).</summary>
+    public double DisplayThumbnailHeight
+    {
+        get => _displayThumbnailHeight;
+        private set => SetProperty(ref _displayThumbnailHeight, value);
+    }
+
+    /// <summary>
+    /// Scale applied to the badge/title row under each thumbnail: its text grows with the
+    /// thumbnail (see <see cref="ThumbnailLayoutCalculator.StatusRowScale"/>).
+    /// </summary>
+    public double StatusRowScale => ThumbnailLayoutCalculator.StatusRowScale(_displayThumbnailWidth);
+
+    /// <summary>
+    /// Width of the status row before scaling, so that once scaled it spans the thumbnail.
+    /// </summary>
+    public double StatusRowWidth => _displayThumbnailWidth / StatusRowScale;
+
+    /// <summary>
+    /// Size of the Preview area, reported by the view when it changes: the "fit" layout
+    /// recomputes the thumbnail size from it.
+    /// </summary>
+    public void SetViewportSize(System.Windows.Size size)
+    {
+        lock (_lock)
+            _viewportSize = size;
+        UpdateDisplaySize();
+    }
+
+    /// <summary>
+    /// Recomputes <see cref="DisplayThumbnailWidth"/>/<see cref="DisplayThumbnailHeight"/>.
+    /// Called when the panel is resized, the layout or configured size changes, and after
+    /// every scan (windows opened, closed or resized). Safe from any thread.
+    /// </summary>
+    internal void UpdateDisplaySize()
+    {
+        if (!IsFitLayout)
+        {
+            DisplayThumbnailWidth = _thumbnailWidth;
+            DisplayThumbnailHeight = _thumbnailHeight;
+            return;
+        }
+
+        System.Windows.Size viewport;
+        List<int> groupSizes;
+        double aspectRatio;
+        lock (_lock)
+        {
+            viewport = _viewportSize;
+            groupSizes = _windows.GroupBy(w => w.DisplayName).Select(g => g.Count()).ToList();
+            aspectRatio = ThumbnailLayoutCalculator.TypicalAspectRatio(_windows.Select(w => w.AspectRatio));
+        }
+
+        // Before the first layout pass or without windows, keep the current size
+        if (viewport.IsEmpty || ThumbnailLayoutCalculator.Fit(viewport, groupSizes, aspectRatio) is not { } size)
+            return;
+
+        DisplayThumbnailWidth = size.Width;
+        DisplayThumbnailHeight = size.Height;
     }
 
     /// <summary>
@@ -129,14 +246,23 @@ internal sealed class PreviewViewModel : ViewModelBase, IDisposable
         _thumbnailManager.SetDestination(hwnd);
     }
 
-    /// <summary>Starts polling. Performs an immediate first scan then starts the timer.</summary>
+    /// <summary>
+    /// Starts polling: an immediate first scan on a background thread, then one per interval.
+    /// </summary>
     public void Start()
     {
         if (!_timer.IsEnabled)
         {
-            Poll(); // immediate first scan
             _timer.Start();
+            OnTimerTick(this, EventArgs.Empty); // first scan now, not after one interval
         }
+    }
+
+    /// <summary>Returns a copy of the tracked windows, safe to use from any thread.</summary>
+    public TrackedWindow[] GetWindowsSnapshot()
+    {
+        lock (_lock)
+            return [.. _windows];
     }
 
     /// <summary>Stops the polling timer.</summary>
@@ -158,7 +284,7 @@ internal sealed class PreviewViewModel : ViewModelBase, IDisposable
     /// Activates the given window: restores it if minimized, then brings it to the foreground.
     /// Uses an Alt key simulation workaround to bypass Windows focus-stealing prevention.
     /// </summary>
-    private static void ActivateWindow(object? parameter)
+    private void ActivateWindow(object? parameter)
     {
         if (parameter is not TrackedWindow window)
             return;
@@ -185,33 +311,102 @@ internal sealed class PreviewViewModel : ViewModelBase, IDisposable
         NativeMethods.SendInput(1, [input], NativeMethods.INPUT.Size);
 
         NativeMethods.SetForegroundWindow(hwnd);
+
+        WindowActivated?.Invoke(hwnd);
     }
 
     // ── Polling logic ───────────────────────────────────────────────────
 
     private async void OnTimerTick(object? sender, EventArgs e)
     {
-        await Task.Run(Poll);
+        // A scan stuck on a slow window must not be joined by a new one every second
+        if (Interlocked.Exchange(ref _isScanning, 1) == 1)
+            return;
 
-        // LLM evaluation runs after merge, on background thread
-        if (LlmService is not null)
+        try
         {
-            TrackedWindow[] snapshot;
-            lock (_lock)
-            {
-                snapshot = [.. _windows];
-            }
-            foreach (var w in snapshot)
-            {
-                await LlmService.EvaluateAsync(w);
-            }
+            await Task.Run(Poll);
         }
+        catch (Exception ex)
+        {
+            // Logged, not rethrown: on the dispatcher it would open an error dialog every second
+            Log.Warning("Window scan failed", ex);
+            return;
+        }
+        finally
+        {
+            Volatile.Write(ref _isScanning, 0);
+        }
+
+        StartLlmEvaluation();
+    }
+
+    /// <summary>
+    /// Runs the LLM evaluation of all windows on a background thread. Screen captures and
+    /// LLM calls (up to 30 s) stay off the UI thread and never delay the next scan; a new pass
+    /// starts only once the previous one has finished.
+    /// </summary>
+    private void StartLlmEvaluation()
+    {
+        if (LlmService is not { } llmService || Interlocked.Exchange(ref _isEvaluating, 1) == 1)
+            return;
+
+        var windows = GetWindowsSnapshot();
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                foreach (var window in windows)
+                    await llmService.EvaluateAsync(window).ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                Log.Warning("LLM evaluation pass failed", ex);
+            }
+            finally
+            {
+                Volatile.Write(ref _isEvaluating, 0);
+            }
+        });
     }
 
     private void Poll()
     {
-        var scanned = _enumerator.GetWindows(MonitoredApps);
+        // Icons are only extracted for windows that do not have one yet
+        HashSet<IntPtr> windowsWithIcon;
+        lock (_lock)
+        {
+            windowsWithIcon = _windows.Where(w => w.Icon is not null).Select(w => w.Hwnd).ToHashSet();
+        }
+
+        var scanned = _enumerator.GetWindows(MonitoredApps, hwnd => !windowsWithIcon.Contains(hwnd));
+        AttentionDetector?.PruneClosedWindows();
+
+        var badges = AgentMonitor?.GetBadges(scanned);
+        foreach (var window in scanned)
+            window.Agent = badges?.GetValueOrDefault(window.Hwnd);
+
         MergeResults(scanned);
+    }
+
+    /// <summary>
+    /// Applies a freshly scanned agent badge to a tracked window and updates its attention flag:
+    /// a waiting agent highlights the window whenever it is not focused, and an agent going from
+    /// busy to idle keeps it highlighted until the user focuses the window.
+    /// </summary>
+    internal static void ApplyAgentState(TrackedWindow window, AgentBadge? badge)
+    {
+        var previous = window.Agent?.Status;
+        var current = badge?.Status;
+        var justFinished = previous == AgentStatus.Busy && current == AgentStatus.Idle;
+
+        window.Agent = badge;
+        window.NeedsAgentAttention = !window.IsActive && current switch
+        {
+            AgentStatus.Waiting => true,
+            AgentStatus.Idle => justFinished || window.NeedsAgentAttention,
+            _ => false,
+        };
     }
 
     /// <summary>
@@ -234,6 +429,8 @@ internal sealed class PreviewViewModel : ViewModelBase, IDisposable
                 {
                     _thumbnailManager.Unregister(_windows[i].Hwnd);
                     LlmService?.Remove(_windows[i].Hwnd);
+                    // Window handles are reused: a new window must not inherit this one's flash
+                    AttentionDetector?.ClearFlashing(_windows[i].Hwnd);
                     _windows.RemoveAt(i);
                 }
             }
@@ -245,6 +442,9 @@ internal sealed class PreviewViewModel : ViewModelBase, IDisposable
                 {
                     // Update mutable properties
                     existing.Title = scannedWindow.Title;
+                    // A minimized window reports no ratio: keep the last known one
+                    if (scannedWindow.AspectRatio > 0)
+                        existing.AspectRatio = scannedWindow.AspectRatio;
                     existing.IsActive = scannedWindow.IsActive;
                     existing.IsHung = scannedWindow.IsHung;
                     existing.IsModalBlocked = scannedWindow.IsModalBlocked;
@@ -264,12 +464,21 @@ internal sealed class PreviewViewModel : ViewModelBase, IDisposable
                     // Icon only updated if it was null
                     if (existing.Icon is null && scannedWindow.Icon is not null)
                         existing.Icon = scannedWindow.Icon;
+
+                    // After IsActive, which clears the "finished, not yet seen" highlight
+                    ApplyAgentState(existing, scannedWindow.Agent);
                 }
                 else
                 {
+                    // No previous state: only a waiting agent can need attention
+                    scannedWindow.NeedsAgentAttention = !scannedWindow.IsActive
+                        && scannedWindow.Agent?.Status == AgentStatus.Waiting;
                     _windows.Add(scannedWindow);
                 }
             }
         }
+
+        // Windows opened, closed or resized change the best "fit" size
+        UpdateDisplaySize();
     }
 }

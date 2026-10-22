@@ -15,6 +15,8 @@ internal sealed class HotkeyService : IDisposable
     private IntPtr _hwnd;
     private HwndSource? _hwndSource;
     private bool _isRegistered;
+    private uint _modifiers;
+    private uint _virtualKey;
 
     /// <summary>Raised when the registered global hotkey is pressed.</summary>
     public event EventHandler? HotkeyPressed;
@@ -29,18 +31,38 @@ internal sealed class HotkeyService : IDisposable
         _hwndSource?.AddHook(WndProc);
     }
 
+    /// <summary>True while a hotkey is registered.</summary>
+    public bool IsRegistered => _isRegistered;
+
     /// <summary>
-    /// Parses a hotkey string (e.g., "Ctrl+Alt+G") and registers it globally.
+    /// Parses a hotkey string (e.g., "Ctrl+Alt+G") and registers it globally, replacing the
+    /// current one. Returns false if the string is invalid or the combination is taken by
+    /// another application; the previous hotkey then stays registered.
     /// </summary>
     public bool Register(string hotkeyString)
     {
-        Unregister();
-
         if (!TryParseHotkey(hotkeyString, out var modifiers, out var vk))
             return false;
 
-        _isRegistered = NativeMethods.RegisterHotKey(_hwnd, HotkeyId, modifiers, vk);
-        return _isRegistered;
+        var hadPrevious = _isRegistered;
+        var (previousModifiers, previousKey) = (_modifiers, _virtualKey);
+        Unregister();
+
+        // MOD_NOREPEAT: holding the keys down must not toggle the panel over and over
+        if (NativeMethods.RegisterHotKey(_hwnd, HotkeyId, modifiers | NativeMethods.MOD_NOREPEAT, vk))
+        {
+            (_modifiers, _virtualKey, _isRegistered) = (modifiers, vk, true);
+            return true;
+        }
+
+        if (hadPrevious)
+        {
+            _isRegistered = NativeMethods.RegisterHotKey(
+                _hwnd, HotkeyId, previousModifiers | NativeMethods.MOD_NOREPEAT, previousKey);
+            (_modifiers, _virtualKey) = (previousModifiers, previousKey);
+        }
+
+        return false;
     }
 
     /// <summary>
@@ -74,6 +96,7 @@ internal sealed class HotkeyService : IDisposable
 
     /// <summary>
     /// Parses a hotkey string like "Ctrl+Alt+G" into Win32 modifier flags and virtual key code.
+    /// At least one modifier is required: a bare key would be captured system-wide.
     /// </summary>
     internal static bool TryParseHotkey(string hotkeyString, out uint modifiers, out uint vk)
     {
@@ -108,6 +131,9 @@ internal sealed class HotkeyService : IDisposable
             }
         }
 
+        if (modifiers == 0)
+            return false;
+
         var keyPart = parts[^1].ToUpperInvariant();
 
         // Try single letter/digit
@@ -127,8 +153,12 @@ internal sealed class HotkeyService : IDisposable
             }
         }
 
-        // Try named keys (F1-F24, etc.)
-        if (Enum.TryParse<Key>(keyPart, ignoreCase: true, out var key))
+        // Try named keys (F1-F24, etc.). Enum.TryParse also accepts numbers ("65") and
+        // comma-separated flags ("A,B"): only real key names, which start with a letter, count.
+        if (char.IsLetter(keyPart[0])
+            && !keyPart.Contains(',')
+            && Enum.TryParse<Key>(keyPart, ignoreCase: true, out var key)
+            && Enum.IsDefined(key))
         {
             vk = (uint)KeyInterop.VirtualKeyFromKey(key);
             return vk != 0;

@@ -1,10 +1,4 @@
-using System.Diagnostics;
-using System.Drawing;
-using System.Drawing.Imaging;
-using System.IO;
-using System.Runtime.InteropServices;
 using WinGlance.Models;
-using WinGlance.NativeApi;
 using WinGlance.ViewModels;
 
 namespace WinGlance.Services;
@@ -12,31 +6,31 @@ namespace WinGlance.Services;
 /// <summary>
 /// Orchestrates screenshot comparison and LLM analysis for tracked windows.
 /// Call <see cref="EvaluateAsync"/> from the polling cycle to detect stale
-/// windows and trigger LLM calls when needed.
+/// windows and trigger LLM calls when needed. Thread-safe: evaluation runs on a
+/// background thread while the polling thread removes closed windows.
 /// </summary>
 internal sealed class LlmService : IDisposable
 {
-    private const uint PW_RENDERFULLCONTENT = 0x00000002;
+    // A failed call (bad key, endpoint down) is retried after this delay, not on every tick
+    internal static readonly TimeSpan RetryDelay = TimeSpan.FromMinutes(1);
 
     private readonly ScreenshotComparer _comparer = new();
     private readonly HashSet<IntPtr> _pendingAnalysis = [];
+    private readonly Dictionary<IntPtr, DateTime> _retryAfter = [];
+    private readonly object _stateLock = new();
+    private readonly CancellationTokenSource _cancellation = new();
+    private readonly LlmConfig _config;
     private LlmAnalyzer? _analyzer;
-    private LlmConfig _config;
 
     /// <summary>
     /// Optional reference to the prompt editor for debug logging.
-    /// Set after construction by the MainWindow.
     /// </summary>
     public PromptEditorViewModel? DebugLogger { get; set; }
 
     public LlmService(LlmConfig config)
     {
         _config = config;
-        var prompt = string.IsNullOrWhiteSpace(config.Prompt)
-            ? LlmConfig.DefaultPrompt
-            : config.Prompt;
-        if (config.Enabled)
-            _analyzer = new LlmAnalyzer(config, prompt);
+        ReloadPrompt(config.Prompt);
     }
 
     /// <summary>
@@ -45,56 +39,56 @@ internal sealed class LlmService : IDisposable
     /// </summary>
     public async Task EvaluateAsync(TrackedWindow window)
     {
-        if (!_config.Enabled)
+        // PrintWindow sends WM_PRINT: a hung window would block the capture
+        if (!_config.Enabled || window.IsHung || _cancellation.IsCancellationRequested)
             return;
 
-        var isStale = _comparer.IsStale(window.Hwnd, _config.StaleThresholdSeconds);
-        window.IsStale = isStale;
+        // Captured outside the lock: a capture can be slow
+        var hash = ScreenshotComparer.CaptureAndHash(window.Hwnd);
+        var now = DateTime.UtcNow;
 
-        if (!isStale)
+        lock (_stateLock)
         {
-            // Content changed — reset verdict and allow re-analysis
-            if (window.LlmVerdict is not null)
+            var isStale = _comparer.IsStale(window.Hwnd, hash, _config.StaleThresholdSeconds, now);
+            window.IsStale = isStale;
+
+            if (!isStale)
             {
+                // Content changed — reset verdict and allow re-analysis
                 window.LlmVerdict = null;
-                _pendingAnalysis.Remove(window.Hwnd);
-            }
-            return;
-        }
-
-        // Already analyzed or in-flight — skip
-        if (window.LlmVerdict is not null || _pendingAnalysis.Contains(window.Hwnd))
-            return;
-
-        _pendingAnalysis.Add(window.Hwnd);
-
-        try
-        {
-            var screenshot = CaptureWindow(window.Hwnd);
-            if (screenshot is null || _analyzer is null)
-            {
-                _pendingAnalysis.Remove(window.Hwnd);
+                _retryAfter.Remove(window.Hwnd);
                 return;
             }
 
-            var (verdict, reason) = await _analyzer.AnalyzeWithReasonAsync(screenshot, window.Title);
-            screenshot.Dispose();
+            // Already analyzed, in flight, or waiting to retry after a failure
+            if (window.LlmVerdict is not null
+                || _pendingAnalysis.Contains(window.Hwnd)
+                || (_retryAfter.TryGetValue(window.Hwnd, out var retryAt) && now < retryAt))
+                return;
 
-            var finalVerdict = verdict ?? "idle";
-            window.LlmVerdict = finalVerdict;
-
-            // Emit debug log
-            DebugLogger?.AppendLog(window.Title, finalVerdict, reason);
+            _pendingAnalysis.Add(window.Hwnd);
         }
-        catch (Exception ex)
+
+        try
         {
-            Trace.TraceWarning($"LLM analysis failed for {window.Hwnd}: {ex.Message}");
-            window.LlmVerdict = "idle";
-            DebugLogger?.AppendLog(window.Title, "idle", $"Error: {ex.Message}");
+            var result = await AnalyzeAsync(window).ConfigureAwait(false);
+            if (result is null)
+                return;
+
+            if (result.Error is null)
+            {
+                window.LlmVerdict = result.Verdict;
+            }
+            else
+            {
+                lock (_stateLock)
+                    _retryAfter[window.Hwnd] = DateTime.UtcNow + RetryDelay;
+            }
         }
         finally
         {
-            _pendingAnalysis.Remove(window.Hwnd);
+            lock (_stateLock)
+                _pendingAnalysis.Remove(window.Hwnd);
         }
     }
 
@@ -104,30 +98,11 @@ internal sealed class LlmService : IDisposable
     /// </summary>
     public async Task ForceEvaluateAsync(TrackedWindow window)
     {
-        if (_analyzer is null)
-            return;
-
-        try
-        {
-            var screenshot = CaptureWindow(window.Hwnd);
-            if (screenshot is null)
-            {
-                DebugLogger?.AppendLog(window.Title, "—", "Could not capture screenshot");
-                return;
-            }
-
-            var (verdict, reason) = await _analyzer.AnalyzeWithReasonAsync(screenshot, window.Title);
-            screenshot.Dispose();
-
-            var finalVerdict = verdict ?? "idle";
-            window.LlmVerdict = finalVerdict;
-            DebugLogger?.AppendLog(window.Title, finalVerdict, reason);
-        }
-        catch (Exception ex)
-        {
-            window.LlmVerdict = "idle";
-            DebugLogger?.AppendLog(window.Title, "idle", $"Error: {ex.Message}");
-        }
+        var result = await AnalyzeAsync(window).ConfigureAwait(false);
+        if (result is null)
+            DebugLogger?.AppendLog(window.Title, "—", "Could not capture the window (minimized or closed)");
+        else if (result.Error is null)
+            window.LlmVerdict = result.Verdict;
     }
 
     /// <summary>
@@ -135,50 +110,64 @@ internal sealed class LlmService : IDisposable
     /// </summary>
     public void Remove(IntPtr hwnd)
     {
-        _comparer.Remove(hwnd);
-        _pendingAnalysis.Remove(hwnd);
+        lock (_stateLock)
+        {
+            _comparer.Remove(hwnd);
+            _pendingAnalysis.Remove(hwnd);
+            _retryAfter.Remove(hwnd);
+        }
     }
 
     /// <summary>
-    /// Reloads the prompt from the current config (called after Save in prompt editor).
+    /// Uses a new system prompt from the next analysis on (called when the prompt is saved).
     /// </summary>
     public void ReloadPrompt(string prompt)
     {
         var effectivePrompt = string.IsNullOrWhiteSpace(prompt) ? LlmConfig.DefaultPrompt : prompt;
-        _analyzer?.Dispose();
-        _analyzer = _config.Enabled ? new LlmAnalyzer(_config, effectivePrompt) : null;
+        _analyzer = new LlmAnalyzer(_config, effectivePrompt);
     }
 
+    /// <summary>Cancels the calls in flight; the service does nothing afterwards.</summary>
     public void Dispose()
     {
-        _analyzer?.Dispose();
+        // Not disposed: a pass still running may read the token after this point
+        _cancellation.Cancel();
     }
 
-    private static Bitmap? CaptureWindow(IntPtr hwnd)
+    /// <summary>
+    /// Captures the window and asks the model, logging the outcome. Returns null when the
+    /// window cannot be captured or the service was disposed.
+    /// </summary>
+    private async Task<LlmResult?> AnalyzeAsync(TrackedWindow window)
     {
-        var placement = new NativeMethods.WINDOWPLACEMENT { Length = (uint)Marshal.SizeOf<NativeMethods.WINDOWPLACEMENT>() };
-        NativeMethods.GetWindowPlacement(hwnd, ref placement);
-        var rect = placement.NormalPosition;
-        var width = rect.Right - rect.Left;
-        var height = rect.Bottom - rect.Top;
-        if (width <= 0 || height <= 0)
+        var analyzer = _analyzer;
+        if (analyzer is null || _cancellation.IsCancellationRequested)
             return null;
 
-        width = Math.Min(width, 1920);
-        height = Math.Min(height, 1080);
+        using var screenshot = ScreenshotComparer.CaptureWindow(window.Hwnd);
+        if (screenshot is null)
+            return null;
 
-        var bmp = new Bitmap(width, height, PixelFormat.Format32bppArgb);
-        using var g = Graphics.FromImage(bmp);
-        var hdc = g.GetHdc();
-        var ok = NativeMethods.PrintWindow(hwnd, hdc, PW_RENDERFULLCONTENT);
-        g.ReleaseHdc(hdc);
-
-        if (!ok)
+        LlmResult result;
+        try
         {
-            bmp.Dispose();
-            return null;
+            result = await analyzer.AnalyzeWithReasonAsync(screenshot, window.Title, _cancellation.Token).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            return null; // service disposed (LLM turned off or settings changed)
         }
 
-        return bmp;
+        if (result.Error is null)
+        {
+            DebugLogger?.AppendLog(window.Title, result.Verdict!, result.Reason);
+        }
+        else
+        {
+            Log.Warning($"LLM analysis failed for \"{window.Title}\": {result.Error}");
+            DebugLogger?.AppendLog(window.Title, "error", result.Error);
+        }
+
+        return result;
     }
 }

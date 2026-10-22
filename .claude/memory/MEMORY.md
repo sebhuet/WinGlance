@@ -1,0 +1,2 @@
+- [Parallel Claude sessions](user-parallel-claude-sessions.md) — user runs one Claude Code session per VS Code window; why agent badges exist
+- [Agent detection source](agent-detection-source.md) — `claude agents --json`, not ~/.claude internals; measured cost

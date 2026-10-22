@@ -19,6 +19,7 @@ When working with multiple windows of the same application (e.g., VS Code), the 
 
 - Clicking on a thumbnail must immediately **bring the corresponding window to the foreground** and give it focus
 - If the window is minimized, it must be restored before receiving focus
+- The activated window is then outlined by a **red frame blinking three times** (about one second) over its visible bounds (DWM extended frame bounds), on its own monitor: a click-through, non-activating topmost overlay, created off-screen at startup so that the first flash is immediate. Setting: `highlightOnSwitch` (default: on)
 
 ### FR-3: Dynamic Window Tracking
 
@@ -33,9 +34,9 @@ When working with multiple windows of the same application (e.g., VS Code), the 
 - Show the **application icon** on each thumbnail for multi-app identification
 - Highlight the **currently active/focused** window's thumbnail with a visual indicator (border color, glow)
 
-### FR-5: Tab-Based Interface
+### FR-5: Views and Navigation
 
-The panel has **3 tabs**:
+The panel has **4 views**, switched from a **right-click context menu** on the panel: Preview, Applications, Settings and Prompt Editor (see FR-10). They were first designed as 3 tabs; the "Tab" names below and the mockups keep that original wording.
 
 #### Tab 1 — Preview (main tab)
 
@@ -47,15 +48,16 @@ The panel has **3 tabs**:
 
 - Lists all **currently running applications** (with window count)
 - Checkbox to **add/remove** an application from the monitored set
-- Already-monitored apps are checked
+- Already-monitored apps are checked; monitored apps that are not running are listed too (0 windows), so saving keeps them
+- Editable **display name**, used as the group header in Preview
 - **Save** button to persist the monitored app list to config
-- Refresh button to re-scan running applications
+- The list is scanned when the view opens; a Refresh button re-scans it
 
 #### Tab 3 — Settings
 
-- **Layout**: horizontal strip / vertical strip / grid
+- **Layout**: fit to panel (default) / horizontal strip / vertical strip / grid
 - **Thumbnail size**: width x height (slider or numeric input)
-- **Panel opacity**: slider (70%-100%)
+- **Panel opacity**: slider (30%-100%)
 - **Panel position**: X / Y coordinates (or "remember last position" checkbox)
 - **Polling interval**: slider (500ms-5000ms)
 - **Auto-start with Windows**: checkbox
@@ -68,14 +70,14 @@ The panel has **3 tabs**:
   - **API key**: password field
   - **Model**: text field
   - **Stale threshold**: slider (10s–120s, default: 30s)
-  - **Edit prompt**: button to open `prompt.txt`
+  - **Edit prompt**: button that opens the Prompt Editor view
 - **Save** button to persist all settings
 
 ### FR-6: Panel Behavior
 
 - The panel must be **draggable** (user can reposition it anywhere on screen)
 - The panel must **remember its position** between sessions (persist to config file)
-- The panel should be **resizable**, with thumbnails scaling proportionally
+- The panel should be **resizable**, with thumbnails scaling proportionally: in the **fit to panel** layout, the thumbnail size is the largest at which all windows fit (rows wrapping at the panel width, a header row per application, the vertical scrollbar width kept free), computed by binary search; the cell aspect ratio is the median of the windows' client-area ratios, and the panel size is saved (`panelWidth`, `panelHeight`)
 - A **minimize to tray** option to hide the panel when not needed
 - The **close button [×]** behavior is **configurable**: either minimize to tray (default) or exit the application
 - System tray icon with right-click menu (Show/Hide, Settings, Exit)
@@ -120,11 +122,13 @@ Extends FR-9 with intelligent window analysis via an external LLM.
 - When a window is flagged as stale, a **single LLM call** is made with:
   - The window **screenshot** (if the model supports vision) or a description of the window title/state
   - The window **title**
-  - A **system prompt** loaded from a dedicated file (`prompt.txt` next to the executable)
+  - A **system prompt** stored in `config.json` (`llm.prompt`) and edited in the Prompt Editor view
 - The LLM determines whether the window:
   - **Awaits user action** (dialog, error, confirmation, input field) → highlight thumbnail with **attention indicator** (orange pulsating border)
-  - **Is simply idle** (nothing happening, no action needed) → highlight thumbnail with **idle indicator** (dimmed/grayed border)
+  - **Is simply idle** (nothing happening, no action needed) → **dimmed thumbnail**
 - Only **one LLM call per stale window** — not repeated until the window content changes again
+- A failed call (network, HTTP error, timeout, unrecognized answer) gives **no verdict**: the error is logged and shown in the debug log, and the call is retried after one minute
+- Minimized and not-responding windows are not captured
 
 #### Supported LLM Providers
 
@@ -139,7 +143,7 @@ Extends FR-9 with intelligent window analysis via an external LLM.
 - **LLM enabled**: checkbox (default: disabled)
 - **Provider**: dropdown — OpenAI / Gemini / Ollama
 - **API endpoint**: text field (pre-filled with default for each provider; editable for Ollama custom URL)
-- **API key**: password field (not needed for Ollama)
+- **API key**: password field (not needed for Ollama); stored encrypted with DPAPI for the current Windows user (`apiKeyProtected`)
 - **Model**: text field (e.g., `gpt-4o-mini`, `gemini-2.0-flash`, `llava`)
 - **Stale threshold**: slider (10s–120s, default: 30s)
 - **Edit Prompt & Debug Log**: button that navigates to the Prompt Editor screen
@@ -154,19 +158,43 @@ Extends FR-9 with intelligent window analysis via an external LLM.
 - **Debug log**: scrollable list displaying each LLM analysis result — window title, verdict (`awaiting_action` / `idle`), and the LLM's reasoning (second line of response)
 - Log is capped at 200 entries (oldest removed first) and can be cleared manually
 
+### FR-11: Coding Agent Detection
+
+Shows, for each monitored window, whether a coding agent (**Claude Code** or **OpenCode**) is running in it, and whether it is working or waiting for the user.
+
+#### Discovery
+
+- **Claude Code**: sessions are listed with `claude agents --json`, the interface documented for external tools ([agent view](https://code.claude.com/docs/en/agent-view)). Each live session gives its `pid`, `cwd`, `status` (`busy` / `waiting` / `idle`) and, when waiting, `waitingFor` (`permission prompt`, `input needed`, …). The files under `~/.claude` are not read: the documentation states they are not a stable interface.
+- **Background commands**: `claude agents --json` reports `idle` as soon as a turn ends, even while commands started in the background keep running. For an idle session, WinGlance counts the direct children of the Claude process that are Claude Code tool shells (Bash tool: `bash -c "source …/.claude/shell-snapshots/…"`; PowerShell tool: `cmd … $__claudeCodeScript …`), reading their command lines from the process (PEB); MCP servers are not counted. A non-zero count shows as working ("N background tasks"). These markers are internal to Claude Code: if they change, the badge falls back to Claude's status.
+- **OpenCode**: no state interface exists, so instances are found from the process list (`opencode.exe`, helpers spawned by an instance excluded). Their working directory is read from the process (PEB). Status is reported as **running**, without busy/idle detail.
+- The `claude` executable is looked up on `PATH`, then in `%USERPROFILE%\.local\bin` (native installer). An npm install (`claude.cmd`) is supported.
+- Discovery runs in the background every `refreshIntervalMs` (default 5 s), not on every window poll: each `claude agents` call costs about 0.2 s of CPU. It is skipped while no `claude.exe` process runs.
+
+#### Window Association
+
+- Walk up the agent's process tree (Toolhelp32 snapshot) to the nearest process owning a monitored window.
+- If that process owns **several** windows (VS Code serves all its windows from one process; Windows Terminal likewise), match the agent's working directory against the window titles: full path in the title first, then the folder name as a title segment (`file - Folder - Visual Studio Code`), then parent folders with a lower score (agent started in a subfolder). A tie leaves the session unassigned rather than guessing.
+- Covers the Claude Code VS Code extension, the CLI in a terminal, and agents in the VS Code integrated terminal. Background sessions run by the Claude supervisor have no window and are not shown.
+
+#### Display
+
+- A badge next to the thumbnail title (outside the DWM thumbnail area, which covers WPF content): `Claude · working` (blue), `Claude · permission prompt` (orange), `Claude · idle` (orange: the agent waits for the next prompt), `OpenCode · running` (teal); `+N` when several sessions share a window; tooltip with each session's name and folder.
+- **Orange border** when an agent waits for the user, or when it finished a turn (busy → idle) while the window was not focused; the latter clears once the window is focused.
+- Settings: **Show Claude Code / OpenCode status on thumbnails** checkbox (default: on), applied live.
+
 ---
 
 ## Non-Functional Requirements
 
 ### NFR-1: Technology Stack
 
-- **Language**: C# (.NET 8+)
+- **Language**: C# (.NET 10)
 - **UI Framework**: WPF (Windows Presentation Foundation)
-- **Target Framework**: `net8.0-windows`
+- **Target Framework**: `net10.0-windows`
 - **Build**: Single-file self-contained executable (no runtime dependency)
 - **Target OS**: Windows 10/11 with DWM enabled (required for live thumbnails)
 - **NuGet packages**:
-  - `System.Text.Json` (included in .NET 8) — config serialization
+  - `System.Text.Json` (included in .NET) — config serialization
   - `Hardcodet.NotifyIcon.Wpf` — system tray icon (or manual `Shell_NotifyIcon` P/Invoke)
 - **App manifest**: `dpiAwareness` set to `PerMonitorV2`
 
@@ -230,9 +258,9 @@ Extends FR-9 with intelligent window analysis via an external LLM.
 ```text
 WinGlance/
 ├── App.xaml                        # Application entry point
-├── App.xaml.cs                     # Startup logic, single-instance mutex, tray icon
-├── MainWindow.xaml                 # Floating panel with TabControl (3 tabs)
-├── MainWindow.xaml.cs              # Panel logic: drag, resize, tab switching
+├── App.xaml.cs                     # Startup logic, single-instance mutex, global error handling
+├── MainWindow.xaml                 # Floating panel; views switched from a right-click menu
+├── MainWindow.xaml.cs              # Panel logic: drag, show/hide, tray icon, hotkey, view switching
 ├── Models/
 │   ├── AppConfig.cs                # Root config model (JSON serializable)
 │   ├── MonitoredApp.cs             # Process name + display name
@@ -242,24 +270,33 @@ WinGlance/
 │   ├── ThumbnailManager.cs         # DWM thumbnail registration & lifecycle
 │   ├── AttentionDetector.cs        # Shell hook + IsHungAppWindow + modal detection
 │   ├── ScreenshotComparer.cs       # PrintWindow capture + perceptual hash diff
-│   ├── LlmAnalyzer.cs             # LLM API calls (OpenAI, Gemini, Ollama)
-│   └── ConfigService.cs            # Load/save config.json
+│   ├── LlmAnalyzer.cs              # LLM API calls (OpenAI, Gemini, Ollama)
+│   ├── LlmService.cs               # Stale detection → LLM analysis orchestration
+│   ├── AgentMonitor.cs             # Coding agent discovery and window matching (FR-11)
+│   ├── HotkeyService.cs            # Global hotkey registration
+│   ├── ThemeService.cs             # Light/dark theme detection
+│   ├── AutoStartService.cs         # Run registry key
+│   ├── Log.cs                      # %LOCALAPPDATA%\WinGlance\winglance.log
+│   └── ConfigService.cs            # Load/save/normalize config.json
 ├── NativeApi/
 │   └── NativeMethods.cs            # All P/Invoke declarations (DWM, User32)
 ├── Views/
-│   ├── PreviewTab.xaml             # Tab 1: thumbnail grid per app
-│   ├── ApplicationsTab.xaml        # Tab 2: app list with checkboxes
-│   └── SettingsTab.xaml            # Tab 3: layout/size/opacity controls
+│   ├── PreviewTab.xaml             # Thumbnail grid per app, with status badges
+│   ├── ApplicationsTab.xaml        # App list with checkboxes and display names
+│   ├── SettingsTab.xaml            # Layout/size/opacity, hotkey, agents, LLM
+│   └── PromptEditorTab.xaml        # LLM prompt editor and debug log
 ├── ViewModels/
-│   ├── MainViewModel.cs            # Orchestrates tabs, holds config
+│   ├── MainViewModel.cs            # Orchestrates views, holds config, LLM service lifecycle
 │   ├── PreviewViewModel.cs         # Observable collection of tracked windows
 │   ├── ApplicationsViewModel.cs    # Running apps list, add/remove monitoring
 │   └── SettingsViewModel.cs        # Bindable settings properties
-├── Converters/
-│   └── BoolToVisibilityConverter.cs
+├── Controls/
+│   └── ThumbnailControl.cs         # Hosts one DWM thumbnail (aspect ratio, scroll clipping)
+├── Converters/                     # Border state, visibility, layout, LLM verdict
+├── Themes/                         # DarkTheme.xaml / LightTheme.xaml
 ├── Assets/
-│   └── icon.ico                    # App + system tray icon
-└── prompt.txt                      # LLM system prompt (editable by user)
+│   ├── icon.ico                    # App + system tray icon
+│   └── prompt.txt                  # Copy of the default LLM prompt
 ```
 
 ### Key Implementation Details
@@ -284,11 +321,11 @@ WinGlance/
 
 10. **Theme Detection**: The app reads `HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\Themes\Personalize\AppsUseLightTheme` and applies a matching WPF resource dictionary. A `SystemEvents.UserPreferenceChanged` handler detects live theme changes.
 
-11. **Attention Detection**: `AttentionDetector` uses three mechanisms: (a) `RegisterShellHookWindow` to receive `HSHELL_FLASH` when a window starts flashing, (b) `IsHungAppWindow` polled alongside window enumeration to detect hung apps, (c) `IsWindowEnabled` checked each cycle to detect modal-blocked windows. Detected states are exposed as properties on `TrackedWindow` and bound to visual indicators (pulsating border, overlay) in the Preview tab.
+11. **Attention Detection**: `AttentionDetector` uses three mechanisms: (a) `RegisterShellHookWindow` to receive `HSHELL_FLASH` when a window starts flashing, (b) `IsHungAppWindow` polled alongside window enumeration to detect hung apps, (c) `IsWindowEnabled` checked each cycle to detect modal-blocked windows. Detected states are exposed as properties on `TrackedWindow` and bound to visual indicators (colored border, badge under the thumbnail) in the Preview view.
 
-12. **Graphical Diff (Stale Detection)**: `ScreenshotComparer` captures each window via `PrintWindow` at the polling interval, computes a perceptual hash (pHash), and compares with the previous capture. If the hash is identical for longer than the configured stale threshold (default 30s), the window is marked as stale and triggers LLM analysis.
+12. **Graphical Diff (Stale Detection)**: `ScreenshotComparer` captures each window via `PrintWindow` at the polling interval, computes a perceptual hash (average hash), and compares with the previous capture. If the hash is identical for longer than the configured stale threshold (default 30s), the window is marked as stale and triggers LLM analysis.
 
-13. **LLM Analysis**: `LlmAnalyzer` provides a unified interface for OpenAI, Gemini, and Ollama APIs. When a stale window is detected: (a) the latest screenshot is encoded as base64, (b) the system prompt is loaded from `prompt.txt`, (c) a single API call is made with the screenshot + window title, (d) the response is parsed to classify the window as "awaiting action" or "idle", (e) the result is set on `TrackedWindow.LlmState` and bound to the appropriate visual indicator. No further calls are made until the window content changes again.
+13. **LLM Analysis**: `LlmAnalyzer` provides a unified interface for OpenAI, Gemini, and Ollama APIs. When a stale window is detected: (a) the latest screenshot is encoded as base64, (b) the system prompt is taken from `config.json` (edited in the Prompt Editor), (c) a single API call is made with the screenshot + window title, (d) the response is parsed to classify the window as "awaiting action" or "idle", (e) the result is set on `TrackedWindow.LlmVerdict` and bound to the appropriate visual indicator. No further calls are made until the window content changes again.
 
 ---
 
@@ -363,7 +400,7 @@ WinGlance/
 │  API key:        [••••••••••••••••                ]               │
 │  Model:          [gpt-4o-mini                     ]               │
 │  Stale threshold: [═══●═════] 30s                                │
-│                                          [Edit prompt.txt]       │
+│                              [Edit Prompt & Debug Log]           │
 │                                                                  │
 │                                              [Save Configuration]│
 └──────────────────────────────────────────────────────────────────┘
@@ -394,9 +431,15 @@ WinGlance/
     "enabled": false,
     "provider": "openai",
     "endpoint": "https://api.openai.com/v1",
-    "apiKey": "",
+    "apiKeyProtected": "",
     "model": "gpt-4o-mini",
-    "staleThresholdSeconds": 30
+    "staleThresholdSeconds": 30,
+    "prompt": "You are a desktop window analyst for WinGlance. …",
+    "debugEnabled": false
+  },
+  "agentDetection": {
+    "enabled": true,
+    "refreshIntervalMs": 5000
   }
 }
 ```
@@ -406,13 +449,12 @@ WinGlance/
 ## Build & Run
 
 ```bash
-dotnet new wpf -n WinGlance
-cd WinGlance
-# develop...
-dotnet publish -c Release -r win-x64 --self-contained -p:PublishSingleFile=true
+dotnet build src/WinGlance.slnx
+dotnet test src/WinGlance.slnx
+dotnet publish src/WinGlance/WinGlance.csproj -c Release -r win-x64 --self-contained -p:PublishSingleFile=true -o publish
 ```
 
-Output: single `WinGlance.exe` (~30-60 MB self-contained)
+Output: single self-contained `publish/WinGlance.exe` (about 166 MB, uncompressed)
 
 ---
 
@@ -437,14 +479,14 @@ Output: single `WinGlance.exe` (~30-60 MB self-contained)
 17. **Theme**: Switch Windows to dark mode — verify WinGlance UI adapts. Switch back to light mode — verify it adapts again
 18. **DPI scaling**: On a multi-monitor setup with different DPI, move the panel between monitors — verify correct sizing and positioning
 19. **Attention — flash**: Trigger a window flash (e.g., a background app requesting focus) — verify the thumbnail shows a pulsating attention indicator
-20. **Attention — not responding**: Force-hang a test app — verify its thumbnail shows a "(Not Responding)" overlay
+20. **Attention — not responding**: Force-hang a test app — verify its thumbnail shows a red border and a "Not Responding" badge
 21. **Attention — modal dialog**: Open a "Save As" dialog in a monitored app — verify the thumbnail indicates the window is blocked by a modal
 22. **Stale detection**: Leave a monitored window untouched for >30s — verify the thumbnail is flagged as stale (dimmed border)
 23. **LLM — awaiting action**: Configure an LLM provider, open a dialog in a monitored window, wait 30s — verify LLM identifies it as awaiting action (orange indicator)
 24. **LLM — idle**: Configure an LLM provider, leave a static window (e.g., a text file) untouched — verify LLM classifies it as idle (dimmed indicator)
 25. **LLM — single call**: Verify that only one LLM call is made per stale window — no repeated calls until the window content changes
 26. **LLM — Ollama local**: Configure Ollama as provider with a local model — verify analysis works without an API key
-27. **Prompt file**: Edit `prompt.txt`, trigger a new analysis — verify the updated prompt is used
+27. **Prompt editor**: Edit the prompt in the Prompt Editor, click Save Prompt, then Run — verify the updated prompt is used
 
 ---
 

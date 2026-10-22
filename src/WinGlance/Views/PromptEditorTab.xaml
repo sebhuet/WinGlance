@@ -12,7 +12,7 @@
         <converters:BoolToVisibilityConverter x:Key="BoolToVisibility" />
 
         <Style TargetType="TextBlock" x:Key="SectionHeader">
-            <Setter Property="Foreground" Value="#FFDDDDDD" />
+            <Setter Property="Foreground" Value="{DynamicResource HeaderText}" />
             <Setter Property="FontSize" Value="13" />
             <Setter Property="FontWeight" Value="SemiBold" />
             <Setter Property="Margin" Value="0,8,0,6" />
@@ -41,9 +41,9 @@
                  VerticalScrollBarVisibility="Auto"
                  FontFamily="Consolas"
                  FontSize="12"
-                 Background="#FF1E1E1E"
-                 Foreground="#FFD4D4D4"
-                 BorderBrush="#FF555555"
+                 Background="{DynamicResource EditorBackground}"
+                 Foreground="{DynamicResource EditorText}"
+                 BorderBrush="{DynamicResource InputBorder}"
                  BorderThickness="1"
                  Padding="6"
                  Margin="0,0,0,4" />
@@ -53,14 +53,14 @@
             <Button Content="Save Prompt"
                     Command="{Binding SaveCommand}"
                     Padding="10,4"
-                    Background="#FF3A3A3A" Foreground="#FFCCCCCC"
-                    BorderBrush="#FF555555" BorderThickness="1"
+                    Background="{DynamicResource ButtonBackground}" Foreground="{DynamicResource PrimaryText}"
+                    BorderBrush="{DynamicResource InputBorder}" BorderThickness="1"
                     Cursor="Hand" Margin="0,0,8,0" />
             <Button Content="Reset to Default"
                     Command="{Binding ResetToDefaultCommand}"
                     Padding="10,4"
-                    Background="#FF3A3A3A" Foreground="#FF999999"
-                    BorderBrush="#FF555555" BorderThickness="1"
+                    Background="{DynamicResource ButtonBackground}" Foreground="{DynamicResource PlaceholderText}"
+                    BorderBrush="{DynamicResource InputBorder}" BorderThickness="1"
                     Cursor="Hand" />
         </StackPanel>
 
@@ -68,13 +68,13 @@
         <StackPanel Grid.Row="3" Orientation="Horizontal" Margin="0,0,0,4">
             <CheckBox Content="Enable Debug Log"
                       IsChecked="{Binding IsDebugEnabled}"
-                      Foreground="#FFCCCCCC"
+                      Foreground="{DynamicResource PrimaryText}"
                       VerticalContentAlignment="Center" />
             <Button Command="{Binding RunAnalysisCommand}"
                     Padding="10,2"
                     Margin="12,0,0,0"
-                    Background="#FF2E5D3A" Foreground="#FFCCCCCC"
-                    BorderBrush="#FF555555" BorderThickness="1"
+                    Background="{DynamicResource RunButtonBackground}" Foreground="{DynamicResource PrimaryText}"
+                    BorderBrush="{DynamicResource InputBorder}" BorderThickness="1"
                     FontSize="11" Cursor="Hand">
                 <Button.Style>
                     <Style TargetType="Button">
@@ -92,16 +92,16 @@
                     Command="{Binding ClearLogCommand}"
                     Padding="8,2"
                     Margin="8,0,0,0"
-                    Background="#FF3A3A3A" Foreground="#FF999999"
-                    BorderBrush="#FF555555" BorderThickness="1"
+                    Background="{DynamicResource ButtonBackground}" Foreground="{DynamicResource PlaceholderText}"
+                    BorderBrush="{DynamicResource InputBorder}" BorderThickness="1"
                     FontSize="11" Cursor="Hand"
                     Visibility="{Binding IsDebugEnabled, Converter={StaticResource BoolToVisibility}}" />
         </StackPanel>
 
         <!-- ── Debug Log Area ─────────────────────────────── -->
         <Border Grid.Row="4"
-                Background="#FF0D0D0D"
-                BorderBrush="#FF555555"
+                Background="{DynamicResource LogBackground}"
+                BorderBrush="{DynamicResource InputBorder}"
                 BorderThickness="1"
                 CornerRadius="3"
                 Margin="0,0,0,4"
@@ -109,7 +109,7 @@
             <ListBox ItemsSource="{Binding DebugLog}"
                      Background="Transparent"
                      BorderThickness="0"
-                     Foreground="#FF88CC88"
+                     Foreground="{DynamicResource LogText}"
                      FontFamily="Consolas"
                      FontSize="11"
                      ScrollViewer.HorizontalScrollBarVisibility="Auto"
@@ -127,7 +127,7 @@
         <!-- ── Hint text when debug is off ────────────────── -->
         <TextBlock Grid.Row="4"
                    Text="Enable debug log to see LLM reasoning for each analyzed window."
-                   Foreground="#FF666666"
+                   Foreground="{DynamicResource DimText}"
                    FontSize="11"
                    FontStyle="Italic"
                    HorizontalAlignment="Center"

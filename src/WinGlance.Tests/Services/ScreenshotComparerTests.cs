@@ -83,4 +83,70 @@ public class ScreenshotComparerTests
         var comparer = new ScreenshotComparer();
         comparer.Remove(new IntPtr(999));
     }
+
+    // ── Capture ──────────────────────────────────────────────────────────
+
+    [Fact]
+    public void CaptureWindow_InvalidHandle_ReturnsNull()
+    {
+        Assert.Null(ScreenshotComparer.CaptureWindow(IntPtr.Zero));
+    }
+
+    [Theory]
+    [InlineData(3000, 1000, 1500, 500)]
+    [InlineData(800, 600, 800, 600)] // already fits: unchanged
+    public void ScaleToFit_KeepsTheAspectRatio(int width, int height, int expectedWidth, int expectedHeight)
+    {
+        using var source = new Bitmap(width, height);
+
+        using var scaled = ScreenshotComparer.ScaleToFit(source, 1500);
+
+        Assert.Equal((expectedWidth, expectedHeight), (scaled.Width, scaled.Height));
+    }
+
+    // ── Staleness over time ──────────────────────────────────────────────
+
+    private static readonly IntPtr Window = new(42);
+    private static readonly DateTime T0 = new(2026, 10, 22, 12, 0, 0, DateTimeKind.Utc);
+
+    [Fact]
+    public void IsStale_SameContentPastTheThreshold_ReturnsTrue()
+    {
+        var comparer = new ScreenshotComparer();
+
+        Assert.False(comparer.IsStale(Window, 7UL, 30, T0)); // first capture
+        Assert.False(comparer.IsStale(Window, 7UL, 30, T0.AddSeconds(29)));
+        Assert.True(comparer.IsStale(Window, 7UL, 30, T0.AddSeconds(30)));
+    }
+
+    [Fact]
+    public void IsStale_ContentChange_RestartsTheClock()
+    {
+        var comparer = new ScreenshotComparer();
+        comparer.IsStale(Window, 7UL, 30, T0);
+
+        Assert.False(comparer.IsStale(Window, 8UL, 30, T0.AddSeconds(40))); // changed
+        Assert.False(comparer.IsStale(Window, 8UL, 30, T0.AddSeconds(60)));
+        Assert.True(comparer.IsStale(Window, 8UL, 30, T0.AddSeconds(70)));
+    }
+
+    [Fact]
+    public void IsStale_FailedCapture_IsNeverStale()
+    {
+        var comparer = new ScreenshotComparer();
+        comparer.IsStale(Window, 7UL, 30, T0);
+
+        Assert.False(comparer.IsStale(Window, null, 30, T0.AddMinutes(10)));
+    }
+
+    [Fact]
+    public void Remove_ForgetsTheWindowHistory()
+    {
+        var comparer = new ScreenshotComparer();
+        comparer.IsStale(Window, 7UL, 30, T0);
+
+        comparer.Remove(Window);
+
+        Assert.False(comparer.IsStale(Window, 7UL, 30, T0.AddMinutes(10))); // first capture again
+    }
 }

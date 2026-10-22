@@ -21,7 +21,25 @@ internal static partial class NativeMethods
     public const int ICON_BIG = 1;
     public const int ICON_SMALL2 = 2;
 
+    public const int GW_OWNER = 4;
     public const int GW_ENABLEDPOPUP = 6;
+
+    public const uint SMTO_ABORTIFHUNG = 0x0002;
+
+    public const int DWMWA_CLOAKED = 14;
+    public const int DWMWA_EXTENDED_FRAME_BOUNDS = 9;
+
+    public const int WS_EX_TRANSPARENT = 0x00000020;
+    public const int WS_EX_LAYERED = 0x00080000;
+
+    public static readonly IntPtr HWND_TOPMOST = new(-1);
+    public const uint SWP_NOACTIVATE = 0x0010;
+
+    public static readonly IntPtr HWND_BROADCAST = new(0xFFFF);
+
+    public const int HSHELL_REDRAW = 6;
+
+    public const uint MOD_NOREPEAT = 0x4000;
 
     public const uint DWM_TNP_RECTDESTINATION = 0x00000001;
     public const uint DWM_TNP_RECTSOURCE = 0x00000002;
@@ -34,6 +52,12 @@ internal static partial class NativeMethods
     public const int HSHELL_FLASH = 0x8006;
 
     public const uint PROCESS_QUERY_LIMITED_INFORMATION = 0x1000;
+    public const uint PROCESS_VM_READ = 0x0010;
+
+    public const uint TH32CS_SNAPPROCESS = 0x00000002;
+    public static readonly IntPtr INVALID_HANDLE_VALUE = new(-1);
+
+    public const int ProcessBasicInformation = 0;
 
     // SendInput constants
     public const uint INPUT_KEYBOARD = 1;
@@ -98,11 +122,27 @@ internal static partial class NativeMethods
         public static int Size => Marshal.SizeOf<INPUT>();
     }
 
+    // MOUSEINPUT is declared only to give the union its native size: SendInput rejects
+    // calls whose cbSize differs from sizeof(INPUT) (40 bytes on x64, 28 on x86).
     [StructLayout(LayoutKind.Explicit)]
     public struct InputUnion
     {
         [FieldOffset(0)]
+        public MOUSEINPUT Mouse;
+
+        [FieldOffset(0)]
         public KEYBDINPUT Keyboard;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct MOUSEINPUT
+    {
+        public int X;
+        public int Y;
+        public uint MouseData;
+        public uint Flags;
+        public uint Time;
+        public IntPtr ExtraInfo;
     }
 
     [StructLayout(LayoutKind.Sequential)]
@@ -113,6 +153,52 @@ internal static partial class NativeMethods
         public uint Flags;
         public uint Time;
         public IntPtr ExtraInfo;
+    }
+
+    // ── Process structures ──────────────────────────────────────────────
+
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+    public struct PROCESSENTRY32W
+    {
+        public uint Size;
+        public uint Usage;
+        public uint ProcessId;
+        public IntPtr DefaultHeapId;
+        public uint ModuleId;
+        public uint Threads;
+        public uint ParentProcessId;
+        public int PriorityClassBase;
+        public uint Flags;
+
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 260)]
+        public string ExeFile;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct PROCESS_BASIC_INFORMATION
+    {
+        public IntPtr ExitStatus;
+        public IntPtr PebBaseAddress;
+        public IntPtr AffinityMask;
+        public IntPtr BasePriority;
+        public IntPtr UniqueProcessId;
+        public IntPtr InheritedFromUniqueProcessId;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct MONITORINFO
+    {
+        public int Size;
+        public RECT Monitor;
+        public RECT WorkArea;
+        public uint Flags;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct DATA_BLOB
+    {
+        public int Size;
+        public IntPtr Data;
     }
 
     // ── Delegates ─────────────────────────────────────────────────────
@@ -159,6 +245,38 @@ internal static partial class NativeMethods
 
     [DllImport("user32.dll", EntryPoint = "SendMessageW")]
     public static extern IntPtr SendMessage(IntPtr hWnd, uint msg, IntPtr wParam, IntPtr lParam);
+
+    [DllImport("user32.dll", EntryPoint = "SendMessageTimeoutW")]
+    public static extern IntPtr SendMessageTimeout(IntPtr hWnd, uint msg, IntPtr wParam, IntPtr lParam, uint fuFlags, uint uTimeout, out IntPtr lpdwResult);
+
+    [DllImport("user32.dll", EntryPoint = "PostMessageW")]
+    public static extern bool PostMessage(IntPtr hWnd, uint msg, IntPtr wParam, IntPtr lParam);
+
+    [DllImport("user32.dll")]
+    public static extern bool EnumChildWindows(IntPtr hWndParent, EnumWindowsProc lpEnumFunc, IntPtr lParam);
+
+    [DllImport("user32.dll")]
+    public static extern bool IsWindow(IntPtr hWnd);
+
+    [DllImport("user32.dll")]
+    public static extern bool GetWindowRect(IntPtr hWnd, out RECT lpRect);
+
+    [DllImport("user32.dll")]
+    public static extern bool GetClientRect(IntPtr hWnd, out RECT lpRect);
+
+    [DllImport("user32.dll")]
+    public static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter, int x, int y, int cx, int cy, uint uFlags);
+
+    [DllImport("user32.dll", EntryPoint = "SetWindowLongW")]
+    public static extern int SetWindowLong(IntPtr hWnd, int nIndex, int dwNewLong);
+
+    public const uint MONITOR_DEFAULTTONEAREST = 2;
+
+    [DllImport("user32.dll")]
+    public static extern IntPtr MonitorFromWindow(IntPtr hwnd, uint dwFlags);
+
+    [DllImport("user32.dll", EntryPoint = "GetMonitorInfoW")]
+    public static extern bool GetMonitorInfo(IntPtr hMonitor, ref MONITORINFO lpmi);
 
     [DllImport("user32.dll")]
     public static extern bool DestroyIcon(IntPtr hIcon);
@@ -217,6 +335,23 @@ internal static partial class NativeMethods
     [DllImport("dwmapi.dll")]
     public static extern int DwmIsCompositionEnabled(out bool pfEnabled);
 
+    [DllImport("dwmapi.dll")]
+    public static extern int DwmGetWindowAttribute(IntPtr hwnd, int dwAttribute, out int pvAttribute, int cbAttribute);
+
+    [DllImport("dwmapi.dll")]
+    public static extern int DwmGetWindowAttribute(IntPtr hwnd, int dwAttribute, out RECT pvAttribute, int cbAttribute);
+
+    // ── Crypt32 (DPAPI) ───────────────────────────────────────────────
+
+    [DllImport("crypt32.dll", CharSet = CharSet.Unicode)]
+    public static extern bool CryptProtectData(ref DATA_BLOB pDataIn, string? szDataDescr, IntPtr pOptionalEntropy, IntPtr pvReserved, IntPtr pPromptStruct, int dwFlags, out DATA_BLOB pDataOut);
+
+    [DllImport("crypt32.dll", CharSet = CharSet.Unicode)]
+    public static extern bool CryptUnprotectData(ref DATA_BLOB pDataIn, IntPtr ppszDataDescr, IntPtr pOptionalEntropy, IntPtr pvReserved, IntPtr pPromptStruct, int dwFlags, out DATA_BLOB pDataOut);
+
+    [DllImport("kernel32.dll")]
+    public static extern IntPtr LocalFree(IntPtr hMem);
+
     // ── Kernel32 (UWP) ────────────────────────────────────────────────
 
     [DllImport("kernel32.dll")]
@@ -227,6 +362,26 @@ internal static partial class NativeMethods
 
     [DllImport("kernel32.dll", EntryPoint = "GetApplicationUserModelId", CharSet = CharSet.Unicode)]
     public static extern int GetApplicationUserModelId(IntPtr hProcess, ref uint applicationUserModelIdLength, char[] applicationUserModelId);
+
+    // ── Kernel32 / Ntdll (process tree, agent detection) ─────────────
+
+    [DllImport("kernel32.dll")]
+    public static extern IntPtr CreateToolhelp32Snapshot(uint dwFlags, uint th32ProcessID);
+
+    [DllImport("kernel32.dll", EntryPoint = "Process32FirstW", CharSet = CharSet.Unicode)]
+    public static extern bool Process32First(IntPtr hSnapshot, ref PROCESSENTRY32W lppe);
+
+    [DllImport("kernel32.dll", EntryPoint = "Process32NextW", CharSet = CharSet.Unicode)]
+    public static extern bool Process32Next(IntPtr hSnapshot, ref PROCESSENTRY32W lppe);
+
+    [DllImport("kernel32.dll")]
+    public static extern bool IsWow64Process(IntPtr hProcess, out bool wow64Process);
+
+    [DllImport("kernel32.dll")]
+    public static extern bool ReadProcessMemory(IntPtr hProcess, IntPtr lpBaseAddress, byte[] lpBuffer, nint nSize, out nint lpNumberOfBytesRead);
+
+    [DllImport("ntdll.dll")]
+    public static extern int NtQueryInformationProcess(IntPtr processHandle, int processInformationClass, ref PROCESS_BASIC_INFORMATION processInformation, int processInformationLength, out int returnLength);
 
     // ── Helpers ───────────────────────────────────────────────────────
 
@@ -251,5 +406,188 @@ internal static partial class NativeMethods
     {
         var exStyle = GetWindowLong(hWnd, GWL_EXSTYLE);
         return (exStyle & WS_EX_APPWINDOW) != 0;
+    }
+
+    /// <summary>
+    /// Lists every running process with its parent PID and executable name,
+    /// using a Toolhelp32 snapshot (a few milliseconds, no WMI).
+    /// </summary>
+    public static List<PROCESSENTRY32W> GetProcessEntries()
+    {
+        var entries = new List<PROCESSENTRY32W>();
+        var snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+        if (snapshot == INVALID_HANDLE_VALUE)
+            return entries;
+
+        try
+        {
+            var entry = new PROCESSENTRY32W { Size = (uint)Marshal.SizeOf<PROCESSENTRY32W>() };
+            if (!Process32First(snapshot, ref entry))
+                return entries;
+
+            do
+            {
+                entries.Add(entry);
+            }
+            while (Process32Next(snapshot, ref entry));
+
+            return entries;
+        }
+        finally
+        {
+            CloseHandle(snapshot);
+        }
+    }
+
+    /// <summary>
+    /// Reads the current directory of another process from its PEB.
+    /// Returns null for 32-bit targets, when WinGlance itself is not 64-bit, or when access is denied.
+    /// </summary>
+    public static string? TryGetProcessCurrentDirectory(int processId) =>
+        TryReadProcessParametersString(processId, ProcessParametersCurrentDirectoryOffset) is { } directory
+            // The PEB stores the directory with a trailing separator ("C:\work\")
+            ? System.IO.Path.TrimEndingDirectorySeparator(directory)
+            : null;
+
+    /// <summary>
+    /// Reads the command line of another process from its PEB.
+    /// Returns null for 32-bit targets, when WinGlance itself is not 64-bit, or when access is denied.
+    /// </summary>
+    public static string? TryGetProcessCommandLine(int processId) =>
+        TryReadProcessParametersString(processId, ProcessParametersCommandLineOffset);
+
+    // Stable x64 layout of RTL_USER_PROCESS_PARAMETERS: UNICODE_STRING fields
+    private const int ProcessParametersCurrentDirectoryOffset = 0x38;
+    private const int ProcessParametersCommandLineOffset = 0x70;
+
+    /// <summary>
+    /// Reads a UNICODE_STRING field of another process's RTL_USER_PROCESS_PARAMETERS.
+    /// Windows offers no public API for this; PEB.ProcessParameters sits at 0x20 on x64.
+    /// </summary>
+    private static string? TryReadProcessParametersString(int processId, int fieldOffset)
+    {
+        if (!Environment.Is64BitProcess)
+            return null;
+
+        var hProcess = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION | PROCESS_VM_READ, false, (uint)processId);
+        if (hProcess == IntPtr.Zero)
+            return null;
+
+        try
+        {
+            // A WOW64 process has a 32-bit PEB with different offsets
+            if (!IsWow64Process(hProcess, out var isWow64) || isWow64)
+                return null;
+
+            var info = new PROCESS_BASIC_INFORMATION();
+            if (NtQueryInformationProcess(hProcess, ProcessBasicInformation, ref info,
+                    Marshal.SizeOf<PROCESS_BASIC_INFORMATION>(), out _) != 0)
+                return null;
+
+            var parameters = ReadPointer(hProcess, info.PebBaseAddress + 0x20);
+            if (parameters == IntPtr.Zero)
+                return null;
+
+            // UNICODE_STRING: Length (bytes) at +0, Buffer at +8
+            var unicodeString = new byte[16];
+            if (!ReadProcessMemory(hProcess, parameters + fieldOffset, unicodeString, unicodeString.Length, out var read)
+                || read != unicodeString.Length)
+                return null;
+
+            var length = BitConverter.ToUInt16(unicodeString, 0);
+            var buffer = (IntPtr)BitConverter.ToInt64(unicodeString, 8);
+            if (length == 0 || buffer == IntPtr.Zero)
+                return null;
+
+            var chars = new byte[length];
+            if (!ReadProcessMemory(hProcess, buffer, chars, length, out read) || read != length)
+                return null;
+
+            return System.Text.Encoding.Unicode.GetString(chars);
+        }
+        finally
+        {
+            CloseHandle(hProcess);
+        }
+    }
+
+    private static IntPtr ReadPointer(IntPtr hProcess, IntPtr address)
+    {
+        var bytes = new byte[IntPtr.Size];
+        return ReadProcessMemory(hProcess, address, bytes, bytes.Length, out var read) && read == bytes.Length
+            ? (IntPtr)BitConverter.ToInt64(bytes, 0)
+            : IntPtr.Zero;
+    }
+
+    /// <summary>
+    /// True if DWM hides the window: on another virtual desktop, or a suspended or
+    /// closed UWP frame kept alive by ApplicationFrameHost. Such windows give black thumbnails.
+    /// </summary>
+    public static bool IsCloaked(IntPtr hWnd) =>
+        DwmGetWindowAttribute(hWnd, DWMWA_CLOAKED, out int cloaked, sizeof(int)) == 0 && cloaked != 0;
+
+    /// <summary>
+    /// Visible bounds of a window in physical pixels. GetWindowRect includes the invisible
+    /// resize borders of Windows 10/11; DWM's extended frame bounds do not.
+    /// </summary>
+    public static bool TryGetVisibleBounds(IntPtr hWnd, out RECT bounds)
+    {
+        if (DwmGetWindowAttribute(hWnd, DWMWA_EXTENDED_FRAME_BOUNDS, out bounds, Marshal.SizeOf<RECT>()) == 0
+            && bounds.Right > bounds.Left && bounds.Bottom > bounds.Top)
+            return true;
+
+        return GetWindowRect(hWnd, out bounds) && bounds.Right > bounds.Left && bounds.Bottom > bounds.Top;
+    }
+
+    /// <summary>Bounds of the monitor showing (most of) the window, in physical pixels.</summary>
+    public static bool TryGetMonitorBounds(IntPtr hWnd, out RECT bounds)
+    {
+        var info = new MONITORINFO { Size = Marshal.SizeOf<MONITORINFO>() };
+        var ok = GetMonitorInfo(MonitorFromWindow(hWnd, MONITOR_DEFAULTTONEAREST), ref info);
+        bounds = info.Monitor;
+        return ok;
+    }
+
+    /// <summary>
+    /// Encrypts data with DPAPI for the current Windows user. Returns null on failure.
+    /// </summary>
+    public static byte[]? ProtectForCurrentUser(byte[] data) => TransformWithDpapi(data, protect: true);
+
+    /// <summary>
+    /// Decrypts data encrypted by <see cref="ProtectForCurrentUser"/>. Returns null when the data
+    /// was encrypted by another user or machine, or is corrupt.
+    /// </summary>
+    public static byte[]? UnprotectForCurrentUser(byte[] data) => TransformWithDpapi(data, protect: false);
+
+    private static byte[]? TransformWithDpapi(byte[] data, bool protect)
+    {
+        const int CRYPTPROTECT_UI_FORBIDDEN = 0x1;
+
+        var handle = GCHandle.Alloc(data, GCHandleType.Pinned);
+        try
+        {
+            var input = new DATA_BLOB { Size = data.Length, Data = handle.AddrOfPinnedObject() };
+            var ok = protect
+                ? CryptProtectData(ref input, null, IntPtr.Zero, IntPtr.Zero, IntPtr.Zero, CRYPTPROTECT_UI_FORBIDDEN, out var output)
+                : CryptUnprotectData(ref input, IntPtr.Zero, IntPtr.Zero, IntPtr.Zero, IntPtr.Zero, CRYPTPROTECT_UI_FORBIDDEN, out output);
+            if (!ok)
+                return null;
+
+            try
+            {
+                var result = new byte[output.Size];
+                Marshal.Copy(output.Data, result, 0, output.Size);
+                return result;
+            }
+            finally
+            {
+                // The output buffer is allocated by crypt32 with LocalAlloc
+                LocalFree(output.Data);
+            }
+        }
+        finally
+        {
+            handle.Free();
+        }
     }
 }

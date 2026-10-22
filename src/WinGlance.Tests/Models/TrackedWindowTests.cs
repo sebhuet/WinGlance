@@ -156,5 +156,56 @@ public class TrackedWindowTests
         Assert.False(window.IsHung);
         Assert.False(window.IsModalBlocked);
         Assert.False(window.IsStale);
+        Assert.False(window.NeedsAgentAttention);
+    }
+
+    // ── Coding agents (FR-11) ───────────────────────────────────────────
+
+    [Fact]
+    public void ProcessId_DefaultsToZero_AndIsSetAtCreation()
+    {
+        Assert.Equal(0u, new TrackedWindow(IntPtr.Zero, "test", "Test").ProcessId);
+        Assert.Equal(42u, new TrackedWindow(IntPtr.Zero, "test", "Test") { ProcessId = 42 }.ProcessId);
+    }
+
+    [Fact]
+    public void Agent_DefaultsToNull_AndRaisesPropertyChanged()
+    {
+        var window = new TrackedWindow(IntPtr.Zero, "test", "Test");
+        var raised = false;
+        window.PropertyChanged += (_, e) => raised |= e.PropertyName == nameof(TrackedWindow.Agent);
+
+        Assert.Null(window.Agent);
+        window.Agent = new AgentBadge(AgentStatus.Busy, "Claude · working", "");
+
+        Assert.True(raised);
+    }
+
+    [Fact]
+    public void Agent_EqualBadge_DoesNotRaisePropertyChanged()
+    {
+        // Every poll builds a new badge instance; equal values must not refresh the UI
+        var window = new TrackedWindow(IntPtr.Zero, "test", "Test")
+        {
+            Agent = new AgentBadge(AgentStatus.Busy, "Claude · working", "details"),
+        };
+        var raised = false;
+        window.PropertyChanged += (_, _) => raised = true;
+
+        window.Agent = new AgentBadge(AgentStatus.Busy, "Claude · working", "details");
+
+        Assert.False(raised);
+    }
+
+    [Fact]
+    public void NeedsAgentAttention_RaisesPropertyChanged()
+    {
+        var window = new TrackedWindow(IntPtr.Zero, "test", "Test");
+        var raised = false;
+        window.PropertyChanged += (_, e) => raised |= e.PropertyName == nameof(TrackedWindow.NeedsAgentAttention);
+
+        window.NeedsAgentAttention = true;
+
+        Assert.True(raised);
     }
 }

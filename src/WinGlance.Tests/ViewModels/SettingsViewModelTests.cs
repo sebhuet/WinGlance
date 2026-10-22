@@ -24,13 +24,22 @@ public class SettingsViewModelTests : IDisposable
     public void Dispose()
     {
         _previewVm.Dispose();
-        try { Directory.Delete(_tempDir, recursive: true); }
-        catch { /* best-effort */ }
+        try
+        {
+            Directory.Delete(_tempDir, recursive: true);
+        }
+        catch
+        {
+            // best-effort
+        }
     }
+
+    // Auto-start values passed to the registry writer; recorded instead of written to HKCU\...\Run
+    private readonly List<bool> _autoStartCalls = [];
 
     private SettingsViewModel CreateVm(Action<double>? opacityCallback = null)
     {
-        return new SettingsViewModel(_configService, _config, _previewVm, opacityCallback);
+        return new SettingsViewModel(_configService, _config, _previewVm, opacityCallback, _autoStartCalls.Add);
     }
 
     // ── Defaults from config ─────────────────────────────────────────
@@ -172,9 +181,13 @@ public class SettingsViewModelTests : IDisposable
         vm.LlmModel = "llama3";
         vm.LlmStaleThresholdSeconds = 45;
 
+        vm.AgentDetectionEnabled = false;
+
         vm.Save();
 
+        Assert.Equal([true], _autoStartCalls); // applied through the injected writer, not the registry
         var loaded = _configService.Load();
+        Assert.False(loaded.AgentDetection.Enabled);
         Assert.Equal("grid", loaded.Layout);
         Assert.Equal(400, loaded.ThumbnailWidth);
         Assert.Equal(300, loaded.ThumbnailHeight);
@@ -206,5 +219,206 @@ public class SettingsViewModelTests : IDisposable
         var vm = CreateVm();
 
         Assert.NotNull(vm.EditPromptCommand);
+    }
+
+    // ── LLM provider ─────────────────────────────────────────────────
+
+    [Theory]
+    [InlineData("google", "https://generativelanguage.googleapis.com/v1beta", "gemini-2.0-flash")]
+    [InlineData("ollama", "http://localhost:11434", "llava")]
+    public void LlmProvider_Switch_AppliesTheProviderDefaults(string provider, string endpoint, string model)
+    {
+        var vm = CreateVm(); // openai defaults
+
+        vm.LlmProvider = provider;
+
+        Assert.Equal(endpoint, vm.LlmEndpoint);
+        Assert.Equal(model, vm.LlmModel);
+    }
+
+    [Fact]
+    public void LlmProvider_Switch_KeepsCustomValues()
+    {
+        var vm = CreateVm();
+        vm.LlmEndpoint = "https://my-proxy.example/v1";
+        vm.LlmModel = "my-model";
+
+        vm.LlmProvider = "ollama";
+
+        Assert.Equal("https://my-proxy.example/v1", vm.LlmEndpoint);
+        Assert.Equal("my-model", vm.LlmModel);
+    }
+
+    [Fact]
+    public void Save_LlmSettingChanged_NotifiesOnce()
+    {
+        var vm = CreateVm();
+        var notifications = 0;
+        vm.LlmSettingsChanged = () => notifications++;
+
+        vm.LlmEnabled = true;
+        vm.Save();
+        vm.Save(); // nothing changed since
+
+        Assert.Equal(1, notifications);
+    }
+
+    // ── Transparency (Options panel) ─────────────────────────────────
+
+    [Theory]
+    [InlineData(0.85, 15)]
+    [InlineData(1.0, 0)]
+    [InlineData(0.3, 70)]
+    public void PanelTransparency_IsTheOpacityTheOtherWayRound(double opacity, int expected)
+    {
+        _config.PanelOpacity = opacity;
+
+        Assert.Equal(expected, CreateVm().PanelTransparency);
+    }
+
+    [Fact]
+    public void PanelTransparency_AppliesTheOpacityLive()
+    {
+        double? applied = null;
+        var vm = CreateVm(opacity => applied = opacity);
+        var raised = new List<string?>();
+        vm.PropertyChanged += (_, e) => raised.Add(e.PropertyName);
+
+        vm.PanelTransparency = 40;
+
+        Assert.Equal(0.6, applied!.Value, precision: 6);
+        Assert.Equal(0.6, vm.PanelOpacity, precision: 6);
+        Assert.Contains(nameof(SettingsViewModel.PanelTransparency), raised);
+    }
+
+    [Theory]
+    [InlineData(-10, 0)]
+    [InlineData(95, 70)] // never below 30 % opacity: the panel must stay visible
+    public void PanelTransparency_IsClamped(int requested, int expected)
+    {
+        var vm = CreateVm();
+
+        vm.PanelTransparency = requested;
+
+        Assert.Equal(expected, vm.PanelTransparency);
+    }
+
+    [Fact]
+    public void SavePanelOpacity_SavesTheOpacityAlone()
+    {
+        var vm = CreateVm();
+        vm.PanelTransparency = 25;
+        vm.Layout = "grid"; // pending in the Settings view, not saved by the Options panel
+
+        vm.SavePanelOpacity();
+
+        var saved = _configService.Load();
+        Assert.Equal(0.75, saved.PanelOpacity, precision: 6);
+        Assert.Equal("fit", saved.Layout);
+        Assert.Empty(_autoStartCalls); // the registry is not touched either
+    }
+
+    // ── Highlight on switch ──────────────────────────────────────────
+
+    [Fact]
+    public void HighlightOnSwitch_IsReadFromConfig_AndSaved()
+    {
+        _config.HighlightOnSwitch = true;
+        var vm = CreateVm();
+        Assert.True(vm.HighlightOnSwitch);
+
+        vm.HighlightOnSwitch = false;
+        vm.Save();
+
+        Assert.False(_configService.Load().HighlightOnSwitch);
+    }
+
+    // ── Hotkey ───────────────────────────────────────────────────────
+
+    [Fact]
+    public void Save_RegistersTheHotkeyImmediately()
+    {
+        var vm = CreateVm();
+        string? applied = null;
+        vm.ApplyHotkey = hotkey =>
+        {
+            applied = hotkey;
+            return true;
+        };
+        vm.Hotkey = "Ctrl+Shift+W";
+
+        vm.Save();
+
+        Assert.Equal("Ctrl+Shift+W", applied);
+        Assert.Equal(string.Empty, vm.HotkeyStatus);
+    }
+
+    [Fact]
+    public void Save_HotkeyRejected_ShowsAStatusMessage()
+    {
+        var vm = CreateVm();
+        vm.ApplyHotkey = _ => false;
+
+        vm.Save();
+
+        Assert.StartsWith("Not registered", vm.HotkeyStatus);
+    }
+
+    [Fact]
+    public void ReportHotkeyResult_Success_ClearsTheStatus()
+    {
+        var vm = CreateVm();
+        vm.ReportHotkeyResult(false);
+
+        vm.ReportHotkeyResult(true);
+
+        Assert.Equal(string.Empty, vm.HotkeyStatus);
+    }
+
+    // ── Coding agents ────────────────────────────────────────────────
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void Constructor_InitializesAgentDetectionFromConfig(bool enabled)
+    {
+        _config.AgentDetection.Enabled = enabled;
+
+        Assert.Equal(enabled, CreateVm().AgentDetectionEnabled);
+    }
+
+    [Fact]
+    public void AgentDetectionEnabled_TurnedOff_RemovesMonitorFromPreview()
+    {
+        _config.AgentDetection.Enabled = true;
+        var vm = CreateVm();
+        vm.AgentDetectionEnabled = false;
+        Assert.Null(_previewVm.AgentMonitor);
+    }
+
+    [Fact]
+    public void AgentDetectionEnabled_TurnedOn_GivesPreviewAMonitorWithConfiguredInterval()
+    {
+        _config.AgentDetection.Enabled = false;
+        _config.AgentDetection.RefreshIntervalMs = 7000;
+        var vm = CreateVm();
+
+        vm.AgentDetectionEnabled = true;
+
+        Assert.NotNull(_previewVm.AgentMonitor);
+        Assert.Equal(TimeSpan.FromSeconds(7), _previewVm.AgentMonitor.RefreshInterval);
+    }
+
+    [Fact]
+    public void AgentDetectionEnabled_RaisesPropertyChanged()
+    {
+        _config.AgentDetection.Enabled = false;
+        var vm = CreateVm();
+        var raised = false;
+        vm.PropertyChanged += (_, e) => raised |= e.PropertyName == nameof(SettingsViewModel.AgentDetectionEnabled);
+
+        vm.AgentDetectionEnabled = true;
+
+        Assert.True(raised);
     }
 }

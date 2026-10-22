@@ -2,7 +2,8 @@
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
 
     <!-- Background colors -->
-    <SolidColorBrush x:Key="WindowBackground" Color="#E0202020" />
+    <!-- Opaque: the panel transparency comes from the Transparency setting alone -->
+    <SolidColorBrush x:Key="WindowBackground" Color="#FF202020" />
     <SolidColorBrush x:Key="TitleBarBackground" Color="#FF2D2D2D" />
     <SolidColorBrush x:Key="PanelBackground" Color="#FF1A1A1A" />
     <SolidColorBrush x:Key="ItemBackground" Color="#33000000" />
@@ -30,5 +31,14 @@
     <SolidColorBrush x:Key="FlashingBorder" Color="#FFFF8C00" />
     <SolidColorBrush x:Key="HungOverlay" Color="#88FF0000" />
     <SolidColorBrush x:Key="ModalBorder" Color="#FFFFCC00" />
+
+    <!-- Headings, messages and the Prompt Editor -->
+    <SolidColorBrush x:Key="HeaderText" Color="#FFDDDDDD" />
+    <SolidColorBrush x:Key="ErrorText" Color="#FFFF6B6B" />
+    <SolidColorBrush x:Key="EditorBackground" Color="#FF1E1E1E" />
+    <SolidColorBrush x:Key="EditorText" Color="#FFD4D4D4" />
+    <SolidColorBrush x:Key="LogBackground" Color="#FF0D0D0D" />
+    <SolidColorBrush x:Key="LogText" Color="#FF88CC88" />
+    <SolidColorBrush x:Key="RunButtonBackground" Color="#FF2E5D3A" />
 
 </ResourceDictionary>

@@ -53,10 +53,10 @@ public class PreviewViewModelTests
     // ── Layout property ──────────────────────────────────────────────────
 
     [Fact]
-    public void Layout_DefaultsToHorizontal()
+    public void Layout_DefaultsToFit()
     {
         using var vm = new PreviewViewModel();
-        Assert.Equal("horizontal", vm.Layout);
+        Assert.Equal("fit", vm.Layout);
     }
 
     [Fact]
@@ -82,7 +82,7 @@ public class PreviewViewModelTests
         var raised = false;
         vm.PropertyChanged += (_, _) => raised = true;
 
-        vm.Layout = "horizontal"; // same as default
+        vm.Layout = "fit"; // same as default
 
         Assert.False(raised);
     }
@@ -300,5 +300,226 @@ public class PreviewViewModelTests
         var vm = new PreviewViewModel();
         vm.Dispose();
         Assert.False(vm.IsPolling);
+    }
+
+    [Fact]
+    public void Start_StartsPolling_AndStopStopsIt()
+    {
+        using var vm = new PreviewViewModel();
+
+        vm.Start(); // first scan runs on a background thread
+        Assert.True(vm.IsPolling);
+
+        vm.Stop();
+        Assert.False(vm.IsPolling);
+    }
+
+    // ── Fit layout ───────────────────────────────────────────────────────
+
+    private static PreviewViewModel FitViewModel(int windows)
+    {
+        var vm = new PreviewViewModel { Layout = PreviewViewModel.FitLayout };
+        for (var i = 0; i < windows; i++)
+            vm.Windows.Add(new TrackedWindow((IntPtr)(i + 1), "Code", "VS Code") { AspectRatio = 1.84 });
+        return vm;
+    }
+
+    [Fact]
+    public void FitLayout_ThumbnailsFollowThePanelSize()
+    {
+        using var vm = FitViewModel(5);
+
+        vm.SetViewportSize(new System.Windows.Size(900, 560));
+        var small = vm.DisplayThumbnailWidth;
+        vm.SetViewportSize(new System.Windows.Size(1800, 1120));
+
+        Assert.True(vm.DisplayThumbnailWidth > small * 1.8);
+        Assert.Equal(1.84, vm.DisplayThumbnailWidth / vm.DisplayThumbnailHeight, precision: 1);
+    }
+
+    [Fact]
+    public void StatusRowScale_FollowsTheDisplayedThumbnailWidth()
+    {
+        using var vm = FitViewModel(1);
+        var changed = new List<string?>();
+        vm.PropertyChanged += (_, e) => changed.Add(e.PropertyName);
+
+        vm.SetViewportSize(new System.Windows.Size(1800, 1120));
+
+        Assert.Contains(nameof(PreviewViewModel.StatusRowScale), changed);
+        Assert.True(vm.StatusRowScale > 1);
+        Assert.Equal(vm.DisplayThumbnailWidth, vm.StatusRowWidth * vm.StatusRowScale, precision: 6);
+    }
+
+    [Fact]
+    public void FitLayout_IgnoresTheConfiguredSize()
+    {
+        using var vm = FitViewModel(1);
+        vm.SetViewportSize(new System.Windows.Size(900, 560));
+
+        vm.ThumbnailWidth = 120;
+
+        Assert.NotEqual(120, vm.DisplayThumbnailWidth);
+    }
+
+    [Theory]
+    [InlineData("horizontal")]
+    [InlineData("vertical")]
+    [InlineData("grid")]
+    public void FixedLayouts_UseTheConfiguredSize(string layout)
+    {
+        using var vm = FitViewModel(5);
+        vm.SetViewportSize(new System.Windows.Size(1800, 1120));
+        vm.ThumbnailWidth = 240;
+        vm.ThumbnailHeight = 130;
+
+        vm.Layout = layout;
+
+        Assert.Equal((240.0, 130.0), (vm.DisplayThumbnailWidth, vm.DisplayThumbnailHeight));
+        Assert.False(vm.IsFitLayout);
+    }
+
+    [Fact]
+    public void FitLayout_RaisesIsFitLayoutChanges()
+    {
+        using var vm = new PreviewViewModel { Layout = "grid" };
+        var raised = false;
+        vm.PropertyChanged += (_, e) => raised |= e.PropertyName == nameof(PreviewViewModel.IsFitLayout);
+
+        vm.Layout = PreviewViewModel.FitLayout;
+
+        Assert.True(raised);
+        Assert.True(vm.IsFitLayout);
+    }
+
+    [Fact]
+    public void GetWindowsSnapshot_ReturnsACopy()
+    {
+        using var vm = new PreviewViewModel();
+        vm.Windows.Add(new TrackedWindow((IntPtr)1, "a", "A"));
+
+        var snapshot = vm.GetWindowsSnapshot();
+        vm.Windows.Clear();
+
+        Assert.Single(snapshot);
+    }
+
+    // ── Coding agents (FR-11) ────────────────────────────────────────────
+
+    private static AgentBadge Badge(AgentStatus status) => new(status, status.ToString(), "");
+
+    private static TrackedWindow WindowWithAgent(AgentStatus? status, bool isActive = false) =>
+        new((IntPtr)1, "Code", "VS Code")
+        {
+            IsActive = isActive,
+            Agent = status is null ? null : Badge(status.Value),
+        };
+
+    [Fact]
+    public void AgentMonitor_DefaultsToNull()
+    {
+        using var vm = new PreviewViewModel();
+        Assert.Null(vm.AgentMonitor);
+    }
+
+    [Fact]
+    public void ApplyAgentState_SetsTheBadge()
+    {
+        var window = WindowWithAgent(null);
+        var badge = Badge(AgentStatus.Busy);
+
+        PreviewViewModel.ApplyAgentState(window, badge);
+
+        Assert.Same(badge, window.Agent);
+    }
+
+    [Theory]
+    [InlineData(AgentStatus.Waiting, false, true)]
+    [InlineData(AgentStatus.Waiting, true, false)] // the user is looking at it
+    [InlineData(AgentStatus.Busy, false, false)]
+    [InlineData(AgentStatus.Running, false, false)]
+    [InlineData(AgentStatus.Idle, false, false)] // idle from the start: nothing new to see
+    public void ApplyAgentState_FromNoAgent_FlagsOnlyAnUnfocusedWaitingAgent(
+        AgentStatus status, bool isActive, bool expected)
+    {
+        var window = WindowWithAgent(null, isActive);
+
+        PreviewViewModel.ApplyAgentState(window, Badge(status));
+
+        Assert.Equal(expected, window.NeedsAgentAttention);
+    }
+
+    [Fact]
+    public void ApplyAgentState_BusyToIdle_FlagsTheFinishedTurn()
+    {
+        var window = WindowWithAgent(AgentStatus.Busy);
+
+        PreviewViewModel.ApplyAgentState(window, Badge(AgentStatus.Idle));
+
+        Assert.True(window.NeedsAgentAttention);
+    }
+
+    [Fact]
+    public void ApplyAgentState_BusyToIdleWhileFocused_DoesNotFlag()
+    {
+        var window = WindowWithAgent(AgentStatus.Busy, isActive: true);
+
+        PreviewViewModel.ApplyAgentState(window, Badge(AgentStatus.Idle));
+
+        Assert.False(window.NeedsAgentAttention);
+    }
+
+    [Fact]
+    public void ApplyAgentState_FinishedTurn_StaysFlaggedUntilTheWindowIsFocused()
+    {
+        var window = WindowWithAgent(AgentStatus.Busy);
+        PreviewViewModel.ApplyAgentState(window, Badge(AgentStatus.Idle));
+
+        PreviewViewModel.ApplyAgentState(window, Badge(AgentStatus.Idle));
+        Assert.True(window.NeedsAgentAttention); // still unseen
+
+        window.IsActive = true;
+        PreviewViewModel.ApplyAgentState(window, Badge(AgentStatus.Idle));
+        Assert.False(window.NeedsAgentAttention); // seen
+
+        window.IsActive = false;
+        PreviewViewModel.ApplyAgentState(window, Badge(AgentStatus.Idle));
+        Assert.False(window.NeedsAgentAttention); // already seen, not flagged again
+    }
+
+    [Fact]
+    public void ApplyAgentState_NewTurn_ClearsTheFinishedFlag()
+    {
+        var window = WindowWithAgent(AgentStatus.Busy);
+        PreviewViewModel.ApplyAgentState(window, Badge(AgentStatus.Idle));
+
+        PreviewViewModel.ApplyAgentState(window, Badge(AgentStatus.Busy));
+
+        Assert.False(window.NeedsAgentAttention);
+    }
+
+    [Fact]
+    public void ApplyAgentState_AgentGone_ClearsBadgeAndFlag()
+    {
+        var window = WindowWithAgent(AgentStatus.Waiting);
+        window.NeedsAgentAttention = true;
+
+        PreviewViewModel.ApplyAgentState(window, null);
+
+        Assert.Null(window.Agent);
+        Assert.False(window.NeedsAgentAttention);
+    }
+
+    [Fact]
+    public void ApplyAgentState_WaitingAgain_FlagsAgainAfterFocusIsLost()
+    {
+        var window = WindowWithAgent(AgentStatus.Waiting, isActive: true);
+        PreviewViewModel.ApplyAgentState(window, Badge(AgentStatus.Waiting));
+        Assert.False(window.NeedsAgentAttention);
+
+        window.IsActive = false;
+        PreviewViewModel.ApplyAgentState(window, Badge(AgentStatus.Waiting));
+
+        Assert.True(window.NeedsAgentAttention);
     }
 }
