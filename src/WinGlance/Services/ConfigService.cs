@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.IO;
 using System.Text.Json;
 using WinGlance.Models;
@@ -23,7 +22,10 @@ internal sealed class ConfigService
 
     public ConfigService()
     {
-        _configPath = GetConfigPath();
+        _configPath = ResolveConfigPath(
+            Path.GetDirectoryName(Environment.ProcessPath),
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            IsDirectoryWritable);
     }
 
     /// <summary>
@@ -39,8 +41,9 @@ internal sealed class ConfigService
     public string ConfigPath => _configPath;
 
     /// <summary>
-    /// Loads the configuration from disk. Returns defaults if the file
-    /// does not exist or contains invalid JSON.
+    /// Loads the configuration from disk. Returns defaults if the file does not exist,
+    /// cannot be read or contains invalid JSON; missing sections and out-of-range values
+    /// are replaced by defaults (see <see cref="Normalize"/>).
     /// </summary>
     public AppConfig Load()
     {
@@ -50,16 +53,16 @@ internal sealed class ConfigService
                 return new AppConfig();
 
             var json = File.ReadAllText(_configPath);
-            return JsonSerializer.Deserialize<AppConfig>(json, s_jsonOptions) ?? new AppConfig();
+            return Normalize(JsonSerializer.Deserialize<AppConfig>(json, s_jsonOptions) ?? new AppConfig());
         }
         catch (JsonException ex)
         {
-            Trace.TraceWarning($"Corrupt config file at {_configPath}: {ex.Message}");
+            Log.Warning($"Corrupt config file at {_configPath}, using defaults", ex);
             return new AppConfig();
         }
-        catch (IOException ex)
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            Trace.TraceWarning($"Failed to read config file at {_configPath}: {ex.Message}");
+            Log.Warning($"Failed to read config file at {_configPath}, using defaults", ex);
             return new AppConfig();
         }
     }
@@ -81,36 +84,80 @@ internal sealed class ConfigService
     }
 
     /// <summary>
-    /// Determines the config file path. Prefers the executable directory;
-    /// falls back to <c>%LOCALAPPDATA%\WinGlance\</c> if unavailable.
+    /// Repairs a deserialized configuration so that the rest of the app can trust it: a
+    /// hand-edited file can hold <c>null</c> sections (which crashed startup) or values the
+    /// UI cannot produce (an opacity of 0 made the panel invisible).
     /// </summary>
-    private static string GetConfigPath()
+    internal static AppConfig Normalize(AppConfig config)
     {
-        // Try the executable's directory first
-        var exePath = Environment.ProcessPath;
-        if (exePath is not null)
-        {
-            var exeDir = Path.GetDirectoryName(exePath);
-            if (exeDir is not null)
-            {
-                var candidate = Path.Combine(exeDir, ConfigFileName);
-                try
-                {
-                    // Test writability by checking/creating the directory
-                    Directory.CreateDirectory(exeDir);
-                    return candidate;
-                }
-                catch
-                {
-                    // Not writable — fall through to LOCALAPPDATA
-                }
-            }
-        }
+        var defaults = new AppConfig();
 
-        // Fallback: %LOCALAPPDATA%\WinGlance\
-        var localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+        config.MonitoredApps = (config.MonitoredApps ?? [])
+            .Where(a => a is not null && !string.IsNullOrWhiteSpace(a.ProcessName))
+            .Select(a => new MonitoredAppConfig
+            {
+                ProcessName = a.ProcessName.Trim(),
+                DisplayName = string.IsNullOrWhiteSpace(a.DisplayName) ? a.ProcessName.Trim() : a.DisplayName,
+            })
+            .ToList();
+
+        config.Layout = config.Layout?.ToLowerInvariant() is "horizontal" or "vertical" or "grid"
+            ? config.Layout.ToLowerInvariant()
+            : defaults.Layout;
+        config.ThumbnailWidth = Math.Clamp(config.ThumbnailWidth, 100, 500);
+        config.ThumbnailHeight = Math.Clamp(config.ThumbnailHeight, 75, 400);
+        config.PanelOpacity = double.IsFinite(config.PanelOpacity)
+            ? Math.Clamp(config.PanelOpacity, 0.3, 1.0)
+            : defaults.PanelOpacity;
+        config.PollingIntervalMs = Math.Clamp(config.PollingIntervalMs, 500, 5000);
+        config.Hotkey = string.IsNullOrWhiteSpace(config.Hotkey) ? defaults.Hotkey : config.Hotkey;
+
+        config.Llm ??= new LlmConfig();
+        config.Llm.Provider = string.IsNullOrWhiteSpace(config.Llm.Provider) ? defaults.Llm.Provider : config.Llm.Provider;
+        config.Llm.Endpoint ??= string.Empty;
+        config.Llm.ApiKey ??= string.Empty;
+        config.Llm.Model ??= string.Empty;
+        config.Llm.Prompt = string.IsNullOrWhiteSpace(config.Llm.Prompt) ? LlmConfig.DefaultPrompt : config.Llm.Prompt;
+        config.Llm.StaleThresholdSeconds = Math.Clamp(config.Llm.StaleThresholdSeconds, 10, 120);
+
+        config.AgentDetection ??= new AgentDetectionConfig();
+        config.AgentDetection.RefreshIntervalMs = Math.Clamp(config.AgentDetection.RefreshIntervalMs, 1000, 60000);
+
+        return config;
+    }
+
+    /// <summary>
+    /// Determines the config file path: next to the executable when that folder is writable
+    /// (portable use), otherwise <c>%LOCALAPPDATA%\WinGlance\</c>.
+    /// </summary>
+    internal static string ResolveConfigPath(string? exeDirectory, string localAppData, Func<string, bool> isWritable)
+    {
+        if (exeDirectory is not null && isWritable(exeDirectory))
+            return Path.Combine(exeDirectory, ConfigFileName);
+
         var fallbackDir = Path.Combine(localAppData, "WinGlance");
         Directory.CreateDirectory(fallbackDir);
         return Path.Combine(fallbackDir, ConfigFileName);
+    }
+
+    /// <summary>
+    /// True if a file can be created in the directory. Creating the directory itself is no
+    /// proof: it succeeds on an existing read-only folder such as Program Files.
+    /// </summary>
+    internal static bool IsDirectoryWritable(string directory)
+    {
+        var probe = Path.Combine(directory, $".winglance-write-test-{Guid.NewGuid():N}");
+        try
+        {
+            using (File.Create(probe, 1, FileOptions.DeleteOnClose))
+            {
+            }
+
+            return true;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return false;
+        }
     }
 }

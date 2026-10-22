@@ -11,19 +11,24 @@ namespace WinGlance.ViewModels;
 /// </summary>
 internal sealed class ApplicationsViewModel : ViewModelBase
 {
-    private readonly WindowEnumerator _enumerator = new();
+    private readonly Func<List<DiscoveredApp>> _discoverRunningApps;
     private readonly ConfigService _configService;
     private readonly AppConfig _config;
     private readonly Action<IReadOnlyList<MonitoredApp>> _onMonitoredAppsChanged;
 
+    /// <param name="discoverRunningApps">
+    /// Scans the running applications; defaults to <see cref="WindowEnumerator.DiscoverRunningApps"/>.
+    /// </param>
     public ApplicationsViewModel(
         ConfigService configService,
         AppConfig config,
-        Action<IReadOnlyList<MonitoredApp>> onMonitoredAppsChanged)
+        Action<IReadOnlyList<MonitoredApp>> onMonitoredAppsChanged,
+        Func<List<DiscoveredApp>>? discoverRunningApps = null)
     {
         _configService = configService;
         _config = config;
         _onMonitoredAppsChanged = onMonitoredAppsChanged;
+        _discoverRunningApps = discoverRunningApps ?? new WindowEnumerator().DiscoverRunningApps;
 
         RefreshCommand = new RelayCommand(_ => Refresh());
         SaveCommand = new RelayCommand(_ => Save());
@@ -40,24 +45,39 @@ internal sealed class ApplicationsViewModel : ViewModelBase
 
     /// <summary>
     /// Scans running applications and merges with the current monitored list.
-    /// Already-monitored apps retain their checked state.
+    /// Already-monitored apps retain their checked state and display name; monitored apps
+    /// that are not running are listed too (0 windows), so that saving does not drop them.
     /// </summary>
     public void Refresh()
     {
-        var discovered = _enumerator.DiscoverRunningApps();
-        var monitored = _config.MonitoredApps
-            .ToDictionary(a => a.ProcessName, StringComparer.OrdinalIgnoreCase);
+        var discovered = _discoverRunningApps();
+
+        // A hand-edited config can list the same process twice; the first entry wins
+        var monitored = new Dictionary<string, MonitoredAppConfig>(StringComparer.OrdinalIgnoreCase);
+        foreach (var app in _config.MonitoredApps)
+            monitored.TryAdd(app.ProcessName, app);
 
         Apps.Clear();
 
         foreach (var app in discovered)
         {
-            var isMonitored = monitored.TryGetValue(app.ProcessName, out var existing);
+            var isMonitored = monitored.Remove(app.ProcessName, out var existing);
             Apps.Add(new AppEntry(app.ProcessName)
             {
                 WindowCount = app.WindowCount,
                 IsMonitored = isMonitored,
                 DisplayName = isMonitored ? existing!.DisplayName : app.ProcessName,
+            });
+        }
+
+        // What remains is monitored but not running right now
+        foreach (var app in monitored.Values.OrderBy(a => a.ProcessName, StringComparer.OrdinalIgnoreCase))
+        {
+            Apps.Add(new AppEntry(app.ProcessName)
+            {
+                WindowCount = 0,
+                IsMonitored = true,
+                DisplayName = app.DisplayName,
             });
         }
     }
@@ -73,7 +93,8 @@ internal sealed class ApplicationsViewModel : ViewModelBase
             .Select(a => new MonitoredAppConfig
             {
                 ProcessName = a.ProcessName,
-                DisplayName = a.DisplayName,
+                // An emptied name would give the group an empty header
+                DisplayName = string.IsNullOrWhiteSpace(a.DisplayName) ? a.ProcessName : a.DisplayName.Trim(),
             })
             .ToList();
 

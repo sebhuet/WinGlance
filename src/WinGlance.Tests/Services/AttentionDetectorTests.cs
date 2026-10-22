@@ -1,15 +1,18 @@
+using WinGlance.NativeApi;
 using WinGlance.Services;
 
 namespace WinGlance.Tests.Services;
 
 public class AttentionDetectorTests
 {
+    private static readonly IntPtr Window = new(0x1234);
+
     [Fact]
     public void IsFlashing_UnknownHandle_ReturnsFalse()
     {
         var detector = new AttentionDetector();
 
-        Assert.False(detector.IsFlashing(new IntPtr(99999)));
+        Assert.False(detector.IsFlashing(Window));
     }
 
     [Fact]
@@ -17,9 +20,7 @@ public class AttentionDetectorTests
     {
         var detector = new AttentionDetector();
 
-        var result = detector.GetFlashingWindows();
-
-        Assert.Empty(result);
+        Assert.Empty(detector.GetFlashingWindows());
     }
 
     [Fact]
@@ -27,9 +28,9 @@ public class AttentionDetectorTests
     {
         var detector = new AttentionDetector();
 
-        detector.ClearFlashing(new IntPtr(12345));
+        var exception = Record.Exception(() => detector.ClearFlashing(Window));
 
-        Assert.False(detector.IsFlashing(new IntPtr(12345)));
+        Assert.Null(exception);
     }
 
     [Fact]
@@ -37,6 +38,54 @@ public class AttentionDetectorTests
     {
         var detector = new AttentionDetector();
 
-        detector.Dispose();
+        var exception = Record.Exception(detector.Dispose);
+
+        Assert.Null(exception);
+    }
+
+    // ── Shell hook notifications ─────────────────────────────────────────
+
+    [Fact]
+    public void HandleShellMessage_Flash_MarksTheWindowAsFlashing()
+    {
+        var detector = new AttentionDetector();
+
+        detector.HandleShellMessage(NativeMethods.HSHELL_FLASH, Window);
+
+        Assert.True(detector.IsFlashing(Window));
+    }
+
+    [Fact]
+    public void HandleShellMessage_RedrawAfterFlash_ClearsIt()
+    {
+        // The shell sends a plain HSHELL_REDRAW when the window stops flashing
+        var detector = new AttentionDetector();
+        detector.HandleShellMessage(NativeMethods.HSHELL_FLASH, Window);
+
+        detector.HandleShellMessage(NativeMethods.HSHELL_REDRAW, Window);
+
+        Assert.False(detector.IsFlashing(Window));
+    }
+
+    [Fact]
+    public void HandleShellMessage_OtherCodes_AreIgnored()
+    {
+        var detector = new AttentionDetector();
+        detector.HandleShellMessage(NativeMethods.HSHELL_FLASH, Window);
+
+        detector.HandleShellMessage(1, Window); // HSHELL_WINDOWCREATED
+
+        Assert.True(detector.IsFlashing(Window));
+    }
+
+    [Fact]
+    public void PruneClosedWindows_ForgetsHandlesThatNoLongerExist()
+    {
+        var detector = new AttentionDetector();
+        detector.HandleShellMessage(NativeMethods.HSHELL_FLASH, new IntPtr(0x7FFFFFF0)); // not a window
+
+        detector.PruneClosedWindows();
+
+        Assert.Empty(detector.GetFlashingWindows());
     }
 }

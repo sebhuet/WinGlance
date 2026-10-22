@@ -31,10 +31,7 @@ public class ApplicationsViewModelTests : IDisposable
         }
     }
 
-    private ApplicationsViewModel CreateVm(Action<IReadOnlyList<MonitoredApp>>? callback = null)
-    {
-        return new ApplicationsViewModel(_configService, _config, callback ?? (_ => { }));
-    }
+    private ApplicationsViewModel CreateVm() => CreateVm([]);
 
     [Fact]
     public void Apps_DefaultsToEmpty()
@@ -60,88 +57,131 @@ public class ApplicationsViewModelTests : IDisposable
         Assert.NotNull(vm.SaveCommand);
     }
 
-    [Fact]
-    public void Refresh_PopulatesApps()
+    // Deterministic scan: the tests used to depend on whatever happened to run on the machine
+    private static List<DiscoveredApp> Running(params (string Name, int Windows)[] apps) =>
+        apps.Select(a => new DiscoveredApp(a.Name, a.Windows)).ToList();
+
+    private ApplicationsViewModel CreateVm(
+        List<DiscoveredApp> running,
+        Action<IReadOnlyList<MonitoredApp>>? callback = null)
     {
-        var vm = CreateVm();
-
-        vm.Refresh();
-
-        // Should discover at least the test runner or other running apps
-        Assert.NotEmpty(vm.Apps);
+        return new ApplicationsViewModel(_configService, _config, callback ?? (_ => { }), () => running);
     }
 
     [Fact]
-    public void Refresh_PreservesMonitoredState()
+    public void Refresh_ListsRunningApps()
     {
-        // Pre-configure a monitored app that we know is running (dotnet is running the test)
-        _config.MonitoredApps.Add(new MonitoredAppConfig
-        {
-            ProcessName = "dotnet",
-            DisplayName = "Test Runner",
-        });
+        var vm = CreateVm(Running(("Code", 3), ("notepad", 1)));
 
-        var vm = CreateVm();
         vm.Refresh();
 
-        var dotnetEntry = vm.Apps.FirstOrDefault(a =>
-            a.ProcessName.Equals("dotnet", StringComparison.OrdinalIgnoreCase));
+        Assert.Equal(["Code", "notepad"], vm.Apps.Select(a => a.ProcessName));
+        Assert.Equal(3, vm.Apps[0].WindowCount);
+        Assert.All(vm.Apps, a => Assert.False(a.IsMonitored));
+    }
 
-        if (dotnetEntry is not null)
-        {
-            Assert.True(dotnetEntry.IsMonitored);
-            Assert.Equal("Test Runner", dotnetEntry.DisplayName);
-        }
-        // If dotnet isn't discoverable (e.g. runs under testhost), that's OK — skip the assertion
+    [Fact]
+    public void Refresh_PreservesMonitoredStateAndDisplayName()
+    {
+        _config.MonitoredApps.Add(new MonitoredAppConfig { ProcessName = "code", DisplayName = "VS Code" });
+        var vm = CreateVm(Running(("Code", 3)));
+
+        vm.Refresh();
+
+        var entry = Assert.Single(vm.Apps);
+        Assert.True(entry.IsMonitored);
+        Assert.Equal("VS Code", entry.DisplayName);
+    }
+
+    [Fact]
+    public void Refresh_KeepsMonitoredAppsThatAreNotRunning()
+    {
+        _config.MonitoredApps.Add(new MonitoredAppConfig { ProcessName = "Slack", DisplayName = "Slack" });
+        var vm = CreateVm(Running(("Code", 3)));
+
+        vm.Refresh();
+
+        var slack = Assert.Single(vm.Apps, a => a.ProcessName == "Slack");
+        Assert.True(slack.IsMonitored);
+        Assert.Equal(0, slack.WindowCount);
+    }
+
+    [Fact]
+    public void Refresh_DuplicateMonitoredEntries_DoNotThrow()
+    {
+        _config.MonitoredApps.Add(new MonitoredAppConfig { ProcessName = "Code", DisplayName = "First" });
+        _config.MonitoredApps.Add(new MonitoredAppConfig { ProcessName = "CODE", DisplayName = "Second" });
+        var vm = CreateVm(Running(("Code", 1)));
+
+        vm.Refresh();
+
+        Assert.Equal("First", Assert.Single(vm.Apps).DisplayName);
     }
 
     [Fact]
     public void Save_UpdatesConfigAndNotifiesCallback()
     {
         IReadOnlyList<MonitoredApp>? callbackResult = null;
-        var vm = CreateVm(apps => callbackResult = apps);
-
+        var vm = CreateVm(Running(("Code", 3), ("notepad", 1)), apps => callbackResult = apps);
         vm.Refresh();
 
-        // Monitor the first discovered app
-        if (vm.Apps.Count > 0)
-        {
-            vm.Apps[0].IsMonitored = true;
-            vm.Apps[0].DisplayName = "Test App";
-            vm.Save();
+        vm.Apps[0].IsMonitored = true;
+        vm.Apps[0].DisplayName = "VS Code";
+        vm.Save();
 
-            Assert.Single(_config.MonitoredApps);
-            Assert.Equal(vm.Apps[0].ProcessName, _config.MonitoredApps[0].ProcessName);
-            Assert.Equal("Test App", _config.MonitoredApps[0].DisplayName);
+        var saved = Assert.Single(_config.MonitoredApps);
+        Assert.Equal(("Code", "VS Code"), (saved.ProcessName, saved.DisplayName));
+        Assert.Equal("VS Code", Assert.Single(callbackResult!).DisplayName);
+        Assert.Single(_configService.Load().MonitoredApps);
+    }
 
-            Assert.NotNull(callbackResult);
-            Assert.Single(callbackResult);
+    [Fact]
+    public void Save_KeepsMonitoredAppsThatAreNotRunning()
+    {
+        _config.MonitoredApps.Add(new MonitoredAppConfig { ProcessName = "Slack", DisplayName = "Slack" });
+        var vm = CreateVm(Running(("Code", 3)));
+        vm.Refresh();
 
-            // Verify file was written
-            var loaded = _configService.Load();
-            Assert.Single(loaded.MonitoredApps);
-        }
+        vm.Save();
+
+        Assert.Equal("Slack", Assert.Single(_config.MonitoredApps).ProcessName);
+    }
+
+    [Fact]
+    public void Save_EmptyDisplayName_FallsBackToProcessName()
+    {
+        var vm = CreateVm(Running(("Code", 3)));
+        vm.Refresh();
+        vm.Apps[0].IsMonitored = true;
+        vm.Apps[0].DisplayName = "  ";
+
+        vm.Save();
+
+        Assert.Equal("Code", Assert.Single(_config.MonitoredApps).DisplayName);
     }
 
     [Fact]
     public void Save_WithNoMonitoredApps_ClearsList()
     {
-        _config.MonitoredApps.Add(new MonitoredAppConfig
-        {
-            ProcessName = "old",
-            DisplayName = "Old App",
-        });
-
-        var vm = CreateVm();
+        _config.MonitoredApps.Add(new MonitoredAppConfig { ProcessName = "old", DisplayName = "Old App" });
+        var vm = CreateVm(Running(("Code", 3)));
         vm.Refresh();
 
-        // Ensure nothing is monitored
         foreach (var app in vm.Apps)
             app.IsMonitored = false;
-
         vm.Save();
 
         Assert.Empty(_config.MonitoredApps);
+    }
+
+    [Fact]
+    public void Constructor_WithoutDiscovery_UsesTheRealScan()
+    {
+        var vm = new ApplicationsViewModel(_configService, _config, _ => { });
+
+        var exception = Record.Exception(vm.Refresh);
+
+        Assert.Null(exception);
     }
 }
 

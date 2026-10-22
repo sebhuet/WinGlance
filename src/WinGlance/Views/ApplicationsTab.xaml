@@ -48,8 +48,19 @@
                             </DataTemplate>
                         </GridViewColumn.CellTemplate>
                     </GridViewColumn>
-                    <GridViewColumn Header="Display Name" Width="160"
-                                    DisplayMemberBinding="{Binding DisplayName}" />
+                    <!-- Editable: the name shown as the group header in Preview -->
+                    <GridViewColumn Header="Display Name" Width="160">
+                        <GridViewColumn.CellTemplate>
+                            <DataTemplate>
+                                <TextBox Text="{Binding DisplayName, UpdateSourceTrigger=PropertyChanged}"
+                                         MinWidth="140"
+                                         Background="#FF2A2A2A"
+                                         Foreground="#FFCCCCCC"
+                                         BorderBrush="#FF555555"
+                                         Padding="2,1" />
+                            </DataTemplate>
+                        </GridViewColumn.CellTemplate>
+                    </GridViewColumn>
                     <GridViewColumn Header="Process" Width="130"
                                     DisplayMemberBinding="{Binding ProcessName}" />
                     <GridViewColumn Header="Windows" Width="60"

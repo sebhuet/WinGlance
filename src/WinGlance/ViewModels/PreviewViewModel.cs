@@ -270,6 +270,7 @@ internal sealed class PreviewViewModel : ViewModelBase, IDisposable
         }
 
         var scanned = _enumerator.GetWindows(MonitoredApps, hwnd => !windowsWithIcon.Contains(hwnd));
+        AttentionDetector?.PruneClosedWindows();
 
         var badges = AgentMonitor?.GetBadges(scanned);
         foreach (var window in scanned)

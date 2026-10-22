@@ -55,6 +55,16 @@ internal sealed class AttentionDetector : IDisposable
             return new HashSet<IntPtr>(_flashingWindows);
     }
 
+    /// <summary>
+    /// Forgets windows that no longer exist. Flashing windows of unmonitored applications are
+    /// tracked too and never removed by the polling cycle, and window handles are reused.
+    /// </summary>
+    public void PruneClosedWindows()
+    {
+        lock (_lock)
+            _flashingWindows.RemoveWhere(hwnd => !NativeMethods.IsWindow(hwnd));
+    }
+
     public void Dispose()
     {
         if (_hwnd != IntPtr.Zero)
@@ -62,13 +72,26 @@ internal sealed class AttentionDetector : IDisposable
         _hwndSource?.RemoveHook(WndProc);
     }
 
+    /// <summary>
+    /// Applies one shell hook notification. HSHELL_FLASH (HSHELL_REDRAW with the high bit set)
+    /// marks the window as flashing; a plain HSHELL_REDRAW, which the shell sends when the
+    /// window stops flashing, clears it.
+    /// </summary>
+    internal void HandleShellMessage(int code, IntPtr hwnd)
+    {
+        lock (_lock)
+        {
+            if (code == NativeMethods.HSHELL_FLASH)
+                _flashingWindows.Add(hwnd);
+            else if (code == NativeMethods.HSHELL_REDRAW)
+                _flashingWindows.Remove(hwnd);
+        }
+    }
+
     private IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
     {
-        if (msg == _shellHookMessage && wParam.ToInt32() == NativeMethods.HSHELL_FLASH)
-        {
-            lock (_lock)
-                _flashingWindows.Add(lParam);
-        }
+        if (msg == _shellHookMessage)
+            HandleShellMessage(wParam.ToInt32(), lParam);
 
         return IntPtr.Zero;
     }
