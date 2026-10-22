@@ -434,9 +434,17 @@ public partial class MainWindow : Window
             Math.Max(0, window.Bottom - monitor.Bottom) / dpi.DpiScaleY);
     }
 
+    private void BackButton_Click(object sender, RoutedEventArgs e) => SwitchToView(0);
+
     private void OnKeyDown(object sender, KeyEventArgs e)
     {
-        if (e.Key == Key.F11 || (e.Key == Key.Escape && WindowState == WindowState.Maximized))
+        // Esc leaves the open view first, then full screen
+        if (e.Key == Key.Escape && _viewModel.IsSecondaryView)
+        {
+            SwitchToView(0);
+            e.Handled = true;
+        }
+        else if (e.Key == Key.F11 || (e.Key == Key.Escape && WindowState == WindowState.Maximized))
         {
             ToggleFullScreen();
             e.Handled = true;

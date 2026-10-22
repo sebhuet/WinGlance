@@ -98,6 +98,36 @@ public class MainViewModelTests
         Assert.Equal(TimeSpan.FromSeconds(3), vm.PreviewViewModel.AgentMonitor.RefreshInterval);
     }
 
+    // ── View navigation ──────────────────────────────────────────────────
+
+    [Theory]
+    [InlineData(0, false, "")]
+    [InlineData(1, true, "Applications")]
+    [InlineData(2, true, "Settings")]
+    [InlineData(3, true, "Prompt Editor")]
+    public void SelectedTabIndex_TellsWhetherABackButtonIsNeeded(int index, bool isSecondary, string title)
+    {
+        var vm = CreateVm();
+
+        vm.SelectedTabIndex = index;
+
+        Assert.Equal(isSecondary, vm.IsSecondaryView);
+        Assert.Equal(title, vm.ViewTitle);
+    }
+
+    [Fact]
+    public void SelectedTabIndex_RaisesTheBackButtonProperties()
+    {
+        var vm = CreateVm();
+        var raised = new List<string?>();
+        vm.PropertyChanged += (_, e) => raised.Add(e.PropertyName);
+
+        vm.SelectedTabIndex = 2;
+
+        Assert.Contains(nameof(MainViewModel.IsSecondaryView), raised);
+        Assert.Contains(nameof(MainViewModel.ViewTitle), raised);
+    }
+
     // ── LLM service lifecycle ────────────────────────────────────────────
 
     [Fact]

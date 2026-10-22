@@ -84,6 +84,8 @@ To switch between views, **right-click anywhere on the panel**. A context menu a
 | **Prompt Editor** | Edit the LLM prompt and watch the analysis log |
 | **Exit**          | Quit the application                           |
 
+Outside Preview, the title bar shows the open view's name (e.g., "WinGlance · Settings") and a **←** button that brings you back to Preview; **Esc** does the same. The Settings view also opens from the **⚙ Options** panel (**All settings…**).
+
 Window tracking continues while another view is open, so indicators are up to date when you come back to Preview.
 
 ### 2.3 Title Bar Buttons

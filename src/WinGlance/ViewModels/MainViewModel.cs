@@ -96,8 +96,29 @@ internal class MainViewModel : ViewModelBase
     public int SelectedTabIndex
     {
         get => _selectedTabIndex;
-        set => SetProperty(ref _selectedTabIndex, value);
+        set
+        {
+            if (SetProperty(ref _selectedTabIndex, value))
+            {
+                OnPropertyChanged(nameof(IsSecondaryView));
+                OnPropertyChanged(nameof(ViewTitle));
+            }
+        }
     }
+
+    /// <summary>
+    /// True outside the Preview view: the title bar then shows a button back to Preview.
+    /// </summary>
+    public bool IsSecondaryView => _selectedTabIndex != 0;
+
+    /// <summary>Name of the open view, shown next to the title; empty for Preview.</summary>
+    public string ViewTitle => _selectedTabIndex switch
+    {
+        1 => "Applications",
+        2 => "Settings",
+        3 => "Prompt Editor",
+        _ => string.Empty,
+    };
 
     /// <summary>ViewModel for the Preview tab.</summary>
     public PreviewViewModel PreviewViewModel { get; }
