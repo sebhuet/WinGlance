@@ -2,7 +2,8 @@
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
 
     <!-- Background colors -->
-    <SolidColorBrush x:Key="WindowBackground" Color="#E0202020" />
+    <!-- Opaque: the panel transparency comes from the Transparency setting alone -->
+    <SolidColorBrush x:Key="WindowBackground" Color="#FF202020" />
     <SolidColorBrush x:Key="TitleBarBackground" Color="#FF2D2D2D" />
     <SolidColorBrush x:Key="PanelBackground" Color="#FF1A1A1A" />
     <SolidColorBrush x:Key="ItemBackground" Color="#33000000" />
