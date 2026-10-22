@@ -106,7 +106,7 @@ Window tracking continues while another view is open, so indicators are up to da
   - If **Close to system tray** is enabled (default): hides the panel to the system tray.
   - If disabled: exits the application entirely.
 
-<img src="images/options.png" alt="The Options panel open under the title bar, with the Transparency slider, the switching options, the agent notification option and the All settings button" width="413">
+<img src="images/options.png" alt="The Options panel with the Transparency slider, the switching options, the agent notification option and the All settings button" width="272">
 
 ### 2.4 System Tray
 
