@@ -137,8 +137,8 @@
             <CheckBox Content="Outline the window with a blinking frame after switching to it"
                       IsChecked="{Binding HighlightOnSwitch}"
                       Foreground="{DynamicResource PrimaryText}" Margin="0,2" />
-            <CheckBox Content="Beep on the side of the window's screen (left, center, right)"
-                      IsChecked="{Binding BeepOnSwitch}"
+            <CheckBox Content="Click sound on the side of the window's screen (left, center, right)"
+                      IsChecked="{Binding ClickOnSwitch}"
                       Foreground="{DynamicResource PrimaryText}" Margin="0,2" />
 
             <!-- ── Hotkey ─────────────────────────────────── -->

@@ -29,10 +29,10 @@ internal sealed class AppConfig
     public bool HighlightOnSwitch { get; set; } = true;
 
     /// <summary>
-    /// Beeps after switching to a window from a thumbnail, on the left, in the center or on the
+    /// Plays a short click after switching to a window from a thumbnail, on the left, in the center or on the
     /// right depending on the monitor the window is on.
     /// </summary>
-    public bool BeepOnSwitch { get; set; } = true;
+    public bool ClickOnSwitch { get; set; } = true;
     public string Hotkey { get; set; } = "Ctrl+Alt+G";
     public LlmConfig Llm { get; set; } = new();
     public AgentDetectionConfig AgentDetection { get; set; } = new();

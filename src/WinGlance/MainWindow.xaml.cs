@@ -20,7 +20,7 @@ public partial class MainWindow : Window
     private readonly HotkeyService _hotkeyService = new();
     private readonly AttentionDetector _attentionDetector = new();
     private readonly WindowHighlighter _windowHighlighter = new();
-    private readonly StereoBeep _stereoBeep = new();
+    private readonly StereoClick _stereoClick = new();
     private readonly uint _showPanelMessage = NativeMethods.RegisterWindowMessage(App.ShowPanelMessageName);
     private HwndSource? _hwndSource;
     private bool _isExiting;
@@ -113,8 +113,8 @@ public partial class MainWindow : Window
                 _windowHighlighter.Flash(target);
 
             // Heard from the side of the window's monitor: left, center or right
-            if (_viewModel.SettingsViewModel.BeepOnSwitch)
-                _stereoBeep.Play(ScreenSide.PanOfWindow(target));
+            if (_viewModel.SettingsViewModel.ClickOnSwitch)
+                _stereoClick.Play(ScreenSide.PanOfWindow(target));
         };
 
         // Allow settings to navigate to prompt editor
@@ -145,7 +145,7 @@ public partial class MainWindow : Window
         _viewModel.PreviewViewModel.Dispose();
         _attentionDetector.Dispose();
         _windowHighlighter.Dispose();
-        _stereoBeep.Dispose();
+        _stereoClick.Dispose();
         _hotkeyService.Dispose();
         _hwndSource?.RemoveHook(WndProc);
         _trayIcon.Dispose();

@@ -190,8 +190,8 @@
                                       IsChecked="{Binding HighlightOnSwitch}"
                                       Foreground="{DynamicResource PrimaryText}"
                                       Margin="0,2" />
-                            <CheckBox Content="Beep from the window's screen side"
-                                      IsChecked="{Binding BeepOnSwitch}"
+                            <CheckBox Content="Click from the window's screen side"
+                                      IsChecked="{Binding ClickOnSwitch}"
                                       Foreground="{DynamicResource PrimaryText}"
                                       Margin="0,2" />
 

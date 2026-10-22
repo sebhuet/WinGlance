@@ -311,28 +311,28 @@ public class SettingsViewModelTests : IDisposable
         vm.Layout = "grid"; // pending in the Settings view, not saved by the Options panel
 
         vm.HighlightOnSwitch = false;
-        vm.BeepOnSwitch = false;
+        vm.ClickOnSwitch = false;
         vm.SaveQuickOptions();
 
         var saved = _configService.Load();
         Assert.Equal(0.75, saved.PanelOpacity, precision: 6);
         Assert.False(saved.HighlightOnSwitch);
-        Assert.False(saved.BeepOnSwitch);
+        Assert.False(saved.ClickOnSwitch);
         Assert.Equal("fit", saved.Layout);
         Assert.Empty(_autoStartCalls); // the registry is not touched either
     }
 
     [Fact]
-    public void BeepOnSwitch_IsReadFromConfig_AndSaved()
+    public void ClickOnSwitch_IsReadFromConfig_AndSaved()
     {
-        _config.BeepOnSwitch = true;
+        _config.ClickOnSwitch = true;
         var vm = CreateVm();
-        Assert.True(vm.BeepOnSwitch);
+        Assert.True(vm.ClickOnSwitch);
 
-        vm.BeepOnSwitch = false;
+        vm.ClickOnSwitch = false;
         vm.Save();
 
-        Assert.False(_configService.Load().BeepOnSwitch);
+        Assert.False(_configService.Load().ClickOnSwitch);
     }
 
     // ── Highlight on switch ──────────────────────────────────────────

@@ -433,7 +433,7 @@ An audit of the code against the specification (October 2026) found bugs in ever
 - [x] **20.9** Full screen button in the title bar (F11, Esc, title bar double-click); content pulled back from the maximized window's overhang
 - [x] **20.10** Options panel (⚙ in the title bar): transparency level, applied live, saved on close; link to the full Settings view
 - [x] **20.11** Back button (←) and view name in the title bar outside Preview; Esc returns to Preview
-- [x] **20.12** Side beep after a switch: left / center / right from the window's monitor (`ScreenSide`, `StereoBeep`); option in Settings and in the Options panel
+- [x] **20.12** Side click after a switch: a dry "tic" on the left / center / right from the window's monitor (`ScreenSide`, `StereoClick`); option in Settings and in the Options panel
 
 ---
 
