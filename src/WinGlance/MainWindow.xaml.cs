@@ -75,7 +75,7 @@ public partial class MainWindow : Window
             _viewModel.PromptEditorViewModel.RunAnalysisFunc = async () =>
             {
                 llmService.ReloadPrompt(_viewModel.PromptEditorViewModel.PromptText);
-                var windows = _viewModel.PreviewViewModel.Windows.ToArray();
+                var windows = _viewModel.PreviewViewModel.GetWindowsSnapshot();
                 if (windows.Length == 0)
                 {
                     _viewModel.PromptEditorViewModel.AppendLog("—", "—", "No monitored windows found");
@@ -158,17 +158,12 @@ public partial class MainWindow : Window
         SettingsView.Visibility = index == 2 ? Visibility.Visible : Visibility.Collapsed;
         PromptEditorView.Visibility = index == 3 ? Visibility.Visible : Visibility.Collapsed;
 
-        // DWM thumbnails are rendered by the OS compositor and ignore WPF Visibility.
-        // We must unregister them when leaving Preview; they re-register on the next poll.
-        if (index == 0)
-        {
-            _viewModel.PreviewViewModel.Start();
-        }
-        else
-        {
-            _viewModel.PreviewViewModel.Stop();
+        // DWM thumbnails are rendered by the OS compositor and ignore WPF Visibility:
+        // unregister them when leaving Preview; they re-register when it becomes visible.
+        // Polling keeps running so that attention, agent and LLM states stay current
+        // (the Prompt Editor's debug log shows live analyses).
+        if (index != 0)
             _viewModel.PreviewViewModel.ThumbnailManager.UnregisterAll();
-        }
 
         // Force SizeToContent recalculation (WPF resets it to Manual after user resize)
         SizeToContent = SizeToContent.Manual;

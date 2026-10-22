@@ -21,6 +21,10 @@ internal sealed class PreviewViewModel : ViewModelBase, IDisposable
     private readonly DispatcherTimer _timer;
     private readonly object _lock = new(); // guards _windows for cross-thread collection sync
 
+    // 1 while a scan / an LLM evaluation pass runs: ticks never pile up behind a slow one
+    private int _isScanning;
+    private int _isEvaluating;
+
     private ObservableCollection<TrackedWindow> _windows = [];
     private string _layout = "horizontal";
     private int _thumbnailWidth = 200;
@@ -134,14 +138,23 @@ internal sealed class PreviewViewModel : ViewModelBase, IDisposable
         _thumbnailManager.SetDestination(hwnd);
     }
 
-    /// <summary>Starts polling. Performs an immediate first scan then starts the timer.</summary>
+    /// <summary>
+    /// Starts polling: an immediate first scan on a background thread, then one per interval.
+    /// </summary>
     public void Start()
     {
         if (!_timer.IsEnabled)
         {
-            Poll(); // immediate first scan
             _timer.Start();
+            OnTimerTick(this, EventArgs.Empty); // first scan now, not after one interval
         }
+    }
+
+    /// <summary>Returns a copy of the tracked windows, safe to use from any thread.</summary>
+    public TrackedWindow[] GetWindowsSnapshot()
+    {
+        lock (_lock)
+            return [.. _windows];
     }
 
     /// <summary>Stops the polling timer.</summary>
@@ -196,21 +209,55 @@ internal sealed class PreviewViewModel : ViewModelBase, IDisposable
 
     private async void OnTimerTick(object? sender, EventArgs e)
     {
-        await Task.Run(Poll);
+        // A scan stuck on a slow window must not be joined by a new one every second
+        if (Interlocked.Exchange(ref _isScanning, 1) == 1)
+            return;
 
-        // LLM evaluation runs after merge, on background thread
-        if (LlmService is not null)
+        try
         {
-            TrackedWindow[] snapshot;
-            lock (_lock)
-            {
-                snapshot = [.. _windows];
-            }
-            foreach (var w in snapshot)
-            {
-                await LlmService.EvaluateAsync(w);
-            }
+            await Task.Run(Poll);
         }
+        catch (Exception ex)
+        {
+            // Logged, not rethrown: on the dispatcher it would open an error dialog every second
+            Log.Warning("Window scan failed", ex);
+            return;
+        }
+        finally
+        {
+            Volatile.Write(ref _isScanning, 0);
+        }
+
+        StartLlmEvaluation();
+    }
+
+    /// <summary>
+    /// Runs the LLM evaluation of all windows on a background thread. Screen captures and
+    /// LLM calls (up to 30 s) stay off the UI thread and never delay the next scan; a new pass
+    /// starts only once the previous one has finished.
+    /// </summary>
+    private void StartLlmEvaluation()
+    {
+        if (LlmService is not { } llmService || Interlocked.Exchange(ref _isEvaluating, 1) == 1)
+            return;
+
+        var windows = GetWindowsSnapshot();
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                foreach (var window in windows)
+                    await llmService.EvaluateAsync(window).ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                Log.Warning("LLM evaluation pass failed", ex);
+            }
+            finally
+            {
+                Volatile.Write(ref _isEvaluating, 0);
+            }
+        });
     }
 
     private void Poll()
@@ -271,6 +318,8 @@ internal sealed class PreviewViewModel : ViewModelBase, IDisposable
                 {
                     _thumbnailManager.Unregister(_windows[i].Hwnd);
                     LlmService?.Remove(_windows[i].Hwnd);
+                    // Window handles are reused: a new window must not inherit this one's flash
+                    AttentionDetector?.ClearFlashing(_windows[i].Hwnd);
                     _windows.RemoveAt(i);
                 }
             }

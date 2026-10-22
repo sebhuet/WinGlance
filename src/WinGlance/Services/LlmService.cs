@@ -20,6 +20,8 @@ internal sealed class LlmService : IDisposable
 
     private readonly ScreenshotComparer _comparer = new();
     private readonly HashSet<IntPtr> _pendingAnalysis = [];
+    // Evaluation runs on a background thread while the polling thread removes closed windows
+    private readonly object _stateLock = new();
     private LlmAnalyzer? _analyzer;
     private LlmConfig _config;
 
@@ -45,37 +47,40 @@ internal sealed class LlmService : IDisposable
     /// </summary>
     public async Task EvaluateAsync(TrackedWindow window)
     {
-        if (!_config.Enabled)
+        // PrintWindow sends WM_PRINT: a hung window would block the capture
+        if (!_config.Enabled || window.IsHung)
             return;
 
-        var isStale = _comparer.IsStale(window.Hwnd, _config.StaleThresholdSeconds);
+        // Captured outside the lock: a capture can be slow
+        var hash = ScreenshotComparer.CaptureAndHash(window.Hwnd);
+        bool isStale;
+        lock (_stateLock)
+            isStale = _comparer.IsStale(window.Hwnd, hash, _config.StaleThresholdSeconds, DateTime.UtcNow);
         window.IsStale = isStale;
 
-        if (!isStale)
+        lock (_stateLock)
         {
-            // Content changed — reset verdict and allow re-analysis
-            if (window.LlmVerdict is not null)
+            if (!isStale)
             {
-                window.LlmVerdict = null;
-                _pendingAnalysis.Remove(window.Hwnd);
+                // Content changed — reset verdict and allow re-analysis
+                if (window.LlmVerdict is not null)
+                {
+                    window.LlmVerdict = null;
+                    _pendingAnalysis.Remove(window.Hwnd);
+                }
+                return;
             }
-            return;
+
+            // Already analyzed or in-flight — skip
+            if (window.LlmVerdict is not null || !_pendingAnalysis.Add(window.Hwnd))
+                return;
         }
-
-        // Already analyzed or in-flight — skip
-        if (window.LlmVerdict is not null || _pendingAnalysis.Contains(window.Hwnd))
-            return;
-
-        _pendingAnalysis.Add(window.Hwnd);
 
         try
         {
             var screenshot = CaptureWindow(window.Hwnd);
             if (screenshot is null || _analyzer is null)
-            {
-                _pendingAnalysis.Remove(window.Hwnd);
-                return;
-            }
+                return; // the finally block releases the pending flag
 
             var (verdict, reason) = await _analyzer.AnalyzeWithReasonAsync(screenshot, window.Title);
             screenshot.Dispose();
@@ -94,7 +99,8 @@ internal sealed class LlmService : IDisposable
         }
         finally
         {
-            _pendingAnalysis.Remove(window.Hwnd);
+            lock (_stateLock)
+                _pendingAnalysis.Remove(window.Hwnd);
         }
     }
 
@@ -135,8 +141,11 @@ internal sealed class LlmService : IDisposable
     /// </summary>
     public void Remove(IntPtr hwnd)
     {
-        _comparer.Remove(hwnd);
-        _pendingAnalysis.Remove(hwnd);
+        lock (_stateLock)
+        {
+            _comparer.Remove(hwnd);
+            _pendingAnalysis.Remove(hwnd);
+        }
     }
 
     /// <summary>

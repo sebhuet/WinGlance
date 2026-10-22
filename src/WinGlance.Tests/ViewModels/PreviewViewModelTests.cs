@@ -302,6 +302,30 @@ public class PreviewViewModelTests
         Assert.False(vm.IsPolling);
     }
 
+    [Fact]
+    public void Start_StartsPolling_AndStopStopsIt()
+    {
+        using var vm = new PreviewViewModel();
+
+        vm.Start(); // first scan runs on a background thread
+        Assert.True(vm.IsPolling);
+
+        vm.Stop();
+        Assert.False(vm.IsPolling);
+    }
+
+    [Fact]
+    public void GetWindowsSnapshot_ReturnsACopy()
+    {
+        using var vm = new PreviewViewModel();
+        vm.Windows.Add(new TrackedWindow((IntPtr)1, "a", "A"));
+
+        var snapshot = vm.GetWindowsSnapshot();
+        vm.Windows.Clear();
+
+        Assert.Single(snapshot);
+    }
+
     // ── Coding agents (FR-11) ────────────────────────────────────────────
 
     private static AgentBadge Badge(AgentStatus status) => new(status, status.ToString(), "");

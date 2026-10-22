@@ -22,13 +22,18 @@ internal sealed class ScreenshotComparer
     /// Captures the window, computes a perceptual hash, and returns whether the
     /// window is stale (unchanged for longer than <paramref name="staleThresholdSeconds"/>).
     /// </summary>
-    public bool IsStale(IntPtr hwnd, int staleThresholdSeconds)
+    public bool IsStale(IntPtr hwnd, int staleThresholdSeconds) =>
+        IsStale(hwnd, CaptureAndHash(hwnd), staleThresholdSeconds, DateTime.UtcNow);
+
+    /// <summary>
+    /// Records a capture hash taken at <paramref name="now"/> and returns whether the window has
+    /// shown the same content for at least <paramref name="staleThresholdSeconds"/>.
+    /// A null hash (failed capture) is never stale.
+    /// </summary>
+    internal bool IsStale(IntPtr hwnd, ulong? hash, int staleThresholdSeconds, DateTime now)
     {
-        var hash = CaptureAndHash(hwnd);
         if (hash is null)
             return false; // capture failed, treat as not stale
-
-        var now = DateTime.UtcNow;
 
         if (_lastHash.TryGetValue(hwnd, out var prevHash))
         {
