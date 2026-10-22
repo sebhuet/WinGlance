@@ -59,7 +59,7 @@
                             ToolTip="{Binding Title}"
                             Cursor="Hand"
                             Opacity="{Binding LlmVerdict, Converter={StaticResource LlmVerdictToOpacity}}">
-                        <!-- Multi-value border: IsActive, IsFlashing, IsHung, IsModalBlocked, NeedsAgentAttention -->
+                        <!-- Multi-value border: IsActive, IsFlashing, IsHung, IsModalBlocked, NeedsAgentAttention, LlmVerdict -->
                         <Border.BorderBrush>
                             <MultiBinding Converter="{StaticResource StateBorderConverter}">
                                 <Binding Path="IsActive" />
@@ -67,6 +67,7 @@
                                 <Binding Path="IsHung" />
                                 <Binding Path="IsModalBlocked" />
                                 <Binding Path="NeedsAgentAttention" />
+                                <Binding Path="LlmVerdict" />
                             </MultiBinding>
                         </Border.BorderBrush>
                         <Border.InputBindings>
@@ -74,99 +75,99 @@
                                           Command="{Binding DataContext.ActivateWindowCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                           CommandParameter="{Binding}" />
                         </Border.InputBindings>
-                        <Grid>
-                            <StackPanel>
-                                <!-- DWM thumbnail area -->
-                                <controls:ThumbnailControl
-                                    SourceHwnd="{Binding Hwnd}"
-                                    ThumbnailManager="{Binding DataContext.ThumbnailManager, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                    Width="{Binding DataContext.ThumbnailWidth, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                    Height="{Binding DataContext.ThumbnailHeight, RelativeSource={RelativeSource AncestorType=UserControl}}" />
+                        <StackPanel>
+                            <!-- DWM thumbnail area. WPF opacity does not reach the DWM image, hence ThumbnailOpacity -->
+                            <controls:ThumbnailControl
+                                SourceHwnd="{Binding Hwnd}"
+                                ThumbnailManager="{Binding DataContext.ThumbnailManager, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                ThumbnailOpacity="{Binding LlmVerdict, Converter={StaticResource LlmVerdictToOpacity}}"
+                                Width="{Binding DataContext.ThumbnailWidth, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                Height="{Binding DataContext.ThumbnailHeight, RelativeSource={RelativeSource AncestorType=UserControl}}" />
 
-                                <!-- Agent badge + window title. The badge sits below the thumbnail because
-                                     DWM draws thumbnails above WPF content, and the row height is fixed:
-                                     a badge appearing must not shift the thumbnails that follow. -->
-                                <DockPanel Height="20"
-                                           LastChildFill="True"
-                                           MaxWidth="{Binding DataContext.ThumbnailWidth, RelativeSource={RelativeSource AncestorType=UserControl}}">
-                                    <Border DockPanel.Dock="Left"
-                                            CornerRadius="3"
-                                            Margin="2,2,0,2"
-                                            Padding="5,0"
-                                            VerticalAlignment="Center"
-                                            ToolTip="{Binding Agent.Details}">
-                                        <Border.Style>
-                                            <Style TargetType="Border">
-                                                <Setter Property="Background" Value="#CC555555" />
-                                                <Style.Triggers>
-                                                    <DataTrigger Binding="{Binding Agent}" Value="{x:Null}">
-                                                        <Setter Property="Visibility" Value="Collapsed" />
-                                                    </DataTrigger>
-                                                    <DataTrigger Binding="{Binding Agent.Status}" Value="Busy">
-                                                        <Setter Property="Background" Value="#CC0078D7" />
-                                                    </DataTrigger>
-                                                    <DataTrigger Binding="{Binding Agent.Status}" Value="Waiting">
-                                                        <Setter Property="Background" Value="#CCFF8C00" />
-                                                    </DataTrigger>
-                                                    <DataTrigger Binding="{Binding Agent.Status}" Value="Running">
-                                                        <Setter Property="Background" Value="#CC00897B" />
-                                                    </DataTrigger>
-                                                </Style.Triggers>
-                                            </Style>
-                                        </Border.Style>
-                                        <TextBlock Text="{Binding Agent.Text}"
-                                                   Foreground="White"
-                                                   FontSize="10"
-                                                   FontWeight="Bold" />
-                                    </Border>
+                            <!-- Badges + window title. Badges sit below the thumbnail because DWM draws
+                                 thumbnails above WPF content, and the row height is fixed: a badge
+                                 appearing must not shift the thumbnails that follow. -->
+                            <DockPanel Height="20"
+                                       LastChildFill="True"
+                                       MaxWidth="{Binding DataContext.ThumbnailWidth, RelativeSource={RelativeSource AncestorType=UserControl}}">
+                                <!-- Coding agent badge (Claude Code / OpenCode) -->
+                                <Border DockPanel.Dock="Left"
+                                        CornerRadius="3"
+                                        Margin="2,2,0,2"
+                                        Padding="5,0"
+                                        VerticalAlignment="Center"
+                                        ToolTip="{Binding Agent.Details}">
+                                    <Border.Style>
+                                        <Style TargetType="Border">
+                                            <Setter Property="Background" Value="#CC555555" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding Agent}" Value="{x:Null}">
+                                                    <Setter Property="Visibility" Value="Collapsed" />
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding Agent.Status}" Value="Busy">
+                                                    <Setter Property="Background" Value="#CC0078D7" />
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding Agent.Status}" Value="Waiting">
+                                                    <Setter Property="Background" Value="#CCFF8C00" />
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding Agent.Status}" Value="Running">
+                                                    <Setter Property="Background" Value="#CC00897B" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Border.Style>
+                                    <TextBlock Text="{Binding Agent.Text}"
+                                               Foreground="White"
+                                               FontSize="10"
+                                               FontWeight="Bold" />
+                                </Border>
 
-                                    <!-- Window title -->
-                                    <TextBlock Text="{Binding Title}"
-                                               Foreground="#FFAAAAAA"
-                                               FontSize="11"
-                                               Margin="4,2,4,2"
-                                               VerticalAlignment="Center"
-                                               TextTrimming="CharacterEllipsis" />
-                                </DockPanel>
-                            </StackPanel>
+                                <!-- Not Responding badge -->
+                                <Border DockPanel.Dock="Left"
+                                        Background="#CCE81123"
+                                        CornerRadius="3"
+                                        Margin="2,2,0,2"
+                                        Padding="5,0"
+                                        VerticalAlignment="Center"
+                                        Visibility="{Binding IsHung, Converter={StaticResource BoolToVisibility}}">
+                                    <TextBlock Text="Not Responding"
+                                               Foreground="White"
+                                               FontSize="10"
+                                               FontWeight="Bold" />
+                                </Border>
 
-                            <!-- Not Responding overlay -->
-                            <Border Background="#88FF0000"
-                                    CornerRadius="3"
-                                    Visibility="{Binding IsHung, Converter={StaticResource BoolToVisibility}}"
-                                    VerticalAlignment="Top"
-                                    HorizontalAlignment="Center"
-                                    Margin="0,4,0,0"
-                                    Padding="6,2">
-                                <TextBlock Text="Not Responding"
-                                           Foreground="White"
-                                           FontSize="10"
-                                           FontWeight="Bold" />
-                            </Border>
+                                <!-- Awaiting Action badge (LLM verdict) -->
+                                <Border DockPanel.Dock="Left"
+                                        Background="#CCFF8C00"
+                                        CornerRadius="3"
+                                        Margin="2,2,0,2"
+                                        Padding="5,0"
+                                        VerticalAlignment="Center">
+                                    <Border.Style>
+                                        <Style TargetType="Border">
+                                            <Setter Property="Visibility" Value="Collapsed" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding LlmVerdict}" Value="awaiting_action">
+                                                    <Setter Property="Visibility" Value="Visible" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Border.Style>
+                                    <TextBlock Text="Awaiting Action"
+                                               Foreground="White"
+                                               FontSize="10"
+                                               FontWeight="Bold" />
+                                </Border>
 
-                            <!-- Awaiting Action overlay (LLM verdict) -->
-                            <Border Background="#CCFFA500"
-                                    CornerRadius="3"
-                                    VerticalAlignment="Bottom"
-                                    HorizontalAlignment="Center"
-                                    Margin="0,0,0,20"
-                                    Padding="6,2">
-                                <Border.Style>
-                                    <Style TargetType="Border">
-                                        <Setter Property="Visibility" Value="Collapsed" />
-                                        <Style.Triggers>
-                                            <DataTrigger Binding="{Binding LlmVerdict}" Value="awaiting_action">
-                                                <Setter Property="Visibility" Value="Visible" />
-                                            </DataTrigger>
-                                        </Style.Triggers>
-                                    </Style>
-                                </Border.Style>
-                                <TextBlock Text="Awaiting Action"
-                                           Foreground="White"
-                                           FontSize="10"
-                                           FontWeight="Bold" />
-                            </Border>
-                        </Grid>
+                                <!-- Window title -->
+                                <TextBlock Text="{Binding Title}"
+                                           Foreground="#FFAAAAAA"
+                                           FontSize="11"
+                                           Margin="4,2,4,2"
+                                           VerticalAlignment="Center"
+                                           TextTrimming="CharacterEllipsis" />
+                            </DockPanel>
+                        </StackPanel>
                     </Border>
                 </DataTemplate>
             </ItemsControl.ItemTemplate>

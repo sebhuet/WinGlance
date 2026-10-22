@@ -7,9 +7,9 @@ namespace WinGlance.Converters;
 /// <summary>
 /// Multi-value converter that determines the thumbnail border brush based on
 /// window state flags: [0] IsActive, [1] IsFlashing, [2] IsHung, [3] IsModalBlocked,
-/// [4] NeedsAgentAttention.
-/// Priority: Hung (red) > Flashing or agent attention (orange) > ModalBlocked (yellow)
-/// > Active (blue) > Inactive (gray).
+/// [4] NeedsAgentAttention, [5] LlmVerdict.
+/// Priority: Hung (red) > Flashing, agent attention or LLM "awaiting_action" (orange)
+/// > ModalBlocked (yellow) > Active (blue) > Inactive (gray).
 /// </summary>
 internal sealed class WindowStateToBorderBrushConverter : IMultiValueConverter
 {
@@ -35,11 +35,12 @@ internal sealed class WindowStateToBorderBrushConverter : IMultiValueConverter
         var isHung = values.Length > 2 && values[2] is true;
         var isModalBlocked = values.Length > 3 && values[3] is true;
         var needsAgentAttention = values.Length > 4 && values[4] is true;
+        var llmAwaitsAction = values.Length > 5 && values[5] is "awaiting_action";
 
         if (isHung)
             return HungBrush;
-        // An agent waiting on the user is the same kind of request as a flashing taskbar button
-        if (isFlashing || needsAgentAttention)
+        // An agent or a window waiting on the user is the same kind of request as a flashing taskbar button
+        if (isFlashing || needsAgentAttention || llmAwaitsAction)
             return FlashingBrush;
         if (isModalBlocked)
             return ModalBrush;

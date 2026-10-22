@@ -72,6 +72,17 @@ public class WindowStateToBorderBrushConverterTests
         Assert.Equal(Color.FromRgb(255, 140, 0), brush.Color); // orange
     }
 
+    [Theory]
+    [InlineData("awaiting_action", 255, 140, 0)] // orange
+    [InlineData("idle", 68, 68, 68)] // dimmed through opacity, not the border
+    [InlineData(null, 68, 68, 68)]
+    public void LlmVerdict_AwaitingAction_ReturnsOrangeBrush(string? verdict, byte r, byte g, byte b)
+    {
+        var result = _converter.Convert([false, false, false, false, false, verdict!], typeof(Brush), null!, CultureInfo.InvariantCulture);
+        var brush = Assert.IsType<SolidColorBrush>(result);
+        Assert.Equal(Color.FromRgb(r, g, b), brush.Color);
+    }
+
     [Fact]
     public void IsHung_TakesPriorityOverAgentAttention()
     {

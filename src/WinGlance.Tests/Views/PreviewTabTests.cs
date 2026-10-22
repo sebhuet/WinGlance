@@ -63,6 +63,56 @@ public class PreviewTabTests
     }
 
     [Fact]
+    public void Badges_SitOutsideTheThumbnailArea()
+    {
+        // DWM draws the thumbnail over WPF content: anything overlapping it would be hidden
+        RunOnSta(() =>
+        {
+            var view = Render(new TrackedWindow((IntPtr)1, "Code", "VS Code") { IsHung = true });
+            var thumbnail = FindDescendants<WinGlance.Controls.ThumbnailControl>(view).Single();
+            var titleRow = FindDescendants<DockPanel>(view).Single();
+
+            var thumbnailBottom = thumbnail.TranslatePoint(new Point(0, thumbnail.ActualHeight), view).Y;
+            var rowTop = titleRow.TranslatePoint(new Point(0, 0), view).Y;
+
+            Assert.True(rowTop >= thumbnailBottom, $"badge row at {rowTop} overlaps thumbnail ending at {thumbnailBottom}");
+        });
+    }
+
+    [Theory]
+    [InlineData(true, null, Visibility.Visible, Visibility.Collapsed)]
+    [InlineData(false, "awaiting_action", Visibility.Collapsed, Visibility.Visible)]
+    [InlineData(false, "idle", Visibility.Collapsed, Visibility.Collapsed)]
+    public void StateBadges_FollowHungAndLlmVerdict(bool isHung, string? verdict, Visibility hungBadge, Visibility awaitingBadge)
+    {
+        RunOnSta(() =>
+        {
+            var window = new TrackedWindow((IntPtr)1, "Code", "VS Code") { IsHung = isHung, LlmVerdict = verdict };
+
+            var titleRow = FindDescendants<DockPanel>(Render(window)).Single();
+
+            Assert.Equal(hungBadge, titleRow.Children[1].Visibility);
+            Assert.Equal(awaitingBadge, titleRow.Children[2].Visibility);
+        });
+    }
+
+    [Theory]
+    [InlineData("idle", 0.5)]
+    [InlineData("awaiting_action", 1.0)]
+    [InlineData(null, 1.0)]
+    public void Thumbnail_IdleVerdict_DimsTheDwmImage(string? verdict, double expectedOpacity)
+    {
+        RunOnSta(() =>
+        {
+            var view = Render(new TrackedWindow((IntPtr)1, "Code", "VS Code") { LlmVerdict = verdict });
+
+            var thumbnail = FindDescendants<WinGlance.Controls.ThumbnailControl>(view).Single();
+
+            Assert.Equal(expectedOpacity, thumbnail.ThumbnailOpacity);
+        });
+    }
+
+    [Fact]
     public void ThumbnailBorder_NeedsAgentAttention_IsOrange()
     {
         RunOnSta(() =>

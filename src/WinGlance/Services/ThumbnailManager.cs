@@ -5,10 +5,13 @@ namespace WinGlance.Services;
 /// <summary>
 /// Manages DWM thumbnail registrations between source windows and a destination window.
 /// Each thumbnail is identified by a handle returned from DwmRegisterThumbnail.
+/// Thread-safe: the polling thread unregisters closed windows while the UI thread
+/// registers and updates visible ones.
 /// </summary>
 internal sealed class ThumbnailManager : IDisposable
 {
     private readonly Dictionary<IntPtr, IntPtr> _thumbnails = []; // sourceHwnd → thumbnailId
+    private readonly object _lock = new();
     private IntPtr _destinationHwnd;
     private bool _disposed;
 
@@ -29,22 +32,32 @@ internal sealed class ThumbnailManager : IDisposable
         if (_destinationHwnd == IntPtr.Zero || sourceHwnd == IntPtr.Zero)
             return IntPtr.Zero;
 
-        // Already registered — return existing
-        if (_thumbnails.TryGetValue(sourceHwnd, out var existing))
-            return existing;
+        lock (_lock)
+        {
+            // Already registered — return existing
+            if (_thumbnails.TryGetValue(sourceHwnd, out var existing))
+                return existing;
 
-        var hr = NativeMethods.DwmRegisterThumbnail(_destinationHwnd, sourceHwnd, out var thumbnailId);
-        if (hr != 0)
-            return IntPtr.Zero;
+            var hr = NativeMethods.DwmRegisterThumbnail(_destinationHwnd, sourceHwnd, out var thumbnailId);
+            if (hr != 0)
+                return IntPtr.Zero;
 
-        _thumbnails[sourceHwnd] = thumbnailId;
-        return thumbnailId;
+            _thumbnails[sourceHwnd] = thumbnailId;
+            return thumbnailId;
+        }
     }
 
     /// <summary>
-    /// Updates the thumbnail properties (destination rect, opacity, visibility).
+    /// Updates the thumbnail properties (destination rect, source rect, opacity, visibility).
     /// </summary>
-    public bool Update(IntPtr thumbnailId, NativeMethods.RECT destination, byte opacity = 255, bool visible = true, bool sourceClientAreaOnly = true)
+    /// <param name="source">Part of the source to show; null shows all of it.</param>
+    public bool Update(
+        IntPtr thumbnailId,
+        NativeMethods.RECT destination,
+        NativeMethods.RECT? source = null,
+        byte opacity = 255,
+        bool visible = true,
+        bool sourceClientAreaOnly = true)
     {
         if (thumbnailId == IntPtr.Zero)
             return false;
@@ -61,12 +74,18 @@ internal sealed class ThumbnailManager : IDisposable
             SourceClientAreaOnly = sourceClientAreaOnly ? 1 : 0,
         };
 
+        if (source is { } sourceRect)
+        {
+            props.Flags |= NativeMethods.DWM_TNP_RECTSOURCE;
+            props.Source = sourceRect;
+        }
+
         var hr = NativeMethods.DwmUpdateThumbnailProperties(thumbnailId, ref props);
         return hr == 0;
     }
 
     /// <summary>
-    /// Queries the source window size for the given thumbnail.
+    /// Queries the source window size for the given thumbnail, in physical pixels.
     /// </summary>
     public bool QuerySourceSize(IntPtr thumbnailId, out NativeMethods.SIZE size)
     {
@@ -82,9 +101,10 @@ internal sealed class ThumbnailManager : IDisposable
     /// </summary>
     public void Unregister(IntPtr sourceHwnd)
     {
-        if (_thumbnails.Remove(sourceHwnd, out var thumbnailId))
+        lock (_lock)
         {
-            NativeMethods.DwmUnregisterThumbnail(thumbnailId);
+            if (_thumbnails.Remove(sourceHwnd, out var thumbnailId))
+                NativeMethods.DwmUnregisterThumbnail(thumbnailId);
         }
     }
 
@@ -93,11 +113,12 @@ internal sealed class ThumbnailManager : IDisposable
     /// </summary>
     public void UnregisterAll()
     {
-        foreach (var thumbnailId in _thumbnails.Values)
+        lock (_lock)
         {
-            NativeMethods.DwmUnregisterThumbnail(thumbnailId);
+            foreach (var thumbnailId in _thumbnails.Values)
+                NativeMethods.DwmUnregisterThumbnail(thumbnailId);
+            _thumbnails.Clear();
         }
-        _thumbnails.Clear();
     }
 
     /// <summary>
@@ -105,7 +126,8 @@ internal sealed class ThumbnailManager : IDisposable
     /// </summary>
     public IntPtr GetThumbnailId(IntPtr sourceHwnd)
     {
-        return _thumbnails.GetValueOrDefault(sourceHwnd);
+        lock (_lock)
+            return _thumbnails.GetValueOrDefault(sourceHwnd);
     }
 
     public void Dispose()
