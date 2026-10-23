@@ -147,4 +147,17 @@ public class ThumbnailLayoutCalculatorTests
     {
         Assert.Equal(expected, Calc.TypicalAspectRatio(ratios), precision: 6);
     }
+
+    [Fact]
+    public void Fit_WithoutGroupHeaders_UsesTheHeaderSpaceForThumbnails()
+    {
+        // Sorted by urgency, the windows form one list: no header row to keep free
+        var available = new Size(900, 300);
+
+        var grouped = Calc.Fit(available, [2, 2, 2], 1.6)!.Value;
+        var sorted = Calc.Fit(available, [6], 1.6, groupHeaders: false)!.Value;
+
+        Assert.True(sorted.Width > grouped.Width, $"sorted {sorted.Width} <= grouped {grouped.Width}");
+        Assert.True(Calc.Fits(available, [6], sorted.Width, 1.6, groupHeaders: false));
+    }
 }

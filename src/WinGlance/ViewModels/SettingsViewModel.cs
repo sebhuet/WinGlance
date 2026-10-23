@@ -32,6 +32,10 @@ internal sealed class SettingsViewModel : ViewModelBase
     private string _nextAgentHotkeyStatus = string.Empty;
     private bool _agentDetectionEnabled;
     private bool _agentNotifications;
+    private bool _sortByUrgency;
+    private bool _showOnlyWindowsThatNeedMe;
+    private bool _showStatusTime;
+    private int _remindAfterMinutes;
 
     // LLM settings
     private bool _llmEnabled;
@@ -73,6 +77,10 @@ internal sealed class SettingsViewModel : ViewModelBase
         _nextAgentHotkey = config.NextAgentHotkey;
         _agentDetectionEnabled = config.AgentDetection.Enabled;
         _agentNotifications = config.AgentDetection.Notify;
+        _sortByUrgency = config.SortByUrgency;
+        _showOnlyWindowsThatNeedMe = config.ShowOnlyWindowsThatNeedMe;
+        _showStatusTime = config.ShowStatusTime;
+        _remindAfterMinutes = config.AgentDetection.RemindAfterMinutes;
 
         _llmEnabled = config.Llm.Enabled;
         _llmProvider = config.Llm.Provider;
@@ -98,6 +106,45 @@ internal sealed class SettingsViewModel : ViewModelBase
                 _previewViewModel.Layout = value;
                 OnPropertyChanged(nameof(IsFitLayout));
             }
+        }
+    }
+
+    /// <summary>
+    /// One list, most urgent first, instead of groups by application. Applied live to the
+    /// preview; persisted by <see cref="Save"/> and by the Options panel.
+    /// </summary>
+    public bool SortByUrgency
+    {
+        get => _sortByUrgency;
+        set
+        {
+            if (SetProperty(ref _sortByUrgency, value))
+                _previewViewModel.SortByUrgency = value;
+        }
+    }
+
+    /// <summary>
+    /// Hides the windows that need nothing. Applied live to the preview; persisted by
+    /// <see cref="Save"/> and by the Options panel.
+    /// </summary>
+    public bool ShowOnlyWindowsThatNeedMe
+    {
+        get => _showOnlyWindowsThatNeedMe;
+        set
+        {
+            if (SetProperty(ref _showOnlyWindowsThatNeedMe, value))
+                _previewViewModel.ShowOnlyWindowsThatNeedMe = value;
+        }
+    }
+
+    /// <summary>Shows the time since the last status change. Applied live to the preview; persisted by <see cref="Save"/>.</summary>
+    public bool ShowStatusTime
+    {
+        get => _showStatusTime;
+        set
+        {
+            if (SetProperty(ref _showStatusTime, value))
+                _previewViewModel.ShowStatusTime = value;
         }
     }
 
@@ -156,7 +203,7 @@ internal sealed class SettingsViewModel : ViewModelBase
 
     /// <summary>
     /// Saves the settings of the Options panel alone (transparency, switch frame, switch click,
-    /// agent notifications), without the other pending changes of the Settings view: the
+    /// agent notifications, order and filter of the windows), without the other pending changes of the Settings view: the
     /// Options panel applies its changes without a Save button.
     /// </summary>
     public void SaveQuickOptions()
@@ -164,13 +211,17 @@ internal sealed class SettingsViewModel : ViewModelBase
         if (_config.PanelOpacity == PanelOpacity
             && _config.HighlightOnSwitch == HighlightOnSwitch
             && _config.ClickOnSwitch == ClickOnSwitch
-            && _config.AgentDetection.Notify == AgentNotifications)
+            && _config.AgentDetection.Notify == AgentNotifications
+            && _config.SortByUrgency == SortByUrgency
+            && _config.ShowOnlyWindowsThatNeedMe == ShowOnlyWindowsThatNeedMe)
             return;
 
         _config.PanelOpacity = PanelOpacity;
         _config.HighlightOnSwitch = HighlightOnSwitch;
         _config.ClickOnSwitch = ClickOnSwitch;
         _config.AgentDetection.Notify = AgentNotifications;
+        _config.SortByUrgency = SortByUrgency;
+        _config.ShowOnlyWindowsThatNeedMe = ShowOnlyWindowsThatNeedMe;
         _configService.Save(_config);
     }
 
@@ -296,6 +347,26 @@ internal sealed class SettingsViewModel : ViewModelBase
     }
 
     /// <summary>
+    /// Minutes an agent may wait for an answer before its border blinks and a reminder is
+    /// shown (0-60, 0: never). Applied live to the preview; persisted by <see cref="Save"/>.
+    /// </summary>
+    public int RemindAfterMinutes
+    {
+        get => _remindAfterMinutes;
+        set
+        {
+            if (SetProperty(ref _remindAfterMinutes, Math.Clamp(value, 0, 60)))
+            {
+                _previewViewModel.RemindAfter = TimeSpan.FromMinutes(_remindAfterMinutes);
+                OnPropertyChanged(nameof(RemindAfterText));
+            }
+        }
+    }
+
+    /// <summary>The reminder delay as shown next to its slider: "10 min", or "Never" at 0.</summary>
+    public string RemindAfterText => _remindAfterMinutes == 0 ? "Never" : $"{_remindAfterMinutes} min";
+
+    /// <summary>
     /// Shows Claude Code / OpenCode status on thumbnails. Applied live: turning it off
     /// removes the monitor, and the next poll clears every badge.
     /// </summary>
@@ -399,6 +470,9 @@ internal sealed class SettingsViewModel : ViewModelBase
     public void Save()
     {
         _config.Layout = Layout;
+        _config.SortByUrgency = SortByUrgency;
+        _config.ShowOnlyWindowsThatNeedMe = ShowOnlyWindowsThatNeedMe;
+        _config.ShowStatusTime = ShowStatusTime;
         _config.ThumbnailWidth = ThumbnailWidth;
         _config.ThumbnailHeight = ThumbnailHeight;
         _config.PanelOpacity = PanelOpacity;
@@ -412,6 +486,7 @@ internal sealed class SettingsViewModel : ViewModelBase
         _config.NextAgentHotkey = NextAgentHotkey.Trim();
         _config.AgentDetection.Enabled = AgentDetectionEnabled;
         _config.AgentDetection.Notify = AgentNotifications;
+        _config.AgentDetection.RemindAfterMinutes = RemindAfterMinutes;
 
         var llm = _config.Llm;
         var llmChanged = (llm.Enabled, llm.Provider, llm.Endpoint, llm.ApiKey, llm.Model, llm.StaleThresholdSeconds)

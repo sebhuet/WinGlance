@@ -195,6 +195,20 @@
                                       Foreground="{DynamicResource PrimaryText}"
                                       Margin="0,2" />
 
+                            <!-- Order of the thumbnails -->
+                            <TextBlock Text="Windows"
+                                       Foreground="{DynamicResource PrimaryText}"
+                                       FontSize="12"
+                                       Margin="0,10,0,2" />
+                            <CheckBox Content="Most urgent first"
+                                      IsChecked="{Binding SortByUrgency}"
+                                      Foreground="{DynamicResource PrimaryText}"
+                                      Margin="0,2" />
+                            <CheckBox Content="Only the windows that need me"
+                                      IsChecked="{Binding ShowOnlyWindowsThatNeedMe}"
+                                      Foreground="{DynamicResource PrimaryText}"
+                                      Margin="0,2" />
+
                             <!-- Coding agents -->
                             <TextBlock Text="Coding agents"
                                        Foreground="{DynamicResource PrimaryText}"

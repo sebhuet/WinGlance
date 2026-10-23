@@ -753,4 +753,192 @@ public class PreviewViewModelTests
 
         Assert.Equal(new[] { ((IntPtr)1, AgentTransition.Finished) }, raised);
     }
+
+    // ── Status time, reminders, order and filter ─────────────────────────
+
+    private static readonly DateTime Noon = new(2026, 10, 23, 12, 0, 0, DateTimeKind.Utc);
+
+    private static TrackedWindow WithAgent(int hwnd, AgentStatus? status, bool isActive = false)
+    {
+        var window = Scanned(hwnd);
+        window.IsActive = isActive;
+        window.Agent = status is null ? null : Badge(status.Value);
+        return window;
+    }
+
+    private static PreviewViewModel AtNoon(out Func<DateTime, DateTime> setNow)
+    {
+        var now = Noon;
+        var vm = new PreviewViewModel { UtcNow = () => now };
+        setNow = value => now = value;
+        return vm;
+    }
+
+    [Fact]
+    public void MergeResults_StatusChange_RestartsTheStatusTime()
+    {
+        using var vm = AtNoon(out var setNow);
+        vm.MergeResults([WithAgent(1, AgentStatus.Busy)]);
+
+        setNow(Noon.AddMinutes(7));
+        vm.MergeResults([WithAgent(1, AgentStatus.Busy)]);
+        Assert.Equal(Noon, vm.Windows.Single().StatusSince);
+        Assert.Equal("7 min", vm.Windows.Single().StatusAge);
+
+        setNow(Noon.AddMinutes(9));
+        vm.MergeResults([WithAgent(1, AgentStatus.Idle)]);
+        Assert.Equal(Noon.AddMinutes(9), vm.Windows.Single().StatusSince);
+        Assert.Equal("< 1 min", vm.Windows.Single().StatusAge);
+    }
+
+    [Fact]
+    public void MergeResults_FinishedTurnSeen_KeepsTheStatusTime()
+    {
+        // Looking at the window clears the orange border, not the time since the agent stopped
+        using var vm = AtNoon(out var setNow);
+        vm.MergeResults([WithAgent(1, AgentStatus.Busy)]);
+        setNow(Noon.AddMinutes(1));
+        vm.MergeResults([WithAgent(1, AgentStatus.Idle)]);
+
+        setNow(Noon.AddMinutes(5));
+        vm.MergeResults([WithAgent(1, AgentStatus.Idle, isActive: true)]);
+
+        Assert.Equal(Noon.AddMinutes(1), vm.Windows.Single().StatusSince);
+    }
+
+    [Fact]
+    public void StatusAge_QuietWindowOrOptionOff_IsEmpty()
+    {
+        using var vm = AtNoon(out _);
+        vm.MergeResults([WithAgent(1, null), WithAgent(2, AgentStatus.Busy)]);
+        Assert.Equal("", vm.Windows[0].StatusAge);
+        Assert.Equal("< 1 min", vm.Windows[1].StatusAge);
+
+        vm.ShowStatusTime = false;
+
+        Assert.Equal("", vm.Windows[1].StatusAge);
+    }
+
+    [Fact]
+    public void MergeResults_AgentWaitingPastTheDelay_BlinksAndRemindsOnce()
+    {
+        using var vm = AtNoon(out var setNow);
+        vm.RemindAfter = TimeSpan.FromMinutes(10);
+        var raised = new List<AgentTransition>();
+        vm.AgentNeedsAttention += (_, transition) => raised.Add(transition);
+        vm.MergeResults([WithAgent(1, AgentStatus.Waiting)]);
+
+        setNow(Noon.AddMinutes(9));
+        vm.MergeResults([WithAgent(1, AgentStatus.Waiting)]);
+        Assert.False(vm.Windows.Single().IsEscalated);
+
+        setNow(Noon.AddMinutes(10));
+        vm.MergeResults([WithAgent(1, AgentStatus.Waiting)]);
+        setNow(Noon.AddMinutes(15));
+        vm.MergeResults([WithAgent(1, AgentStatus.Waiting)]);
+
+        Assert.True(vm.Windows.Single().IsEscalated);
+        Assert.Equal(new[] { AgentTransition.Reminder }, raised);
+    }
+
+    [Fact]
+    public void MergeResults_AgentWaitingInFront_NeitherBlinksNorReminds()
+    {
+        using var vm = AtNoon(out var setNow);
+        var raised = new List<AgentTransition>();
+        vm.AgentNeedsAttention += (_, transition) => raised.Add(transition);
+        vm.MergeResults([WithAgent(1, AgentStatus.Waiting, isActive: true)]);
+
+        setNow(Noon.AddMinutes(30));
+        vm.MergeResults([WithAgent(1, AgentStatus.Waiting, isActive: true)]);
+
+        Assert.False(vm.Windows.Single().IsEscalated);
+        Assert.Empty(raised);
+    }
+
+    [Fact]
+    public void MergeResults_RemindersOff_NeverBlink()
+    {
+        using var vm = AtNoon(out var setNow);
+        vm.RemindAfter = TimeSpan.Zero;
+        vm.MergeResults([WithAgent(1, AgentStatus.Waiting)]);
+
+        setNow(Noon.AddHours(2));
+        vm.MergeResults([WithAgent(1, AgentStatus.Waiting)]);
+
+        Assert.False(vm.Windows.Single().IsEscalated);
+    }
+
+    [Fact]
+    public void MergeResults_CountsTheAgentsThatNeedTheUser()
+    {
+        using var vm = AtNoon(out _);
+        vm.MergeResults([WithAgent(1, AgentStatus.Busy), WithAgent(2, AgentStatus.Waiting), WithAgent(3, AgentStatus.Waiting)]);
+        vm.MergeResults([WithAgent(1, AgentStatus.Idle), WithAgent(2, AgentStatus.Waiting), WithAgent(3, AgentStatus.Waiting, isActive: true)]);
+
+        Assert.Equal(1, vm.AgentsWaiting); // the one in front is being answered
+        Assert.Equal(1, vm.AgentsFinished);
+    }
+
+    [Fact]
+    public void SortByUrgency_ShowsOneListMostUrgentFirst()
+    {
+        using var vm = AtNoon(out var setNow);
+        vm.MergeResults([WithAgent(1, AgentStatus.Busy), WithAgent(2, null)]);
+        setNow(Noon.AddMinutes(1));
+        vm.MergeResults([WithAgent(1, AgentStatus.Busy), WithAgent(2, null), WithAgent(3, AgentStatus.Waiting)]);
+
+        vm.SortByUrgency = true;
+
+        Assert.Empty(vm.GroupedWindows.GroupDescriptions);
+        Assert.Equal(new[] { (IntPtr)3, (IntPtr)1, (IntPtr)2 }, vm.GroupedWindows.Cast<TrackedWindow>().Select(w => w.Hwnd));
+    }
+
+    [Fact]
+    public void ApplyArrangement_ReordersAtMostEveryIntervalAndNeverUnderTheMouse()
+    {
+        using var vm = AtNoon(out var setNow);
+        vm.MergeResults([WithAgent(1, AgentStatus.Busy), WithAgent(2, AgentStatus.Busy)]);
+        vm.SortByUrgency = true; // arranged at noon
+        IntPtr[] Shown() => vm.GroupedWindows.Cast<TrackedWindow>().Select(w => w.Hwnd).ToArray();
+
+        // Window 2 starts waiting: it should come first, but not yet
+        setNow(Noon.AddSeconds(1));
+        vm.MergeResults([WithAgent(1, AgentStatus.Busy), WithAgent(2, AgentStatus.Waiting)]);
+        vm.ApplyArrangement();
+        Assert.Equal(new[] { (IntPtr)1, (IntPtr)2 }, Shown());
+
+        setNow(Noon + PreviewViewModel.ReorderInterval);
+        vm.IsPointerOver = true;
+        vm.ApplyArrangement();
+        Assert.Equal(new[] { (IntPtr)1, (IntPtr)2 }, Shown());
+
+        vm.IsPointerOver = false; // leaving the panel applies the pending order
+        Assert.Equal(new[] { (IntPtr)2, (IntPtr)1 }, Shown());
+    }
+
+    [Fact]
+    public void ShowOnlyWindowsThatNeedMe_HidesWorkingAgentsAndQuietWindows()
+    {
+        using var vm = AtNoon(out _);
+        vm.MergeResults([WithAgent(1, AgentStatus.Busy), WithAgent(2, null), WithAgent(3, AgentStatus.Idle)]);
+
+        vm.ShowOnlyWindowsThatNeedMe = true;
+
+        Assert.Equal(new[] { (IntPtr)3 }, vm.GroupedWindows.Cast<TrackedWindow>().Select(w => w.Hwnd));
+        Assert.False(vm.IsEmptyAfterFilter);
+    }
+
+    [Fact]
+    public void ShowOnlyWindowsThatNeedMe_NothingNeedsTheUser_SaysSo()
+    {
+        using var vm = AtNoon(out _);
+        vm.MergeResults([WithAgent(1, AgentStatus.Busy)]);
+
+        vm.ShowOnlyWindowsThatNeedMe = true;
+
+        Assert.True(vm.IsEmptyAfterFilter);
+        vm.ShowOnlyWindowsThatNeedMe = false;
+        Assert.False(vm.IsEmptyAfterFilter);
+    }
 }

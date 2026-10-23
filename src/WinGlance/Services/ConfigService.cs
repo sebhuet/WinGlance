@@ -126,6 +126,7 @@ internal sealed class ConfigService
 
         config.AgentDetection ??= new AgentDetectionConfig();
         config.AgentDetection.RefreshIntervalMs = Math.Clamp(config.AgentDetection.RefreshIntervalMs, 1000, 60000);
+        config.AgentDetection.RemindAfterMinutes = Math.Clamp(config.AgentDetection.RemindAfterMinutes, 0, 60);
 
         return config;
     }

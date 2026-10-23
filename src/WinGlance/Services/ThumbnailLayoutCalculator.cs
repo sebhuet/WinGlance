@@ -37,7 +37,8 @@ internal static class ThumbnailLayoutCalculator
     /// <param name="available">Size of the Preview area, in device-independent pixels.</param>
     /// <param name="groupSizes">Number of windows in each application group.</param>
     /// <param name="aspectRatio">Width / height of a thumbnail cell.</param>
-    public static Size? Fit(Size available, IReadOnlyList<int> groupSizes, double aspectRatio)
+    /// <param name="groupHeaders">False when the windows are shown in one list without group headers (sorted by urgency).</param>
+    public static Size? Fit(Size available, IReadOnlyList<int> groupSizes, double aspectRatio, bool groupHeaders = true)
     {
         var groups = groupSizes.Where(n => n > 0).ToList();
         if (groups.Count == 0 || available.Width <= 0 || available.Height <= 0)
@@ -52,7 +53,7 @@ internal static class ThumbnailLayoutCalculator
         while (low < high)
         {
             var middle = (low + high + 1) / 2;
-            if (Fits(available, groups, middle, aspectRatio))
+            if (Fits(available, groups, middle, aspectRatio, groupHeaders))
                 low = middle;
             else
                 high = middle - 1;
@@ -66,7 +67,7 @@ internal static class ThumbnailLayoutCalculator
     /// True if thumbnails of the given width fit, laid out as the view does: as many items per
     /// row as the width allows, every group starting a new row under its header.
     /// </summary>
-    internal static bool Fits(Size available, IReadOnlyList<int> groupSizes, double thumbnailWidth, double aspectRatio)
+    internal static bool Fits(Size available, IReadOnlyList<int> groupSizes, double thumbnailWidth, double aspectRatio, bool groupHeaders = true)
     {
         if (thumbnailWidth < 1)
             return false;
@@ -77,7 +78,8 @@ internal static class ThumbnailLayoutCalculator
 
         var itemHeight = ItemHeight(thumbnailWidth, aspectRatio);
         var rows = groupSizes.Sum(n => (n + perRow - 1) / perRow);
-        var height = (groupSizes.Count(n => n > 0) * GroupHeaderHeight) + (rows * itemHeight);
+        var headers = groupHeaders ? groupSizes.Count(n => n > 0) : 0;
+        var height = (headers * GroupHeaderHeight) + (rows * itemHeight);
         return height <= available.Height - SafetyMargin;
     }
 

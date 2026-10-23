@@ -472,4 +472,68 @@ public class SettingsViewModelTests : IDisposable
 
         Assert.True(raised);
     }
+
+    // ── Order, filter, status time, reminders ────────────────────────────
+
+    [Fact]
+    public void OrderOptions_ApplyLiveToThePreview()
+    {
+        var vm = CreateVm();
+
+        vm.SortByUrgency = true;
+        vm.ShowOnlyWindowsThatNeedMe = true;
+        vm.ShowStatusTime = false;
+        vm.RemindAfterMinutes = 25;
+
+        Assert.True(_previewVm.SortByUrgency);
+        Assert.True(_previewVm.ShowOnlyWindowsThatNeedMe);
+        Assert.False(_previewVm.ShowStatusTime);
+        Assert.Equal(TimeSpan.FromMinutes(25), _previewVm.RemindAfter);
+    }
+
+    [Fact]
+    public void Save_PersistsTheOrderOptions()
+    {
+        var vm = CreateVm();
+        vm.SortByUrgency = true;
+        vm.ShowOnlyWindowsThatNeedMe = true;
+        vm.ShowStatusTime = false;
+        vm.RemindAfterMinutes = 30;
+
+        vm.Save();
+        var saved = _configService.Load();
+
+        Assert.True(saved.SortByUrgency);
+        Assert.True(saved.ShowOnlyWindowsThatNeedMe);
+        Assert.False(saved.ShowStatusTime);
+        Assert.Equal(30, saved.AgentDetection.RemindAfterMinutes);
+    }
+
+    [Fact]
+    public void SaveQuickOptions_PersistsTheOrderAndFilterOfTheOptionsPanel()
+    {
+        var vm = CreateVm();
+        vm.SortByUrgency = true;
+        vm.ShowOnlyWindowsThatNeedMe = true;
+
+        vm.SaveQuickOptions();
+        var saved = _configService.Load();
+
+        Assert.True(saved.SortByUrgency);
+        Assert.True(saved.ShowOnlyWindowsThatNeedMe);
+    }
+
+    [Theory]
+    [InlineData(-3, 0, "Never")]
+    [InlineData(10, 10, "10 min")]
+    [InlineData(90, 60, "60 min")]
+    public void RemindAfterMinutes_IsClampedAndDescribed(int value, int expected, string text)
+    {
+        var vm = CreateVm();
+
+        vm.RemindAfterMinutes = value;
+
+        Assert.Equal(expected, vm.RemindAfterMinutes);
+        Assert.Equal(text, vm.RemindAfterText);
+    }
 }

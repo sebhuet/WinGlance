@@ -18,6 +18,8 @@ public partial class MainWindow : Window
 {
     private readonly MainViewModel _viewModel;
     private readonly TaskbarIcon _trayIcon;
+    private readonly Icon _applicationIcon = LoadApplicationIcon();
+    private Icon? _badgeIcon;
     private readonly HotkeyService _hotkeyService = new();
     private readonly HotkeyService _nextAgentHotkeyService = new(hotkeyId: 2);
 
@@ -72,12 +74,19 @@ public partial class MainWindow : Window
         // System tray icon
         _trayIcon = new TaskbarIcon
         {
-            Icon = LoadApplicationIcon(),
+            Icon = _applicationIcon,
             ToolTipText = "WinGlance",
             ContextMenu = CreateTrayContextMenu(),
         };
         _trayIcon.TrayMouseDoubleClick += (_, _) => ShowPanel();
         _trayIcon.TrayBalloonTipClicked += (_, _) => ActivateNotifiedWindow();
+
+        // Counter of the agents that need the user, on the tray icon (raised on the polling thread)
+        _viewModel.PreviewViewModel.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName is nameof(PreviewViewModel.AgentsWaiting) or nameof(PreviewViewModel.AgentsFinished))
+                Dispatcher.BeginInvoke(UpdateTrayCounter);
+        };
 
         Loaded += OnLoaded;
         Closing += OnClosing;
@@ -174,6 +183,7 @@ public partial class MainWindow : Window
         _nextAgentHotkeyService.Dispose();
         _hwndSource?.RemoveHook(WndProc);
         _trayIcon.Dispose();
+        _badgeIcon?.Dispose();
     }
 
     /// <summary>
@@ -438,6 +448,19 @@ public partial class MainWindow : Window
         _lastNotifiedWindow = window;
         _trayIcon.ShowBalloonTip(title, message, BalloonIcon.Info);
         Log.Info($"Notified: {title}");
+    }
+
+    /// <summary>Draws the number of agents that need the user on the tray icon, and lists them in its tooltip.</summary>
+    private void UpdateTrayCounter()
+    {
+        var waiting = _viewModel.PreviewViewModel.AgentsWaiting;
+        var finished = _viewModel.PreviewViewModel.AgentsFinished;
+
+        var previous = _badgeIcon;
+        _badgeIcon = waiting + finished > 0 ? TrayBadge.Create(_applicationIcon, waiting, finished) : null;
+        _trayIcon.Icon = _badgeIcon ?? _applicationIcon;
+        _trayIcon.ToolTipText = TrayBadge.Describe(waiting, finished);
+        previous?.Dispose();
     }
 
     private void ActivateNotifiedWindow()

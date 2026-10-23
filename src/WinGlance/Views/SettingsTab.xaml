@@ -134,6 +134,15 @@
                              Foreground="{DynamicResource PrimaryText}"
                              IsChecked="{Binding Layout, Converter={StaticResource LayoutRadioConverter}, ConverterParameter=grid}" />
             </StackPanel>
+            <CheckBox Content="Sort by urgency: the window that has needed me longest comes first, top left"
+                      IsChecked="{Binding SortByUrgency}"
+                      Foreground="{DynamicResource PrimaryText}" Margin="0,2" />
+            <CheckBox Content="Show only the windows that need me (hide working agents and quiet windows)"
+                      IsChecked="{Binding ShowOnlyWindowsThatNeedMe}"
+                      Foreground="{DynamicResource PrimaryText}" Margin="0,2" />
+            <CheckBox Content="Show the time since the last status change"
+                      IsChecked="{Binding ShowStatusTime}"
+                      Foreground="{DynamicResource PrimaryText}" Margin="0,2" />
 
             <!-- ── Thumbnail Size ─────────────────────────── -->
             <TextBlock Text="Thumbnail Size" Style="{StaticResource SectionHeader}" />
@@ -282,6 +291,15 @@
             <CheckBox Content="Notify me when an agent finishes or needs me"
                       IsChecked="{Binding AgentNotifications}"
                       Foreground="{DynamicResource PrimaryText}" Margin="0,2" />
+            <TextBlock Text="Remind me when an agent has waited for an answer longer than"
+                       Style="{StaticResource Label}" Margin="0,6,0,2" />
+            <DockPanel Margin="0,0,0,2">
+                <TextBlock DockPanel.Dock="Right" Text="{Binding RemindAfterText}"
+                           Style="{StaticResource Label}" Width="60" Margin="8,0,0,0" />
+                <Slider Minimum="0" Maximum="60" TickFrequency="5" IsSnapToTickEnabled="True"
+                        Value="{Binding RemindAfterMinutes}"
+                        AutomationProperties.Name="Reminder delay" />
+            </DockPanel>
 
             <!-- ── LLM Analysis ───────────────────────────── -->
             <TextBlock Text="LLM Analysis" Style="{StaticResource SectionHeader}" />

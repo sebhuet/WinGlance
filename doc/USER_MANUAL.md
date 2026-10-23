@@ -4,7 +4,7 @@ WinGlance is a portable, always-on-top floating panel for Windows 10 and Windows
 
 <img src="images/preview.png" alt="The WinGlance panel showing two groups of live window thumbnails, Windows PowerShell and Command Prompt, with colored borders and coding agent badges" width="1020">
 
-In this example, WinGlance monitors two applications. In the **Windows PowerShell** group, Claude Code waits for a permission answer in `web-client` (red), has finished its turn in `docs-site` while you were elsewhere (orange), and is working in `api-server` (blue badge); OpenCode runs in `infra`. In the **Command Prompt** group, a confirmation dialog blocks `db-backup` (yellow) and `nightly-build` flashes for attention (orange).
+In this example, WinGlance monitors two applications. In the **Windows PowerShell** group, Claude Code waits for a permission answer in `web-client` (red, with a blinking ring: it has waited longer than the reminder delay), has finished its turn in `docs-site` while you were elsewhere (orange), and is working in `api-server` (blue badge); OpenCode runs in `infra`. In the **Command Prompt** group, a confirmation dialog blocks `db-backup` (yellow). Next to each badge, the time since the window's status last changed.
 
 ---
 
@@ -99,6 +99,7 @@ Window tracking continues while another view is open, so indicators are up to da
 - **Options** (⚙): opens the Options panel, a quick settings panel under the title bar. Changes apply at once and are saved when the panel closes. **All settings…** opens the full Settings view.
   - **Transparency**, from 0 % (opaque) to 70 %, applied as you move the slider.
   - **When switching to a window**: the blinking red frame and the side click played when you switch to a window (see [Section 3.5](#35-switching-windows)).
+  - **Windows**: **Most urgent first** and **Only the windows that need me** (see [Section 3.10](#310-sorting-and-filtering)).
   - **Coding agents**: the notifications sent when an agent finishes or needs you (see [Section 3.8](#38-coding-agent-indicators)).
 - **Minimize** (—): minimizes the panel to the Windows taskbar.
 - **Full screen** (□): the panel covers its whole screen; in the Fit to panel layout the thumbnails grow to fill it. Click again (❐), press **F11** or **Esc**, or double-click the title bar to go back. Clicking a thumbnail also leaves full screen, so that the window you switch to is not hidden behind the panel.
@@ -106,7 +107,7 @@ Window tracking continues while another view is open, so indicators are up to da
   - If **Close to system tray** is enabled (default): hides the panel to the system tray.
   - If disabled: exits the application entirely.
 
-<img src="images/options.png" alt="The Options panel with the Transparency slider, the switching options, the agent notification option and the All settings button" width="272">
+<img src="images/options.png" alt="The Options panel with the Transparency slider, the switching options, the Most urgent first and Only the windows that need me options, the agent notification option and the All settings button" width="272">
 
 ### 2.4 System Tray
 
@@ -119,6 +120,8 @@ WinGlance places an icon in the Windows system tray (notification area) at launc
 
 The tray icon remains visible even when the panel is hidden, so you can always bring it back.
 
+When coding agents need you, a **counter** appears on the tray icon: the number of agents waiting for your answer plus those whose finished turn you have not seen yet. It is red when at least one agent waits for an answer, orange otherwise. Hover the icon for the details, e.g. "WinGlance · 2 agents waiting for you, 1 finished".
+
 ---
 
 ## 3. Preview View
@@ -129,7 +132,7 @@ The Preview view is the main view of WinGlance (see the screenshot at the top of
 
 ### 3.2 Thumbnail Grouping
 
-Thumbnails are **grouped by application**. Each group has a header showing:
+Thumbnails are **grouped by application** (unless **Sort by urgency** is on, see [Section 3.10](#310-sorting-and-filtering)). Each group has a header showing:
 
 - The application icon
 - The application name
@@ -151,8 +154,10 @@ Four layout modes are available (configurable in Settings):
 Each thumbnail displays:
 
 - A **live preview** of the window content, with the window's proportions kept (empty bands fill the rest).
-- Below it, the **window title** (truncated with "..." if too long), preceded by any status badges: coding agent, **Not Responding**, **Awaiting Action**. Badges sit below the preview because Windows draws live previews above everything else. This row grows with the thumbnail (up to 2.5 times), so its text stays readable on large thumbnails.
+- Below it, the **window title** (truncated with "..." if too long), preceded by any status badges (coding agent, **Not Responding**, **Awaiting Action**) and by the **time since the status last changed**, e.g. "12 min" or "1 h 05". Badges sit below the preview because Windows draws live previews above everything else. This row grows with the thumbnail (up to 2.5 times), so its text stays readable on large thumbnails.
 - Hover over a thumbnail to see the **full window title** in a tooltip.
+
+The time is shown for windows that have a status: a coding agent, or an attention state (not responding, dialog, flashing, awaiting action). For an agent, it counts from its last status change (for example since it stopped working), not from the moment you looked at the window. Turn it off in **Settings > Layout**.
 
 Windows on another virtual desktop are not shown (their preview would be black); they appear when you switch to their desktop.
 
@@ -219,6 +224,8 @@ Badges refresh every 5 seconds. Turn them off in **Settings > Coding Agents**.
 
 **Notifications.** When an agent finishes its turn or starts waiting for you (permission prompt, question) while its window is not in front, WinGlance shows a Windows notification, e.g. "Claude finished · BookAmPlus" or "Claude needs you · BookAmPlus" with the reason. Click it to switch to the window. Agents already waiting when WinGlance starts are not notified. Turn notifications off in **Settings > Coding Agents** or in the **⚙ Options** panel; Windows' Do not disturb mode also silences them.
 
+**Reminders.** When an agent has waited for your answer longer than the reminder delay (10 minutes by default) while you are in another window, a **red ring blinks** around its thumbnail and WinGlance shows a reminder notification ("Claude still needs you · BookAmPlus", with how long it has waited). The reminder is shown once per waiting period. Set the delay, or turn reminders off, in **Settings > Coding Agents**.
+
 **Next agent hotkey.** Press **Ctrl+Alt+N** (configurable in **Settings > Global Hotkeys**) from anywhere to switch to the next window whose agent needs you: agents waiting for an answer first, then turns you have not seen yet, then idle agents. Press it again to go on to the next one; working agents are skipped.
 
 ### 3.9 Dynamic Window Tracking
@@ -226,6 +233,27 @@ Badges refresh every 5 seconds. Turn them off in **Settings > Coding Agents**.
 - When a new window opens for a monitored application, its thumbnail appears automatically (within approximately one second).
 - When a window is closed, its thumbnail is removed automatically.
 - UWP / Microsoft Store applications (e.g., Calculator, Photos) are correctly identified by their real app name.
+
+### 3.10 Sorting and Filtering
+
+Two options change which thumbnails are shown and in what order. Both are in **Settings > Layout** and in the **⚙ Options** panel (**Windows**), and apply at once.
+
+**Sort by urgency** (Options: **Most urgent first**) shows all the windows in one list, without application groups, the most urgent at the top left:
+
+1. An agent waiting for your answer (permission prompt, question)
+2. A window not responding, blocked by a dialog, flashing, or found awaiting action by the AI
+3. An agent that finished its turn while you were elsewhere
+4. An idle agent you have already seen
+5. A working agent
+6. Windows without agent or state
+
+Within each level, the window in that status for the longest time comes first: the agent that has waited longest for you is at the top left.
+
+<img src="images/sorted.png" alt="The panel sorted by urgency: the agent waiting for a permission answer at the top left, then the window blocked by a dialog, the agent that finished, the working agents and the quiet window last" width="1020">
+
+**Show only the windows that need me** (Options: **Only the windows that need me**) hides working agents and windows without agent or state. When nothing needs you, the panel says so.
+
+To keep the thumbnails from jumping under your cursor, they are rearranged **at most every 3 seconds**, and **never while the mouse is over them**: the new order applies when the mouse leaves the panel. New windows appear at their place right away.
 
 ---
 
@@ -272,6 +300,14 @@ Open the Settings view by right-clicking the panel and selecting **Settings**, b
 ### 5.1 Layout
 
 Choose between **Fit to panel** (default), **Horizontal**, **Vertical**, or **Grid** using radio buttons. Changes apply immediately to the Preview view.
+
+Three options follow, also applied immediately:
+
+| Option                                         | Default | Description                                                                              |
+| ---------------------------------------------- | ------- | ---------------------------------------------------------------------------------------- |
+| **Sort by urgency**                            | Off     | One list, most urgent first (see [Section 3.10](#310-sorting-and-filtering)).            |
+| **Show only the windows that need me**         | Off     | Hides working agents and quiet windows (see [Section 3.10](#310-sorting-and-filtering)). |
+| **Show the time since the last status change** | On      | The time under each thumbnail (see [Section 3.4](#34-thumbnail-contents)).               |
 
 In **Fit to panel**, resize the panel with its grip: WinGlance tries every arrangement of rows and columns and keeps the one giving the largest thumbnails, taking the typical proportions of your windows. Each window keeps its own proportions inside its thumbnail. The panel size is remembered. In the other layouts the panel sizes itself to the thumbnails.
 
@@ -329,10 +365,11 @@ The hotkeys are applied when you click **Save Configuration**. If one cannot be 
 
 ### 5.7 Coding Agents
 
-| Option                                               | Default | Description                                                                                    |
-| ---------------------------------------------------- | ------- | ---------------------------------------------------------------------------------------------- |
-| **Show Claude Code / OpenCode status on thumbnails** | On      | Shows the agent badges described in [Section 3.8](#38-coding-agent-indicators).                |
-| **Notify me when an agent finishes or needs me**     | On      | Shows a Windows notification when an agent finishes or starts waiting while you are elsewhere. |
+| Option                                                           | Default | Description                                                                                                                |
+| ---------------------------------------------------------------- | ------- | -------------------------------------------------------------------------------------------------------------------------- |
+| **Show Claude Code / OpenCode status on thumbnails**             | On      | Shows the agent badges described in [Section 3.8](#38-coding-agent-indicators).                                            |
+| **Notify me when an agent finishes or needs me**                 | On      | Shows a Windows notification when an agent finishes or starts waiting while you are elsewhere.                             |
+| **Remind me when an agent has waited for an answer longer than** | 10 min  | Blinking ring and reminder notification (see [Section 3.8](#38-coding-agent-indicators)); 0 to 60 minutes, **Never** at 0. |
 
 Changes apply immediately. The refresh interval (`agentDetection.refreshIntervalMs`, default 5000 ms) can be changed in `config.json`.
 
@@ -497,28 +534,32 @@ Records startup, warnings and errors: hotkey registration failures, LLM analysis
 
 ## 10. Default Settings Reference
 
-| Setting                  | Default Value               |
-| ------------------------ | --------------------------- |
-| Layout                   | Fit to panel                |
-| Thumbnail width          | 200 px                      |
-| Thumbnail height         | 150 px                      |
-| Panel opacity            | 85%                         |
-| Polling interval         | 1000 ms                     |
-| Remember position        | On                          |
-| Close to tray            | On                          |
-| Auto-start               | Off                         |
-| Blinking frame on switch | On                          |
-| Side click on switch     | On                          |
-| Show / hide hotkey       | Ctrl+Alt+G                  |
-| Next agent hotkey        | Ctrl+Alt+N                  |
-| Coding agent badges      | On                          |
-| Agent notifications      | On                          |
-| Agent refresh            | 5000 ms                     |
-| LLM analysis             | Off                         |
-| LLM provider             | openai                      |
-| LLM endpoint             | `https://api.openai.com/v1` |
-| LLM model                | gpt-4o-mini                 |
-| Stale threshold          | 30 seconds                  |
+| Setting                   | Default Value               |
+| ------------------------- | --------------------------- |
+| Layout                    | Fit to panel                |
+| Thumbnail width           | 200 px                      |
+| Thumbnail height          | 150 px                      |
+| Panel opacity             | 85%                         |
+| Polling interval          | 1000 ms                     |
+| Remember position         | On                          |
+| Close to tray             | On                          |
+| Auto-start                | Off                         |
+| Blinking frame on switch  | On                          |
+| Side click on switch      | On                          |
+| Show / hide hotkey        | Ctrl+Alt+G                  |
+| Next agent hotkey         | Ctrl+Alt+N                  |
+| Coding agent badges       | On                          |
+| Agent notifications       | On                          |
+| Agent reminder delay      | 10 minutes                  |
+| Sort by urgency           | Off                         |
+| Only windows that need me | Off                         |
+| Time since status change  | On                          |
+| Agent refresh             | 5000 ms                     |
+| LLM analysis              | Off                         |
+| LLM provider              | openai                      |
+| LLM endpoint              | `https://api.openai.com/v1` |
+| LLM model                 | gpt-4o-mini                 |
+| Stale threshold           | 30 seconds                  |
 
 ---
 
@@ -575,6 +616,10 @@ Records startup, warnings and errors: hotkey registration failures, LLM analysis
 **Q: I do not get agent notifications.**
 
 > Check that **Notify me when an agent finishes or needs me** is checked (Settings > Coding Agents, or the ⚙ Options panel) and that Windows' Do not disturb mode is off. No notification is shown for the window in front, nor for agents already waiting when WinGlance started.
+
+**Q: The thumbnails do not reorder after an agent's status changed.**
+
+> With **Sort by urgency** or **Show only the windows that need me**, thumbnails are rearranged at most every 3 seconds and never while the mouse is over the panel, so that they do not move while you aim at one. Move the mouse out of the panel: the new order applies at once.
 
 **Q: Can I run WinGlance from a USB drive?**
 

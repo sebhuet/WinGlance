@@ -257,4 +257,15 @@ public class ConfigServiceTests : IDisposable
         Assert.True(config.AgentDetection.Enabled);
         Assert.Equal(5000, config.AgentDetection.RefreshIntervalMs);
     }
+
+    [Theory]
+    [InlineData(-5, 0)]
+    [InlineData(10, 10)]
+    [InlineData(500, 60)]
+    public void Normalize_RemindAfterMinutes_IsClampedTo0To60(int value, int expected)
+    {
+        var config = new AppConfig { AgentDetection = { RemindAfterMinutes = value } };
+
+        Assert.Equal(expected, ConfigService.Normalize(config).AgentDetection.RemindAfterMinutes);
+    }
 }

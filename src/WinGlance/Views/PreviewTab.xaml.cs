@@ -16,6 +16,16 @@ public partial class PreviewTab : UserControl
         // or the layout could flip between two sizes.
         Scroller.SizeChanged += (_, e) => ReportSize(e.NewSize);
         DataContextChanged += (_, _) => ReportSize(Scroller.RenderSize);
+
+        // Thumbnails are not reordered under the mouse: the user may be about to click one
+        Scroller.MouseEnter += (_, _) => SetPointerOver(true);
+        Scroller.MouseLeave += (_, _) => SetPointerOver(false);
+    }
+
+    private void SetPointerOver(bool isOver)
+    {
+        if (DataContext is PreviewViewModel viewModel)
+            viewModel.IsPointerOver = isOver;
     }
 
     private void ReportSize(Size size)

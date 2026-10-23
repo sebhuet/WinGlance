@@ -36,6 +36,21 @@ internal sealed class PreviewViewModel : ViewModelBase, IDisposable
     private double _displayThumbnailHeight = 150;
     private System.Windows.Size _viewportSize = System.Windows.Size.Empty;
 
+    private bool _sortByUrgency;
+    private bool _showOnlyWindowsThatNeedMe;
+    private bool _showStatusTime = true;
+    private bool _isPointerOver;
+    private bool _isEmptyAfterFilter;
+    private int _agentsWaiting;
+    private int _agentsFinished;
+    private DateTime _lastArrangement = DateTime.MinValue;
+
+    /// <summary>
+    /// Least time between two reorderings of the thumbnails: a panel that keeps moving would
+    /// make the user click the wrong thumbnail.
+    /// </summary>
+    internal static readonly TimeSpan ReorderInterval = TimeSpan.FromSeconds(3);
+
     /// <summary>
     /// Creates the preview with its window list grouped by application and a stopped polling
     /// timer; <see cref="Start"/> begins the scans.
@@ -205,12 +220,17 @@ internal sealed class PreviewViewModel : ViewModelBase, IDisposable
         lock (_lock)
         {
             viewport = _viewportSize;
-            groupSizes = _windows.GroupBy(w => w.DisplayName).Select(g => g.Count()).ToList();
-            aspectRatio = ThumbnailLayoutCalculator.TypicalAspectRatio(_windows.Select(w => w.AspectRatio));
+            var shown = _showOnlyWindowsThatNeedMe ? _windows.Where(WindowUrgency.NeedsMe).ToList() : [.. _windows];
+            // Sorted by urgency, the windows form one list without group headers
+            groupSizes = _sortByUrgency
+                ? [shown.Count]
+                : shown.GroupBy(w => w.DisplayName).Select(g => g.Count()).ToList();
+            aspectRatio = ThumbnailLayoutCalculator.TypicalAspectRatio(shown.Select(w => w.AspectRatio));
         }
 
         // Before the first layout pass or without windows, keep the current size
-        if (viewport.IsEmpty || ThumbnailLayoutCalculator.Fit(viewport, groupSizes, aspectRatio) is not { } size)
+        if (viewport.IsEmpty
+            || ThumbnailLayoutCalculator.Fit(viewport, groupSizes, aspectRatio, groupHeaders: !_sortByUrgency) is not { } size)
             return;
 
         DisplayThumbnailWidth = size.Width;
@@ -282,6 +302,208 @@ internal sealed class PreviewViewModel : ViewModelBase, IDisposable
         LlmService?.Dispose();
     }
 
+    // ── Order, filter, status time and reminders ───────────────────────
+
+    /// <summary>Current time (UTC); replaced by tests.</summary>
+    internal Func<DateTime> UtcNow { get; set; } = () => DateTime.UtcNow;
+
+    /// <summary>
+    /// Shows the windows in one list, most urgent first (see <see cref="WindowUrgency"/>),
+    /// instead of grouped by application. Applied at once.
+    /// </summary>
+    public bool SortByUrgency
+    {
+        get => _sortByUrgency;
+        set
+        {
+            if (SetProperty(ref _sortByUrgency, value))
+            {
+                ApplyViewMode();
+                UpdateDisplaySize();
+            }
+        }
+    }
+
+    /// <summary>Hides the windows that need nothing (<see cref="WindowUrgency.NeedsMe"/>). Applied at once.</summary>
+    public bool ShowOnlyWindowsThatNeedMe
+    {
+        get => _showOnlyWindowsThatNeedMe;
+        set
+        {
+            if (SetProperty(ref _showOnlyWindowsThatNeedMe, value))
+            {
+                ApplyViewMode();
+                UpdateDisplaySize();
+            }
+        }
+    }
+
+    /// <summary>Shows the time since the last status change under each thumbnail. Applied at once.</summary>
+    public bool ShowStatusTime
+    {
+        get => _showStatusTime;
+        set
+        {
+            if (!SetProperty(ref _showStatusTime, value))
+                return;
+            var now = UtcNow();
+            foreach (var window in GetWindowsSnapshot())
+                UpdateStatusAge(window, now);
+        }
+    }
+
+    /// <summary>
+    /// How long an agent may wait for an answer before its border blinks and a reminder is
+    /// raised; <see cref="TimeSpan.Zero"/> turns reminders off.
+    /// </summary>
+    public TimeSpan RemindAfter { get; set; } = TimeSpan.FromMinutes(10);
+
+    /// <summary>
+    /// True while the mouse is over the thumbnails (set by the view): they are not reordered
+    /// then, and a pending reordering happens when the mouse leaves.
+    /// </summary>
+    public bool IsPointerOver
+    {
+        get => _isPointerOver;
+        set
+        {
+            if (SetProperty(ref _isPointerOver, value) && !value)
+                ApplyArrangement();
+        }
+    }
+
+    /// <summary>True when "only windows that need me" hides every tracked window.</summary>
+    public bool IsEmptyAfterFilter
+    {
+        get => _isEmptyAfterFilter;
+        private set => SetProperty(ref _isEmptyAfterFilter, value);
+    }
+
+    /// <summary>Agents waiting for an answer in a window that is not in front (tray icon counter).</summary>
+    public int AgentsWaiting
+    {
+        get => _agentsWaiting;
+        private set => SetProperty(ref _agentsWaiting, value);
+    }
+
+    /// <summary>Agents whose finished turn the user has not seen yet (tray icon counter).</summary>
+    public int AgentsFinished
+    {
+        get => _agentsFinished;
+        private set => SetProperty(ref _agentsFinished, value);
+    }
+
+    /// <summary>
+    /// Sets grouping, order and filter of <see cref="GroupedWindows"/> from the options.
+    /// Must run on the thread that created the view model (the UI thread).
+    /// </summary>
+    private void ApplyViewMode()
+    {
+        if (GroupedWindows is not ListCollectionView view)
+            return;
+
+        using (view.DeferRefresh())
+        {
+            view.GroupDescriptions.Clear();
+            if (!_sortByUrgency)
+                view.GroupDescriptions.Add(new PropertyGroupDescription(nameof(TrackedWindow.DisplayName)));
+            view.CustomSort = _sortByUrgency ? WindowUrgency.Comparer.Instance : null;
+            view.Filter = _showOnlyWindowsThatNeedMe ? IsShown : null;
+        }
+
+        _lastArrangement = UtcNow();
+        UpdateIsEmptyAfterFilter(view);
+    }
+
+    private static bool IsShown(object item) => item is TrackedWindow window && WindowUrgency.NeedsMe(window);
+
+    /// <summary>
+    /// Brings the shown thumbnails in line with the current statuses, after a scan or when the
+    /// mouse leaves the panel. The view does not re-sort or re-filter by itself when a status
+    /// changes; a refresh does, at most once per <see cref="ReorderInterval"/>, never under
+    /// the mouse, and only when the order or the set shown actually changed.
+    /// Must run on the UI thread.
+    /// </summary>
+    internal void ApplyArrangement()
+    {
+        if ((!_sortByUrgency && !_showOnlyWindowsThatNeedMe) || GroupedWindows is not ListCollectionView view)
+            return;
+
+        if (!_isPointerOver && UtcNow() - _lastArrangement >= ReorderInterval)
+        {
+            List<TrackedWindow> wanted;
+            lock (_lock)
+                wanted = _windows.Where(w => !_showOnlyWindowsThatNeedMe || WindowUrgency.NeedsMe(w)).ToList();
+
+            var shown = view.Cast<TrackedWindow>().ToList();
+            bool upToDate;
+            if (_sortByUrgency)
+            {
+                wanted.Sort(WindowUrgency.Comparer.Instance);
+                upToDate = shown.SequenceEqual(wanted);
+            }
+            else
+            {
+                // Grouped: the view orders the groups itself, only the set shown matters
+                upToDate = shown.ToHashSet().SetEquals(wanted);
+            }
+
+            if (!upToDate)
+            {
+                view.Refresh();
+                _lastArrangement = UtcNow();
+            }
+        }
+
+        UpdateIsEmptyAfterFilter(view);
+    }
+
+    private void UpdateIsEmptyAfterFilter(ListCollectionView view)
+    {
+        int tracked;
+        lock (_lock)
+            tracked = _windows.Count;
+        IsEmptyAfterFilter = _showOnlyWindowsThatNeedMe && tracked > 0 && view.IsEmpty;
+    }
+
+    /// <summary>
+    /// After a scan: restarts the status time of a window whose status changed, refreshes the
+    /// time shown, and blinks the border of an agent waiting for longer than
+    /// <see cref="RemindAfter"/>, raising one reminder per waiting period.
+    /// </summary>
+    private void UpdateStatusTime(TrackedWindow window, DateTime now, List<(TrackedWindow Window, AgentTransition Transition)> transitions)
+    {
+        var key = WindowUrgency.StatusKey(window);
+        if (key != window.StatusKey)
+        {
+            window.StatusKey = key;
+            window.StatusSince = now;
+            window.ReminderRaised = false;
+        }
+
+        UpdateStatusAge(window, now);
+
+        // The user looking at the window is answering it: no blinking, no reminder
+        var overdue = window.Agent?.Status == AgentStatus.Waiting
+            && RemindAfter > TimeSpan.Zero
+            && now - window.StatusSince >= RemindAfter
+            && !window.IsActive;
+        window.IsEscalated = overdue;
+        if (overdue && !window.ReminderRaised)
+        {
+            window.ReminderRaised = true;
+            transitions.Add((window, AgentTransition.Reminder));
+        }
+    }
+
+    private void UpdateStatusAge(TrackedWindow window, DateTime now)
+    {
+        // A quiet window has no status worth timing
+        window.StatusAge = _showStatusTime && WindowUrgency.Rank(window) < WindowUrgency.Quiet
+            ? WindowUrgency.FormatAge(now - window.StatusSince)
+            : string.Empty;
+    }
+
     // ── Click-to-switch ────────────────────────────────────────────────
 
     /// <summary>
@@ -350,6 +572,8 @@ internal sealed class PreviewViewModel : ViewModelBase, IDisposable
             Volatile.Write(ref _isScanning, 0);
         }
 
+        // Back on the UI thread: the view's order and filter follow the new statuses
+        ApplyArrangement();
         StartLlmEvaluation();
     }
 
@@ -486,6 +710,8 @@ internal sealed class PreviewViewModel : ViewModelBase, IDisposable
     {
         // Raised once the lock is released: handlers may read the window list
         var transitions = new List<(TrackedWindow Window, AgentTransition Transition)>();
+        var now = UtcNow();
+        int waiting, finished;
 
         lock (_lock)
         {
@@ -539,16 +765,24 @@ internal sealed class PreviewViewModel : ViewModelBase, IDisposable
                     var transition = ApplyAgentState(existing, scannedWindow.Agent);
                     if (transition != AgentTransition.None)
                         transitions.Add((existing, transition));
+                    UpdateStatusTime(existing, now, transitions);
                 }
                 else
                 {
                     // No previous state: only a waiting agent can need attention
                     scannedWindow.NeedsAgentAttention = !scannedWindow.IsActive
                         && scannedWindow.Agent?.Status == AgentStatus.Waiting;
+                    UpdateStatusTime(scannedWindow, now, transitions);
                     _windows.Add(scannedWindow);
                 }
             }
+
+            waiting = _windows.Count(w => w.NeedsAgentAttention && w.Agent?.Status == AgentStatus.Waiting);
+            finished = _windows.Count(w => w.NeedsAgentAttention && w.Agent?.Status == AgentStatus.Idle);
         }
+
+        AgentsWaiting = waiting;
+        AgentsFinished = finished;
 
         // Windows opened, closed or resized change the best "fit" size
         UpdateDisplaySize();

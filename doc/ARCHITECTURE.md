@@ -46,11 +46,13 @@ All the code is in `src/WinGlance/`; tests mirror it in `src/WinGlance.Tests/`.
 | `Services/ClaudeToolShells.cs`                | Counts the commands an idle Claude session still runs in the background                                          |
 | `Services/ProcessTree.cs`                     | Snapshot of all processes and their parents                                                                      |
 | `Services/AgentWindowMatcher.cs`              | Ties a session to the window hosting it (process lineage, then folder name in the title)                         |
+| `Services/WindowUrgency.cs`                   | Urgency rank, status key, "needs me" filter and order of the windows; duration format                            |
 | `Services/LlmService.cs`                      | Stale detection, then one LLM analysis per unchanged window; retry delay; cancellation                           |
 | `Services/LlmAnalyzer.cs`                     | HTTP calls to OpenAI, Gemini and Ollama; verdict parsing                                                         |
 | `Services/ScreenshotComparer.cs`              | `PrintWindow` capture and perceptual (average) hash                                                              |
 | `Services/HotkeyService.cs`                   | Parses `Ctrl+Alt+G`-style hotkeys and registers them                                                             |
 | `Services/WindowHighlighter.cs`               | Blinking red frame around the window switched to                                                                 |
+| `Services/TrayBadge.cs`                       | Tray icon with the counter of agents that need the user, and its tooltip                                         |
 | `Services/StereoClick.cs`, `ScreenSide.cs`    | Short click panned to the side of the window's screen                                                            |
 | `Services/ConfigService.cs`                   | Config path, atomic save, normalization of values read                                                           |
 | `Services/SecretProtector.cs`                 | DPAPI encryption of the LLM API key                                                                              |
@@ -128,6 +130,14 @@ Claude Code sessions come from `claude agents --json`, the interface the Claude 
 - **Badge** (`AgentBadge`): the most urgent session gives the label and color; `+N` counts the others.
 - **Transitions** (`ApplyAgentState`): busy → idle is "finished", → waiting is "needs input". An agent first seen already waiting is not a transition, to avoid a burst of notifications at startup. `MainWindow` shows them as tray notifications when `agentDetection.notify` is on.
 - **Next agent hotkey** (`FindNextAgentWindow`): waiting agents first, then finished turns not seen yet, then idle agents, cycling from the window in front.
+
+## Order, filter, status time and reminders
+
+`WindowUrgency` ranks each window (agent waiting, attention state, agent finished unseen, idle agent, working agent, quiet) and defines the status whose changes reset `TrackedWindow.StatusSince`: the agent status for a window with an agent, otherwise its attention state. Each merge restarts that clock on a change, refreshes `StatusAge` (the text under the thumbnail), and sets `IsEscalated` for an agent waiting longer than `RemindAfter` while not in front; one `Reminder` transition per waiting period goes through the same notification path as the others. The counts of waiting and finished agents feed the tray icon counter (`TrayBadge`).
+
+The preview binds to a `ListCollectionView` over the window collection. Grouped by application by default; with **sort by urgency**, the groups are removed and `CustomSort` uses `WindowUrgency.Comparer`; **only the windows that need me** sets its `Filter`. The view does not re-sort or re-filter when a property changes: `ApplyArrangement`, called on the UI thread after each scan and when the mouse leaves the thumbnails, refreshes it when the order or the set shown differs from the wanted one, at most every `ReorderInterval` (3 s) and never under the mouse. A refresh regenerates the item containers, so the thumbnails are unregistered and registered again; reordering rarely keeps that invisible. In the "fit" layout, the size computation counts only the windows shown, and no header row when sorted.
+
+The escalation ring is drawn outside the item border, in its margin: the border of a waiting agent is already red, and the item size must not change.
 
 ## LLM analysis
 

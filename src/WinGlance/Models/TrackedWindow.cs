@@ -19,6 +19,8 @@ public class TrackedWindow : ViewModels.ViewModelBase, IEquatable<TrackedWindow>
     private string? _llmVerdict;
     private AgentBadge? _agent;
     private bool _needsAgentAttention;
+    private string _statusAge = string.Empty;
+    private bool _isEscalated;
 
     /// <summary>
     /// Creates a new tracked window with immutable identity properties.
@@ -134,6 +136,34 @@ public class TrackedWindow : ViewModels.ViewModelBase, IEquatable<TrackedWindow>
         get => _needsAgentAttention;
         set => SetProperty(ref _needsAgentAttention, value);
     }
+
+    // ── Status time and reminders ──────────────────────────────────────
+
+    /// <summary>
+    /// When the window's status last changed (UTC): agent status, or attention state for a
+    /// window without agent (see <see cref="Services.WindowUrgency.StatusKey"/>).
+    /// </summary>
+    public DateTime StatusSince { get; set; }
+
+    /// <summary>Status the <see cref="StatusSince"/> time refers to.</summary>
+    internal string? StatusKey { get; set; }
+
+    /// <summary>Time since the last status change, e.g. "12 min"; empty when not shown.</summary>
+    public string StatusAge
+    {
+        get => _statusAge;
+        set => SetProperty(ref _statusAge, value);
+    }
+
+    /// <summary>True when an agent has waited for an answer longer than the reminder delay: the border blinks.</summary>
+    public bool IsEscalated
+    {
+        get => _isEscalated;
+        set => SetProperty(ref _isEscalated, value);
+    }
+
+    /// <summary>True once the reminder notification of the current waiting period has been raised.</summary>
+    internal bool ReminderRaised { get; set; }
 
     // ── Equality (by HWND) ──────────────────────────────────────────────
 

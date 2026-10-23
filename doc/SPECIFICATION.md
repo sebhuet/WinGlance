@@ -189,6 +189,16 @@ Shows, for each monitored window, whether a coding agent (**Claude Code** or **O
 - When a window's agent goes from busy to idle (finished) or starts waiting (needs input) while the window is not in front, a Windows notification is shown through the tray icon (balloon tip, displayed as a toast). Clicking it activates the window. An agent first seen already waiting (startup) is not notified. Setting: `agentDetection.notify` (default: on).
 - A second global hotkey, `nextAgentHotkey` (default `Ctrl+Alt+N`, empty for none), activates the next window whose agent needs the user: waiting first, then finished but not seen, then idle; within a group in panel order, starting after the window in front, so repeated presses cycle.
 
+#### Urgency order, filter, status time, reminders
+
+- **Status time**: each window remembers when its status last changed: the agent status for a window with an agent (seeing a finished turn does not reset it), otherwise its attention state (not responding, modal, flashing, LLM awaiting action, none). The time since then is shown next to the badges, e.g. `12 min`, `1 h 05`, for windows that have a status. Setting: `showStatusTime` (default: on).
+- **Sort by urgency** (`sortByUrgency`, default: off): one list without application groups, ordered by rank, then by time in the status, longest first: (1) agent waiting for an answer, (2) not responding, modal, flashing or LLM awaiting action, (3) agent finished and not seen, (4) idle agent, (5) working agent, (6) no agent and no state.
+- **Only the windows that need me** (`showOnlyWindowsThatNeedMe`, default: off): hides ranks 5 and 6; an empty panel says "Nothing needs you right now."
+- **Calm reordering**: the order and the filter follow status changes at most every 3 seconds and never while the mouse is over the thumbnails; a pending change applies when the mouse leaves. New windows take their place at once.
+- **Reminders** (`agentDetection.remindAfterMinutes`, 0-60, default 10, 0 = off): an agent waiting for an answer longer than the delay while its window is not in front gets a blinking red ring around its thumbnail, and one reminder notification per waiting period ("Claude still needs you", with the waiting time).
+- **Tray counter**: the tray icon shows the number of agents waiting for an answer plus finished turns not seen (red badge if any agent waits, orange otherwise), and lists them in its tooltip.
+- The order and filter options are in Settings > Layout and in the Options panel; the reminder delay in Settings > Coding Agents.
+
 ---
 
 ## Non-Functional Requirements
@@ -352,9 +362,12 @@ All declarations are in `NativeApi/NativeMethods.cs`.
 {
   "monitoredApps": [
     { "processName": "Code", "displayName": "VS Code" },
-    { "processName": "notepad++", "displayName": "Notepad++" }
+    { "processName": "WindowsTerminal", "displayName": "Terminal" }
   ],
-  "layout": "horizontal",
+  "layout": "fit",
+  "sortByUrgency": false,
+  "showOnlyWindowsThatNeedMe": false,
+  "showStatusTime": true,
   "thumbnailWidth": 200,
   "thumbnailHeight": 150,
   "panelOpacity": 0.85,
@@ -362,9 +375,14 @@ All declarations are in `NativeApi/NativeMethods.cs`.
   "rememberPosition": true,
   "panelX": 100,
   "panelY": 100,
+  "panelWidth": 900,
+  "panelHeight": 560,
   "autoStart": false,
   "closeToTray": true,
+  "highlightOnSwitch": true,
+  "clickOnSwitch": true,
   "hotkey": "Ctrl+Alt+G",
+  "nextAgentHotkey": "Ctrl+Alt+N",
   "llm": {
     "enabled": false,
     "provider": "openai",
@@ -377,10 +395,14 @@ All declarations are in `NativeApi/NativeMethods.cs`.
   },
   "agentDetection": {
     "enabled": true,
-    "refreshIntervalMs": 5000
+    "notify": true,
+    "refreshIntervalMs": 5000,
+    "remindAfterMinutes": 10
   }
 }
 ```
+
+Values out of range are brought back into range on load (see `ConfigService.Normalize`); missing keys take their default.
 
 ---
 

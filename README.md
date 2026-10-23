@@ -15,6 +15,7 @@ When working with multiple windows of the same application (e.g., several VS Cod
 - **Window attention detection** — highlights windows that are flashing, not responding, or blocked by a modal dialog
 - **Coding agent badges** — shows whether Claude Code or OpenCode runs in each window, and whether it is working, idle, or waiting for you
 - **Agent notifications** — a Windows notification when an agent finishes or needs you while you are elsewhere, and a hotkey (default: Ctrl+Alt+N) that jumps to the next agent waiting for you
+- **Most urgent first** — optional order where the window that has needed you longest sits at the top left, a filter to show only the windows that need you, the time since each status change, reminders for agents left waiting, and a counter on the tray icon
 - **LLM-assisted analysis** — optional integration with OpenAI, Gemini, or Ollama to intelligently detect windows awaiting user action
 - **Global hotkey** — configurable shortcut (default: Ctrl+Alt+G) to show/hide the panel
 - **Dark/light theme** — auto-detects Windows system theme

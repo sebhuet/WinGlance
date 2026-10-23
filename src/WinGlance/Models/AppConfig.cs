@@ -13,6 +13,18 @@ internal sealed class AppConfig
     /// <summary>Preview layout: "fit" (default), "horizontal", "vertical" or "grid"; any other value falls back to the default.</summary>
     public string Layout { get; set; } = "fit";
 
+    /// <summary>
+    /// Shows the windows in one list ordered by urgency (the one that has needed the user longest
+    /// at the top left) instead of grouped by application (default off).
+    /// </summary>
+    public bool SortByUrgency { get; set; }
+
+    /// <summary>Hides the windows that need nothing: agent working, or no agent and no attention state (default off).</summary>
+    public bool ShowOnlyWindowsThatNeedMe { get; set; }
+
+    /// <summary>Shows under each thumbnail the time since the window's status last changed (default on).</summary>
+    public bool ShowStatusTime { get; set; } = true;
+
     /// <summary>Thumbnail width in pixels, 100-500 (default 200); not used by the "fit" layout.</summary>
     public int ThumbnailWidth { get; set; } = 200;
 
@@ -87,6 +99,12 @@ internal sealed class AgentDetectionConfig
     /// (~0.2 s of CPU), hence a slower cadence than window polling.
     /// </summary>
     public int RefreshIntervalMs { get; set; } = 5000;
+
+    /// <summary>
+    /// Minutes an agent may wait for an answer before its border blinks and a reminder
+    /// notification is shown, 0-60 (default 10; 0 turns reminders off).
+    /// </summary>
+    public int RemindAfterMinutes { get; set; } = 10;
 }
 
 /// <summary>

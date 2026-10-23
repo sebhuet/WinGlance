@@ -13,6 +13,9 @@ public enum AgentTransition
 
     /// <summary>The agent started waiting on the user (permission prompt, question, dialog).</summary>
     NeedsInput,
+
+    /// <summary>The agent has been waiting on the user for longer than the reminder delay.</summary>
+    Reminder,
 }
 
 /// <summary>
@@ -27,15 +30,22 @@ internal static class AgentNotification
     {
         var badge = window.Agent;
         var agent = badge?.AgentName ?? "Agent";
-        var what = transition == AgentTransition.NeedsInput
-            ? $"{agent} needs you"
-            : $"{agent} finished";
+        var what = transition switch
+        {
+            AgentTransition.NeedsInput => $"{agent} needs you",
+            AgentTransition.Reminder => $"{agent} still needs you",
+            _ => $"{agent} finished",
+        };
         var title = badge?.Project is { } project ? $"{what} · {project}" : what;
 
         // For a waiting agent the status says why ("permission prompt"); the window title says where
-        var reason = transition == AgentTransition.NeedsInput && badge?.StatusText is { } status
+        var waiting = transition is AgentTransition.NeedsInput or AgentTransition.Reminder;
+        var reason = waiting && badge?.StatusText is { } status
             ? status + Environment.NewLine
             : string.Empty;
+        // A reminder also says for how long: the reason to look now
+        if (transition == AgentTransition.Reminder)
+            reason = $"Waiting for {Services.WindowUrgency.FormatAge(DateTime.UtcNow - window.StatusSince)}" + Environment.NewLine + reason;
         return (title, reason + window.Title);
     }
 }

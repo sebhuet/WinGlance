@@ -42,6 +42,10 @@ internal class MainViewModel : ViewModelBase
             AgentMonitor = config.AgentDetection.Enabled
                 ? new AgentMonitor(config.AgentDetection.RefreshIntervalMs)
                 : null,
+            SortByUrgency = config.SortByUrgency,
+            ShowOnlyWindowsThatNeedMe = config.ShowOnlyWindowsThatNeedMe,
+            ShowStatusTime = config.ShowStatusTime,
+            RemindAfter = TimeSpan.FromMinutes(config.AgentDetection.RemindAfterMinutes),
         };
 
         ApplicationsViewModel = new ApplicationsViewModel(

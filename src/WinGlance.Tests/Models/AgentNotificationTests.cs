@@ -44,4 +44,16 @@ public class AgentNotificationTests
         Assert.Equal("Agent finished", title);
         Assert.Equal("Some window", message);
     }
+
+    [Fact]
+    public void Describe_Reminder_SaysForHowLongTheAgentHasWaited()
+    {
+        var window = Window(AgentStatus.Waiting);
+        window.StatusSince = DateTime.UtcNow.AddMinutes(-12);
+
+        var (title, message) = AgentNotification.Describe(window, AgentTransition.Reminder);
+
+        Assert.StartsWith("Claude still needs you", title);
+        Assert.StartsWith("Waiting for 12 min" + Environment.NewLine, message);
+    }
 }
