@@ -32,6 +32,7 @@ When working with multiple windows of the same application (e.g., VS Code), the 
 ### FR-4: Window Title Display
 
 - Show the **window title** (truncated if needed) below each thumbnail
+- The text is built from a template, `titleFormat` (default `{title}`), where `{title}`, `{project}` (agent folder, otherwise the title segment before the application name), `{document}` (first title segment) and `{app}` (display name) are replaced; a result made only of separators falls back to the title. The full title stays in the tooltip. Set in Settings > Layout, applied live
 - Show the **application icon** on each thumbnail for multi-app identification
 - Highlight the **currently active/focused** window's thumbnail with a visual indicator (border color, glow)
 
@@ -368,6 +369,7 @@ All declarations are in `NativeApi/NativeMethods.cs`.
   "sortByUrgency": false,
   "showOnlyWindowsThatNeedMe": false,
   "showStatusTime": true,
+  "titleFormat": "{title}",
   "thumbnailWidth": 200,
   "thumbnailHeight": 150,
   "panelOpacity": 0.85,

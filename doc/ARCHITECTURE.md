@@ -47,6 +47,7 @@ All the code is in `src/WinGlance/`; tests mirror it in `src/WinGlance.Tests/`.
 | `Services/ProcessTree.cs`                     | Snapshot of all processes and their parents                                                                      |
 | `Services/AgentWindowMatcher.cs`              | Ties a session to the window hosting it (process lineage, then folder name in the title)                         |
 | `Services/WindowUrgency.cs`                   | Urgency rank, status key, "needs me" filter and order of the windows; duration format                            |
+| `Services/WindowTitleFormat.cs`               | Text under each thumbnail from the title template: `{title}`, `{project}`, `{document}`, `{app}`                 |
 | `Services/LlmService.cs`                      | Stale detection, then one LLM analysis per unchanged window; retry delay; cancellation                           |
 | `Services/LlmAnalyzer.cs`                     | HTTP calls to OpenAI, Gemini and Ollama; verdict parsing                                                         |
 | `Services/ScreenshotComparer.cs`              | `PrintWindow` capture and perceptual (average) hash                                                              |

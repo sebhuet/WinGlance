@@ -25,6 +25,12 @@ internal sealed class AppConfig
     /// <summary>Shows under each thumbnail the time since the window's status last changed (default on).</summary>
     public bool ShowStatusTime { get; set; } = true;
 
+    /// <summary>
+    /// Template of the text under each thumbnail: {title}, {project}, {document} and {app} are
+    /// replaced (default "{title}"); the full title stays in the tooltip.
+    /// </summary>
+    public string TitleFormat { get; set; } = "{title}";
+
     /// <summary>Thumbnail width in pixels, 100-500 (default 200); not used by the "fit" layout.</summary>
     public int ThumbnailWidth { get; set; } = 200;
 

@@ -309,6 +309,17 @@ Three options follow, also applied immediately:
 | **Show only the windows that need me**         | Off     | Hides working agents and quiet windows (see [Section 3.10](#310-sorting-and-filtering)). |
 | **Show the time since the last status change** | On      | The time under each thumbnail (see [Section 3.4](#34-thumbnail-contents)).               |
 
+**Text under each thumbnail** sets what the thumbnails show next to their badges, from a template where these fields are replaced:
+
+| Field        | Replaced by                                                                                  |
+| ------------ | -------------------------------------------------------------------------------------------- |
+| `{title}`    | The window title (default)                                                                   |
+| `{project}`  | The project: the coding agent's folder, otherwise the title part before the application name |
+| `{document}` | The first part of the title, usually the open file                                           |
+| `{app}`      | The application's display name                                                               |
+
+For example, `{project} · {document}` turns "Readme.md - Claude4Business - Visual Studio Code" into "Claude4Business · Readme.md", so that the project stays readable when the title is cut. The full title always shows in the tooltip. The change applies immediately.
+
 In **Fit to panel**, resize the panel with its grip: WinGlance tries every arrangement of rows and columns and keeps the one giving the largest thumbnails, taking the typical proportions of your windows. Each window keeps its own proportions inside its thumbnail. The panel size is remembered. In the other layouts the panel sizes itself to the thumbnails.
 
 ### 5.2 Thumbnail Size
@@ -554,6 +565,7 @@ Records startup, warnings and errors: hotkey registration failures, LLM analysis
 | Sort by urgency           | Off                         |
 | Only windows that need me | Off                         |
 | Time since status change  | On                          |
+| Text under each thumbnail | `{title}`                   |
 | Agent refresh             | 5000 ms                     |
 | LLM analysis              | Off                         |
 | LLM provider              | openai                      |

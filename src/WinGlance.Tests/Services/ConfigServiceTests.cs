@@ -268,4 +268,12 @@ public class ConfigServiceTests : IDisposable
 
         Assert.Equal(expected, ConfigService.Normalize(config).AgentDetection.RemindAfterMinutes);
     }
+
+    [Fact]
+    public void Normalize_BlankTitleFormat_FallsBackToTheTitle()
+    {
+        var config = new AppConfig { TitleFormat = "  " };
+
+        Assert.Equal("{title}", ConfigService.Normalize(config).TitleFormat);
+    }
 }

@@ -35,6 +35,7 @@ internal sealed class SettingsViewModel : ViewModelBase
     private bool _sortByUrgency;
     private bool _showOnlyWindowsThatNeedMe;
     private bool _showStatusTime;
+    private string _titleFormat;
     private int _remindAfterMinutes;
 
     // LLM settings
@@ -80,6 +81,7 @@ internal sealed class SettingsViewModel : ViewModelBase
         _sortByUrgency = config.SortByUrgency;
         _showOnlyWindowsThatNeedMe = config.ShowOnlyWindowsThatNeedMe;
         _showStatusTime = config.ShowStatusTime;
+        _titleFormat = config.TitleFormat;
         _remindAfterMinutes = config.AgentDetection.RemindAfterMinutes;
 
         _llmEnabled = config.Llm.Enabled;
@@ -145,6 +147,20 @@ internal sealed class SettingsViewModel : ViewModelBase
         {
             if (SetProperty(ref _showStatusTime, value))
                 _previewViewModel.ShowStatusTime = value;
+        }
+    }
+
+    /// <summary>
+    /// Template of the text under each thumbnail ({title}, {project}, {document}, {app}).
+    /// Applied live to the preview; persisted by <see cref="Save"/>.
+    /// </summary>
+    public string TitleFormat
+    {
+        get => _titleFormat;
+        set
+        {
+            if (SetProperty(ref _titleFormat, value ?? string.Empty))
+                _previewViewModel.TitleFormat = _titleFormat;
         }
     }
 
@@ -473,6 +489,7 @@ internal sealed class SettingsViewModel : ViewModelBase
         _config.SortByUrgency = SortByUrgency;
         _config.ShowOnlyWindowsThatNeedMe = ShowOnlyWindowsThatNeedMe;
         _config.ShowStatusTime = ShowStatusTime;
+        _config.TitleFormat = string.IsNullOrWhiteSpace(TitleFormat) ? Services.WindowTitleFormat.Default : TitleFormat.Trim();
         _config.ThumbnailWidth = ThumbnailWidth;
         _config.ThumbnailHeight = ThumbnailHeight;
         _config.PanelOpacity = PanelOpacity;

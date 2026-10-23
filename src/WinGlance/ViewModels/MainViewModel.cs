@@ -45,6 +45,7 @@ internal class MainViewModel : ViewModelBase
             SortByUrgency = config.SortByUrgency,
             ShowOnlyWindowsThatNeedMe = config.ShowOnlyWindowsThatNeedMe,
             ShowStatusTime = config.ShowStatusTime,
+            TitleFormat = config.TitleFormat,
             RemindAfter = TimeSpan.FromMinutes(config.AgentDetection.RemindAfterMinutes),
         };
 

@@ -124,6 +124,8 @@ internal sealed class ConfigService
         config.Llm.Prompt = string.IsNullOrWhiteSpace(config.Llm.Prompt) ? LlmConfig.DefaultPrompt : config.Llm.Prompt;
         config.Llm.StaleThresholdSeconds = Math.Clamp(config.Llm.StaleThresholdSeconds, 10, 120);
 
+        config.TitleFormat = string.IsNullOrWhiteSpace(config.TitleFormat) ? defaults.TitleFormat : config.TitleFormat;
+
         config.AgentDetection ??= new AgentDetectionConfig();
         config.AgentDetection.RefreshIntervalMs = Math.Clamp(config.AgentDetection.RefreshIntervalMs, 1000, 60000);
         config.AgentDetection.RemindAfterMinutes = Math.Clamp(config.AgentDetection.RemindAfterMinutes, 0, 60);

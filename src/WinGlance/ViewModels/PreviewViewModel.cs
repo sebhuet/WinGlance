@@ -39,6 +39,7 @@ internal sealed class PreviewViewModel : ViewModelBase, IDisposable
     private bool _sortByUrgency;
     private bool _showOnlyWindowsThatNeedMe;
     private bool _showStatusTime = true;
+    private string _titleFormat = WindowTitleFormat.Default;
     private bool _isPointerOver;
     private bool _isEmptyAfterFilter;
     private int _agentsWaiting;
@@ -353,6 +354,22 @@ internal sealed class PreviewViewModel : ViewModelBase, IDisposable
     }
 
     /// <summary>
+    /// Template of the text shown under each thumbnail, e.g. "{project} · {document}"
+    /// (see <see cref="WindowTitleFormat"/>). Applied at once.
+    /// </summary>
+    public string TitleFormat
+    {
+        get => _titleFormat;
+        set
+        {
+            if (!SetProperty(ref _titleFormat, string.IsNullOrWhiteSpace(value) ? WindowTitleFormat.Default : value))
+                return;
+            foreach (var window in GetWindowsSnapshot())
+                window.DisplayText = WindowTitleFormat.Apply(_titleFormat, window);
+        }
+    }
+
+    /// <summary>
     /// How long an agent may wait for an answer before its border blinks and a reminder is
     /// raised; <see cref="TimeSpan.Zero"/> turns reminders off.
     /// </summary>
@@ -482,6 +499,8 @@ internal sealed class PreviewViewModel : ViewModelBase, IDisposable
         }
 
         UpdateStatusAge(window, now);
+        // After the agent update: {project} uses the agent's folder
+        window.DisplayText = WindowTitleFormat.Apply(_titleFormat, window);
 
         // The user looking at the window is answering it: no blinking, no reminder
         var overdue = window.Agent?.Status == AgentStatus.Waiting

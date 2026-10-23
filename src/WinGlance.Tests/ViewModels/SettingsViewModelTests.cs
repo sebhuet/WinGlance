@@ -536,4 +536,16 @@ public class SettingsViewModelTests : IDisposable
         Assert.Equal(expected, vm.RemindAfterMinutes);
         Assert.Equal(text, vm.RemindAfterText);
     }
+
+    [Fact]
+    public void TitleFormat_AppliesLiveAndIsSaved()
+    {
+        var vm = CreateVm();
+
+        vm.TitleFormat = "{project}";
+        vm.Save();
+
+        Assert.Equal("{project}", _previewVm.TitleFormat);
+        Assert.Equal("{project}", _configService.Load().TitleFormat);
+    }
 }

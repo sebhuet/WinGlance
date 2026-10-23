@@ -143,6 +143,13 @@
             <CheckBox Content="Show the time since the last status change"
                       IsChecked="{Binding ShowStatusTime}"
                       Foreground="{DynamicResource PrimaryText}" Margin="0,2" />
+            <TextBlock Text="Text under each thumbnail" Style="{StaticResource Label}" Margin="0,8,0,2" />
+            <TextBox Text="{Binding TitleFormat, UpdateSourceTrigger=PropertyChanged}"
+                     Background="{DynamicResource InputBackground}" Foreground="{DynamicResource PrimaryText}"
+                     BorderBrush="{DynamicResource InputBorder}" Padding="4,3"
+                     AutomationProperties.Name="Text under each thumbnail" />
+            <TextBlock Text="{}{title} window title, {project} project folder, {document} open file, {app} application — e.g. {project} · {document}"
+                       Foreground="{DynamicResource DimText}" FontSize="11" TextWrapping="Wrap" Margin="0,2,0,0" />
 
             <!-- ── Thumbnail Size ─────────────────────────── -->
             <TextBlock Text="Thumbnail Size" Style="{StaticResource SectionHeader}" />

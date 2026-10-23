@@ -21,6 +21,7 @@ public class TrackedWindow : ViewModels.ViewModelBase, IEquatable<TrackedWindow>
     private bool _needsAgentAttention;
     private string _statusAge = string.Empty;
     private bool _isEscalated;
+    private string? _displayText;
 
     /// <summary>
     /// Creates a new tracked window with immutable identity properties.
@@ -61,7 +62,21 @@ public class TrackedWindow : ViewModels.ViewModelBase, IEquatable<TrackedWindow>
     public string Title
     {
         get => _title;
-        set => SetProperty(ref _title, value);
+        set
+        {
+            if (SetProperty(ref _title, value) && _displayText is null)
+                OnPropertyChanged(nameof(DisplayText));
+        }
+    }
+
+    /// <summary>
+    /// Text shown under the thumbnail, built from the title template of the settings
+    /// (<see cref="Services.WindowTitleFormat"/>); the title until a template is applied.
+    /// </summary>
+    public string DisplayText
+    {
+        get => _displayText ?? _title;
+        set => SetProperty(ref _displayText, value);
     }
 
     /// <summary>Application icon extracted from the window or its class.</summary>

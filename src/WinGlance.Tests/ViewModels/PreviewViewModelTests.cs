@@ -941,4 +941,18 @@ public class PreviewViewModelTests
         vm.ShowOnlyWindowsThatNeedMe = false;
         Assert.False(vm.IsEmptyAfterFilter);
     }
+
+    [Fact]
+    public void TitleFormat_AppliesToTheWindowsAtOnceAndAfterEachScan()
+    {
+        using var vm = new PreviewViewModel();
+        vm.MergeResults([Scanned(1, "Readme.md - WinGlance - Visual Studio Code")]);
+        Assert.Equal("Readme.md - WinGlance - Visual Studio Code", vm.Windows.Single().DisplayText);
+
+        vm.TitleFormat = "{project} · {document}";
+        Assert.Equal("WinGlance · Readme.md", vm.Windows.Single().DisplayText);
+
+        vm.MergeResults([Scanned(1, "Notes.md - WinGlance - Visual Studio Code")]);
+        Assert.Equal("WinGlance · Notes.md", vm.Windows.Single().DisplayText);
+    }
 }
