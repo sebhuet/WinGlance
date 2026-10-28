@@ -53,12 +53,23 @@ public class WindowTitleFormatTests
     }
 
     [Theory]
-    [InlineData("api-server", "api-server")]
-    [InlineData("Untitled - Notepad", "Untitled")]
     [InlineData("● main.cs - WinGlance - Visual Studio Code", "WinGlance")]
+    [InlineData("api-server", "")] // one or two segments name no project
+    [InlineData("Untitled - Notepad", "")]
     public void ProjectOf_FromTheTitle(string title, string expected)
     {
         Assert.Equal(expected, WindowTitleFormat.ProjectOf(Window(title)));
+    }
+
+    [Theory]
+    [InlineData(VsCodeTitle, null, "Claude4Business - Adaptation française de la doc")]
+    [InlineData("Untitled - Notepad", null, "Untitled")] // no project: no dangling separator
+    [InlineData("Orders · Acme Admin - Google Chrome", null, "Orders · Acme Admin")]
+    [InlineData("api-server", @"C:\dev\api-server", "api-server")] // document equal to the project: not repeated
+    [InlineData("api-server", null, "api-server")]
+    public void Apply_DefaultTemplate_ProjectFirstWithoutRepetition(string title, string? agentFolder, string expected)
+    {
+        Assert.Equal(expected, WindowTitleFormat.Apply(WindowTitleFormat.Default, Window(title, agentFolder)));
     }
 
     [Fact]

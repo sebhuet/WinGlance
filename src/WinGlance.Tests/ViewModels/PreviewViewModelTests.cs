@@ -947,7 +947,7 @@ public class PreviewViewModelTests
     {
         using var vm = new PreviewViewModel();
         vm.MergeResults([Scanned(1, "Readme.md - WinGlance - Visual Studio Code")]);
-        Assert.Equal("Readme.md - WinGlance - Visual Studio Code", vm.Windows.Single().DisplayText);
+        Assert.Equal("WinGlance - Readme.md", vm.Windows.Single().DisplayText); // default: project first
 
         vm.TitleFormat = "{project} · {document}";
         Assert.Equal("WinGlance · Readme.md", vm.Windows.Single().DisplayText);

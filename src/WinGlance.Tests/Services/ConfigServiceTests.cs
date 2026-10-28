@@ -274,6 +274,6 @@ public class ConfigServiceTests : IDisposable
     {
         var config = new AppConfig { TitleFormat = "  " };
 
-        Assert.Equal("{title}", ConfigService.Normalize(config).TitleFormat);
+        Assert.Equal("{project} - {document}", ConfigService.Normalize(config).TitleFormat);
     }
 }

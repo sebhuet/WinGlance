@@ -27,9 +27,10 @@ internal sealed class AppConfig
 
     /// <summary>
     /// Template of the text under each thumbnail: {title}, {project}, {document} and {app} are
-    /// replaced (default "{title}"); the full title stays in the tooltip.
+    /// replaced (default "{project} - {document}": the project first, readable when the text is cut);
+    /// the full title stays in the tooltip.
     /// </summary>
-    public string TitleFormat { get; set; } = "{title}";
+    public string TitleFormat { get; set; } = Services.WindowTitleFormat.Default;
 
     /// <summary>Thumbnail width in pixels, 100-500 (default 200); not used by the "fit" layout.</summary>
     public int ThumbnailWidth { get; set; } = 200;
